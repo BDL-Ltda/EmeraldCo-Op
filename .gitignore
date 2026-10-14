@@ -1,0 +1,17 @@
+# ROMs, saves and mGBA savestates
+*.gba
+*.sav
+*.ss[0-9]
+*.srm
+
+# Release patches and ROM build outputs
+*.bps
+*.elf
+*.map
+
+# BIOS and private client configuration
+gba_bios.bin
+/client/config.lua
+
+# Local Go command outputs
+/bin/
