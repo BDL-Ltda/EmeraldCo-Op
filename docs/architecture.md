@@ -56,7 +56,7 @@ Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a 
 
 The protocol is **JSON lines over TCP**, with a generic envelope containing `v`, `type` and message-specific fields. [Issue #12](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/12) defines the detailed contract in [protocol.md](protocol.md).
 
-For **v1**, the Go server is a **dumb relay**. There is **one global room** with a maximum of **5 players total**, leaving **4 remote player slots** for each client. No accounts are required. Identity combines **`PLAYER_ID` from the local client configuration** with the **in-game trainer ID** (`trainerId` conceptually; its wire representation is still to be specified).
+For **v1**, the Go server is a **dumb relay**. There is **one global room** with a maximum of **5 players total**, leaving **4 remote player slots** for each client. No accounts are required. Identity combines **`PLAYER_ID` from the local client configuration** with the **in-game trainer ID** (`trainerId`, a 32-bit integer on the wire; see [protocol.md](protocol.md)).
 
 For the MVP, **leomayca hosts the server with port forwarding**. Access uses a **shared join key** and **basic limits**. The details of hosting, local configuration and limits belong to [#18](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/18) and [playing-online.md](playing-online.md). Never commit or publish the join key, public IPs or other secrets. `client/config.lua` is local-only; [client/config.example.lua](../client/config.example.lua) provides placeholder settings until the configuration loader is implemented.
 
