@@ -1,4 +1,6 @@
 # Global symbols exported to the Lua client, one C identifier per line.
+# Add data objects only, not functions. Thumb function values encode a state
+# bit in the ELF; symgen exports symbol values verbatim without normalizing it.
 # Keep struct field offsets in docs/memory-map.md, not in this allowlist.
 gObjectEvents
 gPlayerAvatar

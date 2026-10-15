@@ -217,30 +217,47 @@ func writeFixtureFile(t *testing.T, directory, name string, data []byte) string 
 	return path
 }
 
-func fixtureCLIArgs(t *testing.T) ([]string, string) {
+type cliFixture struct {
+	elfPath     string
+	romPath     string
+	symbolsPath string
+	outPath     string
+}
+
+func (fixture cliFixture) args() []string {
+	return []string{
+		"-elf", fixture.elfPath,
+		"-rom", fixture.romPath,
+		"-symbols", fixture.symbolsPath,
+		"-out", fixture.outPath,
+	}
+}
+
+func newCLIFixture(t *testing.T) cliFixture {
 	t.Helper()
 	directory := t.TempDir()
-	elfPath := writeFixtureFile(t, directory, "synthetic-elf", syntheticELF(t, fixtureSymbols()))
-	romPath := writeFixtureFile(t, directory, "synthetic-rom", []byte(fixtureROM))
-	symbolsPath := writeFixtureFile(t, directory, "symbols.txt", []byte("fixtureBeta\nfixtureAlpha\n"))
-	outPath := filepath.Join(directory, "addresses.lua")
-	return []string{"-elf", elfPath, "-rom", romPath, "-symbols", symbolsPath, "-out", outPath}, outPath
+	return cliFixture{
+		elfPath:     writeFixtureFile(t, directory, "synthetic-elf", syntheticELF(t, fixtureSymbols())),
+		romPath:     writeFixtureFile(t, directory, "synthetic-rom", []byte(fixtureROM)),
+		symbolsPath: writeFixtureFile(t, directory, "symbols.txt", []byte("fixtureBeta\nfixtureAlpha\n")),
+		outPath:     filepath.Join(directory, "addresses.lua"),
+	}
 }
 
 func TestRunWritesGolden(t *testing.T) {
-	args, outPath := fixtureCLIArgs(t)
+	fixture := newCLIFixture(t)
 	var stdout, stderr bytes.Buffer
-	if code := run(args, &stdout, &stderr); code != 0 {
+	if code := run(fixture.args(), &stdout, &stderr); code != 0 {
 		t.Fatalf("exit = %d, stderr = %s", code, &stderr)
 	}
-	got, err := os.ReadFile(outPath)
+	got, err := os.ReadFile(fixture.outPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, readGolden(t)) {
 		t.Fatalf("CLI output differs from golden:\n%s", got)
 	}
-	if !strings.Contains(stdout.String(), outPath) || stderr.Len() != 0 {
+	if !strings.Contains(stdout.String(), fixture.outPath) || stderr.Len() != 0 {
 		t.Fatalf("expected success naming output, got stdout %q, stderr %q", &stdout, &stderr)
 	}
 }
@@ -274,19 +291,19 @@ func TestRunArguments(t *testing.T) {
 func TestRunFailurePreservesExistingOutput(t *testing.T) {
 	for _, failure := range []string{"missing symbol", "missing ROM", "malformed ELF"} {
 		t.Run(failure, func(t *testing.T) {
-			args, outPath := fixtureCLIArgs(t)
+			fixture := newCLIFixture(t)
 			previous := []byte("previous output must survive\n")
-			writeFixtureFile(t, filepath.Dir(outPath), filepath.Base(outPath), previous)
+			writeFixtureFile(t, filepath.Dir(fixture.outPath), filepath.Base(fixture.outPath), previous)
 			switch failure {
 			case "missing symbol":
-				writeFixtureFile(t, filepath.Dir(args[5]), filepath.Base(args[5]), []byte("fixtureMissing\n"))
+				writeFixtureFile(t, filepath.Dir(fixture.symbolsPath), filepath.Base(fixture.symbolsPath), []byte("fixtureMissing\n"))
 			case "missing ROM":
-				args[3] = filepath.Join(filepath.Dir(outPath), "missing-rom")
+				fixture.romPath = filepath.Join(filepath.Dir(fixture.outPath), "missing-rom")
 			case "malformed ELF":
-				writeFixtureFile(t, filepath.Dir(args[1]), filepath.Base(args[1]), []byte("invalid ELF"))
+				writeFixtureFile(t, filepath.Dir(fixture.elfPath), filepath.Base(fixture.elfPath), []byte("invalid ELF"))
 			}
 			var stdout, stderr bytes.Buffer
-			if code := run(args, &stdout, &stderr); code != 1 {
+			if code := run(fixture.args(), &stdout, &stderr); code != 1 {
 				t.Fatalf("exit = %d, want 1, stderr = %s", code, &stderr)
 			}
 			if stderr.Len() == 0 || stdout.Len() != 0 {
@@ -295,7 +312,7 @@ func TestRunFailurePreservesExistingOutput(t *testing.T) {
 			if failure == "missing symbol" && !strings.Contains(stderr.String(), "fixtureMissing") {
 				t.Fatalf("missing symbol error does not name fixtureMissing: %s", &stderr)
 			}
-			got, err := os.ReadFile(outPath)
+			got, err := os.ReadFile(fixture.outPath)
 			if err != nil || !bytes.Equal(got, previous) {
 				t.Fatalf("old output was changed: got %q, read error %v", got, err)
 			}
@@ -304,10 +321,10 @@ func TestRunFailurePreservesExistingOutput(t *testing.T) {
 }
 
 func TestRunOutputError(t *testing.T) {
-	args, outPath := fixtureCLIArgs(t)
-	args[7] = filepath.Dir(outPath)
+	fixture := newCLIFixture(t)
+	fixture.outPath = filepath.Dir(fixture.outPath)
 	var stdout, stderr bytes.Buffer
-	if code := run(args, &stdout, &stderr); code != 1 {
+	if code := run(fixture.args(), &stdout, &stderr); code != 1 {
 		t.Fatalf("exit = %d, want 1, stderr = %s", code, &stderr)
 	}
 	if stderr.Len() == 0 || stdout.Len() != 0 {
