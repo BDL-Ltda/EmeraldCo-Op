@@ -19,7 +19,7 @@ EmeraldCo-Op/
 │   └── symgen/               # ELF symbol generator entry point (placeholder)
 ├── internal/                 # shared Go packages
 ├── client/                   # mGBA Lua client and example configuration
-├── rom/                      # pokeemerald sources; submodule conversion in #1
+├── rom/                      # pokeemerald sources (git submodule)
 ├── docs/                     # design decisions and planned interfaces
 └── .github/                  # issue and pull request templates
 ```
@@ -32,9 +32,9 @@ cd EmeraldCo-Op
 ```
 
 For an existing checkout, run `git submodule update --init --recursive` after
-pulling changes. `rom/` is currently a vendored copy of pokeemerald;
-[issue #1](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/1) converts it to
-the project's fork as a submodule. These commands also work after that conversion.
+pulling changes. `rom/` tracks our fork at
+[DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald) as a
+Git submodule.
 
 ## Go development
 

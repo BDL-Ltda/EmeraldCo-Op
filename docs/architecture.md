@@ -6,7 +6,7 @@ This document records the design agreed in [issue #2](https://github.com/DaviAle
 
 | Path | Responsibility |
 | --- | --- |
-| `rom/` | Currently vendored [pret/pokeemerald](https://github.com/pret/pokeemerald) sources; [#1](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/1) will track our fork as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
+| `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
 | `cmd/server/` | Go relay server entry point. |
 | `cmd/fakeclient/` | Go client used to exercise the protocol without an emulator. |
 | `cmd/symgen/` | Go tool that generates Lua global addresses from the ROM build's ELF. |
