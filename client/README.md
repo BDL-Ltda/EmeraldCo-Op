@@ -18,8 +18,29 @@ ignored by Git. Set a unique `PLAYER_ID` and keep any real join key private.
 Connection settings and configuration loading will be defined with the network
 client in [issue #17](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/17).
 
-Generated addresses will live in `addresses.lua` after
-[issue #4](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/4). Do not create
-that file by guessing addresses. Future pure modules belong in `lib/`, with a
-small test runner in `tests/` added by
+## Generated addresses
+
+[`addresses.lua`](addresses.lua) is generated and committed. It returns a table
+with the built ROM's `romSha1` and a `symbols` table whose entries contain `addr`
+and `size`. It is the only source of global memory addresses for the client;
+never guess addresses, edit the generated file or copy numeric values into other
+modules. Struct offsets will be sourced from decompilation headers in the
+[memory map](../docs/memory-map.md), separately from global addresses.
+
+After building the ROM, run this from the repository root with Go installed:
+
+```sh
+go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua
+```
+
+The ELF and ROM must come from the same build. Rebuild and regenerate after any
+ROM source, submodule, toolchain or build configuration change, and commit
+`addresses.lua` in the same pull request. The generator embeds its default
+allowlist from `cmd/symgen/symbols.txt` and produces deterministic, sorted output.
+See [Generating client addresses](../README.md#generating-client-addresses) for
+the allowlist, validation and verification steps.
+
+The generated data does not yet implement a runnable client; runtime integration
+belongs to [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
+Future pure modules belong in `lib/`, with a small test runner in `tests/` added by
 [issue #16](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/16).

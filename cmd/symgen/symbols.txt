@@ -1,0 +1,7 @@
+# Global symbols exported to the Lua client, one C identifier per line.
+# Keep struct field offsets in docs/memory-map.md, not in this allowlist.
+gObjectEvents
+gPlayerAvatar
+gSaveBlock1Ptr
+gSaveBlock2Ptr
+gMain
