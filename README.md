@@ -27,7 +27,7 @@ EmeraldCo-Op/
 ## Cloning
 
 ```sh
-git clone --recurse-submodules https://github.com/DaviAlencastro/EmeraldCo-Op.git
+git clone --recurse-submodules https://github.com/BDL-Ltda/EmeraldCo-Op.git
 cd EmeraldCo-Op
 ```
 
@@ -55,14 +55,111 @@ placeholder messages. No external Go dependencies are required.
 The race check requires a supported C compiler with cgo enabled. There are no
 tests yet because the commands have no behavior beyond their placeholder logs.
 
-## ROM and client development
+## Building the ROM
 
-The planned ROM build uses modern GCC (`make modern`) inside a pinned Docker
-image. The Docker setup and build wrappers are tracked in
-[issue #3](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/3).
-All players will use our built ROM from milestone 0.1 onward, distributed as a
-`.bps` patch applied locally. Do not commit ROMs, saves, BIOS files, patches or
-build outputs.
+Install Docker Desktop on Windows or macOS, start it, and select the **Linux
+container engine**. On Linux, use Docker Engine with the Docker Compose v2
+plugin, or Docker Desktop. The `docker` and `docker compose` commands must be
+available in your terminal. No local GBA toolchain is needed.
+
+Initialize the ROM submodule, then build from the repository root:
+
+```sh
+git submodule update --init --recursive
+docker compose run --build --rm rom
+```
+
+This command also builds the Docker image on its first run. The image uses
+`devkitpro/devkitarm:20260610`, pinned by digest
+`sha256:15b79ce75822c289538d8153da5fa7aafe5e6adc32ad8a575a197beca0f0761b`,
+with `libpng-dev` installed from the immutable Debian snapshot
+`20260610T000000Z`. Compose fixes the platform to `linux/amd64` on every host so
+all developers use the same compiler and host tools. ARM hosts need Docker's
+AMD64 emulation, which can make builds slower.
+
+The first run takes longer because it downloads the image and installs its host
+dependency. Compilation time depends on the machine and the CPU and memory
+allocated to Docker. Later runs reuse the Docker image layers, but still compile
+the ROM from a clean state.
+
+As a local reference, a clean build on Windows with Docker Desktop and eight
+jobs took about 2 minutes 15 seconds after the base image was downloaded. Expect
+several minutes for the initial download and image setup; ARM emulation or lower
+CPU/memory limits can take longer.
+
+The wrappers run the same Compose command and locate the repository themselves,
+so they work regardless of the current working directory. From the repository
+root, use either:
+
+```powershell
+.\scripts\build-rom.ps1
+# Optional: limit parallel compilation to four jobs.
+.\scripts\build-rom.ps1 -Jobs 4
+```
+
+```sh
+sh scripts/build-rom.sh
+# Optional: limit parallel compilation to four jobs.
+sh scripts/build-rom.sh 4
+```
+
+From another directory, pass the wrapper's full path instead. By default the
+build uses `nproc` inside the container. A supplied job count must be an integer
+from 1 to 256; lower it if Docker runs out of memory.
+
+The build copies the sources to a temporary Linux filesystem inside the
+container, runs `make clean` followed by `make modern -jJOBS`, and copies only
+these three outputs back to the checkout:
+
+| Output | Purpose |
+| --- | --- |
+| `rom/pokeemerald_modern.gba` | ROM to open in mGBA. |
+| `rom/pokeemerald_modern.elf` | Build symbols for the future address generator. |
+| `rom/pokeemerald_modern.map` | Linker map. |
+
+ROM source files are not modified. There is no persistent incremental build
+cache; the temporary build directory is removed with the container. The build
+container runs without network access; pulling and building its Docker image
+requires network access. The command prints the ROM's SHA1 after a successful
+build.
+
+### Verify the build with another developer
+
+Use two independent checkouts on different machines, at the same main-repository
+commit and pinned ROM submodule commit, without local ROM source changes. Both
+developers should initialize the submodule and run the build command above.
+Record the commits and the image tag/digest when comparing results:
+
+```sh
+git rev-parse HEAD
+git -C rom rev-parse HEAD
+```
+
+Calculate the ROM SHA1 in PowerShell:
+
+```powershell
+Get-FileHash -Algorithm SHA1 .\rom\pokeemerald_modern.gba
+```
+
+Or in a POSIX shell:
+
+```sh
+sha1sum rom/pokeemerald_modern.gba
+```
+
+The two hashes must match, ignoring letter case. `make modern` is not expected
+to match a retail Emerald ROM; compare our builds with each other. Each developer
+should also open `rom/pokeemerald_modern.gba` in mGBA, start a new game, and leave
+the truck. Record both developers' hashes and emulator results in the pull
+request; a build on one machine alone does not establish cross-machine
+reproducibility.
+
+Address generation belongs to [issue #4](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/4)
+and is not performed by this command. All players will use our built ROM from
+milestone 0.1 onward, distributed as a `.bps` patch applied locally. Do not commit
+ROMs, saves, BIOS files, patches or build outputs.
+
+## Client development
 
 The client targets mGBA with Lua 5.4 and native sockets, subject to validation in
 [issue #8](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/8).
