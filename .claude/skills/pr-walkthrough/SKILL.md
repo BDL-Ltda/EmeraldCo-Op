@@ -1,11 +1,15 @@
 ---
 name: pr-walkthrough
-description: Create a knowledge-transfer walkthrough for a pull request in Emerald Co-Op, a self-contained HTML page with animated diagrams that explains what changed and why, published on the `walkthroughs` branch and linked in a PR comment. Use right after opening a PR (the last step of the pre-commit skill), or when asked to explain a PR to reviewers.
+description: Create a knowledge-transfer walkthrough for a pull request in Emerald Co-Op, a self-contained HTML page with animated diagrams that explains what changed and why, published on the `walkthroughs` branch and linked in a PR comment. Use right after opening a `feat` or `fix` PR (the last step of the pre-commit skill), or when a human asks for one. Skip it for every other PR type.
 ---
 
 # PR walkthrough
 
 Reviewers learn faster from a picture than from a diff. After opening a PR, write a single HTML page that explains it: where the change sits in the system, how it works, the decisions behind it, and how it was tested. It is **not** part of the PR's code. It lives on the `walkthroughs` branch and the PR gets a comment linking to it.
+
+## When to make one
+
+Only for PRs whose title type is **`feat`** or **`fix`**. Those change behavior, so a reviewer needs to understand them. Skip it for `docs`, `chore`, `ci`, `build`, `test`, `refactor`, `perf`, `style` and `revert`: the page costs a lot of tokens and adds little there. The only exception is a human explicitly asking for a walkthrough on a specific PR.
 
 Start from [`template.html`](template.html) in this folder. It has the colors, fonts, diagram classes and scripts already set up.
 
