@@ -6,7 +6,7 @@ The wire protocol between the mGBA Lua client and the Go relay server, as agreed
 
 - JSON over TCP, one message per line. Each message is a single JSON object followed by `\n`. A message never contains a raw newline (JSON escapes newlines inside strings).
 - Maximum line length: 4096 bytes, not counting the `\n`. A receiver stops reading a longer line once it passes the limit, so it never buffers more than 4097 bytes per line. The server answers `error bad_message` and closes.
-- Text is UTF-8.
+- Text is UTF-8. `<`, `>` and `&` are sent as is, not as `\u` escapes.
 
 ## Envelope
 

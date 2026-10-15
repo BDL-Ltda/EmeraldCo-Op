@@ -74,7 +74,7 @@ See the [client README](client/README.md) for the planned configuration.
 
 - [Architecture](docs/architecture.md): agreed design and communication flow.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
-- [Protocol](docs/protocol.md): stub for the JSON-lines protocol (#12).
+- [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
 - [Memory map](docs/memory-map.md): stub for sourced memory layouts (#9).
 - [Playing online](docs/playing-online.md): stub for hosting and joining (#18).
 

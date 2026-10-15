@@ -82,6 +82,16 @@ func TestEncodeNilPlayersAsEmptyArray(t *testing.T) {
 	}
 }
 
+func TestEncodeDoesNotEscapeHTML(t *testing.T) {
+	line, err := Encode(Error{Code: CodeBadMessage, Message: "<a> & <b>"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "{\"v\":1,\"type\":\"error\",\"code\":\"bad_message\",\"message\":\"<a> & <b>\"}\n"; string(line) != want {
+		t.Fatalf("got %q, want %q", line, want)
+	}
+}
+
 func TestEncodeRejects(t *testing.T) {
 	tests := []struct {
 		name string

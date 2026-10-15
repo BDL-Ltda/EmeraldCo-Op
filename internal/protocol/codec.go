@@ -36,10 +36,15 @@ func Encode(msg Message) ([]byte, error) {
 	if err := msg.Validate(); err != nil {
 		return nil, err
 	}
-	body, err := json.Marshal(msg)
-	if err != nil {
+	// Leave <, > and & unescaped: lines are not embedded in HTML, and plain
+	// text is simpler for the Lua client.
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(msg); err != nil {
 		return nil, err
 	}
+	body := bytes.TrimSuffix(buffer.Bytes(), []byte("\n"))
 
 	// Type names are fixed ASCII constants, so they need no JSON escaping.
 	line := fmt.Appendf(nil, `{"v":%d,"type":%q`, Version, msg.Type())
