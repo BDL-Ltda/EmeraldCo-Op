@@ -1,0 +1,6 @@
+/docker/rom/Dockerfile text eol=lf
+/docker/rom/*.sources text eol=lf
+/docker/rom/*.sh text eol=lf
+/docker-compose.yml text eol=lf
+/scripts/*.sh text eol=lf
+/docs/*.md text eol=lf

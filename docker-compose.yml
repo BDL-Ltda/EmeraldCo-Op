@@ -1,0 +1,12 @@
+services:
+  rom:
+    platform: linux/amd64
+    build:
+      context: ./docker/rom
+    network_mode: none
+    volumes:
+      - type: bind
+        source: ./rom
+        target: /source
+        bind:
+          create_host_path: false
