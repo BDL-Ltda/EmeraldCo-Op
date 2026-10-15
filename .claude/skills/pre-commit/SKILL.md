@@ -101,4 +101,5 @@ Closes #<issue>
 ```
 
 - After opening the PR, move the issue to **In review** on the board (see the `pick-task` skill for the command; In review = `d1478c1a`).
+- Then use the `pr-walkthrough` skill (`.claude/skills/pr-walkthrough/SKILL.md`) to create the PR's walkthrough page and post it as a PR comment. It is not part of the PR's code.
 - One human approval is required before merging. Never approve or merge your own PR.

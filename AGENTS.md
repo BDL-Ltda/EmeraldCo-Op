@@ -51,6 +51,8 @@ Once you pick an issue:
 - the checks that must pass locally before a PR is opened (tests, lint, ROM build, forbidden files);
 - the branch name and PR body format.
 
+Right after opening a PR, use the **`pr-walkthrough` skill** (`.claude/skills/pr-walkthrough/SKILL.md`): it creates an HTML page with diagrams explaining what changed and why, publishes it on the `walkthroughs` branch and links it in a PR comment, so reviewers can learn the change quickly.
+
 Every change goes through a PR into `master` with one human approval. Never push to `master` directly, and never merge your own PR without that approval.
 
 ## Definition of Done
@@ -65,3 +67,4 @@ Shared, tool-agnostic how-tos live in `.claude/skills/<name>/SKILL.md`. Claude C
 |---|---|
 | `pick-task` | Choosing the next issue to work on |
 | `pre-commit` | Before every commit, and before opening a PR |
+| `pr-walkthrough` | Right after opening a PR: explain it to reviewers |
