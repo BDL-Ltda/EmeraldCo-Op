@@ -55,11 +55,11 @@ Copy `template.html` to a scratch location, outside the repo working tree, as `p
 - **Write plainly**, in English, with the repo's own terms. Short sentences and active voice.
 - **It's public.** Never include join keys, IP addresses, ROM or save data, or anything AGENTS.md forbids in the repo.
 
-Check it once in a browser (Playwright with the preinstalled Chromium is fine) in light and dark mode and at 400 px wide. There should be no console errors and no horizontal page scroll.
+If you have a browser available (for example Playwright with Chromium), check the page once in light and dark mode and at 400 px wide. There should be no console errors and no horizontal page scroll. If you have no browser, skip the check and say so in the PR comment.
 
 ## 4. Publish on the `walkthroughs` branch
 
-`walkthroughs` is an orphan branch that only holds these pages. It's never merged and has no branch protection requirements. Use a separate worktree so your PR branch is untouched:
+`walkthroughs` is an orphan branch that only holds these pages. It's never merged. A ruleset on it should block deletion and force pushes (a repo admin sets it in **Settings → Rules → Rulesets**); normal pushes still work. Never force-push or delete it: every walkthrough link depends on it. Use a separate worktree so your PR branch is untouched:
 
 ```bash
 N=40   # PR number
@@ -101,3 +101,12 @@ _Diagrams and numbers come from the diff, issue #<ISSUE> and the commands run fo
 ```
 
 The browser link goes through raw.githack.com, which serves files from public GitHub repos as web pages. If it's ever down, the download link always works.
+
+## If you can't push or comment
+
+Some environments can't push to other branches or post PR comments. Codex cloud tasks are one example: they have no GitHub credentials in the sandbox. If step 4 or 5 fails for that reason:
+
+- **Never** commit the page to the PR branch to get around it. It must not become part of the PR's code.
+- Save `pr-<N>.html` where the person you work for can get it: your final message, the task output, or a local path you name.
+- Add this line to the PR body: `Walkthrough: built but not published (<reason>). Publish it with steps 4–5 of the pr-walkthrough skill.`
+- Stop there. A human, or an agent with push access, runs steps 4 and 5 with the saved file. If the file was lost, they rebuild it from steps 1–3.
