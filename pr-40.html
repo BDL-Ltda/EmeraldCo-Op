@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Release Process Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#40</span>
+  <h1>How a release reaches players</h1>
+  <p class="lede">This PR adds two guides: how a maintainer turns our ROM build into a <code>.bps</code> patch, and how a player turns that patch into a playable ROM. Docs only, no code.</p>
+  <div class="meta">
+    <span>closes <b>#7</b></span>
+    <span>branch <b>docs/7-release-process</b></span>
+    <span>files <b>4</b></span>
+    <span>lines <b>+249 / −2</b></span>
+    <span>milestone <b>0.0 Foundations</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#release">Cutting a release</a></li>
+    <li><a href="#bps">Inside a .bps</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#player">Player path</a></li>
+    <li><a href="#lock">Version lock</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#next">What's next</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<!-- BIG PICTURE -->
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>We can't ship the game, only a diff</h2>
+    <p>The repo is public, so a <code>.gba</code> can never be committed or uploaded. Players already own Emerald, so we give them only the <strong>difference</strong> between their ROM and ours. Making that diff needs the retail ROM, which CI doesn't have, so a release is a local step on a maintainer's machine. This PR writes those steps down.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where each file lives</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1200 560" role="img" aria-label="Diagram: the maintainer builds the ROM and creates a .bps patch, GitHub hosts the release, the player applies the patch and runs mGBA, which talks to the relay server.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="a1e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="370" height="540" rx="10"/>
+      <text class="t-zone" x="30" y="38">MAINTAINER PC</text>
+      <rect class="zone" x="415" y="10" width="370" height="330" rx="10"/>
+      <text class="t-zone" x="435" y="38">GITHUB · PUBLIC</text>
+      <rect class="zone" x="415" y="370" width="370" height="180" rx="10"/>
+      <text class="t-zone" x="435" y="398">HOST · NOT THIS PR</text>
+      <rect class="zone" x="820" y="10" width="370" height="540" rx="10"/>
+      <text class="t-zone" x="840" y="38">PLAYER PC</text>
+
+      <g class="step" style="--i:0">
+        <rect class="box" x="35" y="60" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="51" y="84">checkout vX.Y</text>
+        <text class="t-sub" x="51" y="104">clean tree, pinned submodule</text>
+        <path class="edge" d="M195 116V146" marker-end="url(#a1)"/>
+        <rect class="box" x="35" y="150" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="51" y="174">docker compose run rom</text>
+        <text class="t-sub" x="51" y="194">make modern, pinned toolchain</text>
+        <path class="edge" d="M195 206V236" marker-end="url(#a1)"/>
+        <rect class="box" x="35" y="240" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="51" y="264">pokeemerald_modern.gba</text>
+        <text class="t-sub" x="51" y="284">our build · its SHA1 goes in the notes</text>
+        <path class="edge em" d="M195 296V326" marker-end="url(#a1e)"/>
+        <rect class="box pub" x="35" y="330" width="320" height="56" rx="6"/>
+        <text class="t-mono t-em" x="51" y="354">flips --create --bps</text>
+        <text class="t-sub" x="51" y="374">then apply it back as a check</text>
+        <rect class="box priv" x="35" y="460" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="51" y="484">emerald-us.gba</text>
+        <text class="t-sub" x="51" y="504">retail · SHA1 f3ae0881… · never uploaded</text>
+        <path class="edge em" d="M195 460V390" marker-end="url(#a1e)"/>
+      </g>
+
+      <g class="step" style="--i:1">
+        <rect class="box" x="440" y="60" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="456" y="84">master @ vX.Y</text>
+        <text class="t-sub" x="456" y="104">source, client/, addresses.lua</text>
+        <path class="edge ret" d="M440 88H359" marker-end="url(#a1)"/>
+        <path class="edge" d="M600 116V196" marker-end="url(#a1)"/>
+        <text class="t-sub" x="610" y="160">git archive client/</text>
+        <rect class="box pub" x="440" y="200" width="320" height="72" rx="6"/>
+        <text class="t-mono t-em" x="456" y="226">Release vX.Y</text>
+        <text class="t-sub" x="456" y="246">emerald-coop-vX.Y.bps + client.zip</text>
+        <text class="t-sub" x="456" y="264">notes: patched ROM SHA1</text>
+        <path class="edge em flow" d="M355 358C400 358 400 236 436 236" marker-end="url(#a1e)"/>
+      </g>
+
+      <g class="step" style="--i:2">
+        <rect class="box priv" x="845" y="60" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="861" y="84">emerald-us.gba</text>
+        <text class="t-sub" x="861" y="104">their own dump</text>
+        <path class="edge em" d="M1005 116V146" marker-end="url(#a1e)"/>
+        <rect class="box pub" x="845" y="150" width="320" height="56" rx="6"/>
+        <text class="t-mono t-em" x="861" y="174">flips --apply</text>
+        <text class="t-sub" x="861" y="194">refuses a wrong base ROM</text>
+        <path class="edge em" d="M1005 206V236" marker-end="url(#a1e)"/>
+        <rect class="box priv" x="845" y="240" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="861" y="264">emerald-coop-vX.Y.gba</text>
+        <text class="t-sub" x="861" y="284">SHA1 must match the notes</text>
+        <path class="edge em" d="M1005 296V326" marker-end="url(#a1e)"/>
+        <rect class="box" x="845" y="330" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="861" y="354">mGBA + bridge.lua</text>
+        <text class="t-sub" x="861" y="374">checks the ROM hash at startup (#10)</text>
+        <rect class="box priv" x="845" y="460" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="861" y="484">config.lua</text>
+        <text class="t-sub" x="861" y="504">player ID, join key · never shared</text>
+        <path class="edge" d="M1005 460V390" marker-end="url(#a1)"/>
+        <path class="edge em flow" d="M760 222C805 222 805 178 841 178" marker-end="url(#a1e)"/>
+        <path class="edge em flow" d="M760 256C815 256 805 350 841 350" marker-end="url(#a1e)"/>
+      </g>
+
+      <g class="step" style="--i:3">
+        <rect class="box dim" x="440" y="430" width="320" height="56" rx="6"/>
+        <text class="t-mono" x="456" y="454">Go relay server</text>
+        <text class="t-sub" x="456" y="474">JSON lines over TCP · 0.2</text>
+        <path class="edge ret" d="M845 372C805 372 800 458 764 458" marker-end="url(#a1)"/>
+        <text class="t-sub" x="780" y="420">presence</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>public, on GitHub</span><span><i class="d"></i>private, never leaves the machine</span><span><i class="flow"></i>what this PR documents</span></div>
+  </figure>
+</section>
+
+<!-- RELEASE SEQUENCE -->
+<section id="release">
+  <div class="prose">
+    <span class="eyebrow">docs/releasing.md</span>
+    <h2>Cutting a release, in order</h2>
+    <p>Five steps, all on the maintainer's machine. The numbers match the sections of <code>releasing.md</code>.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Sequence</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 520" role="img" aria-label="Sequence diagram of the five release steps between the maintainer, Docker, Flips, git and GitHub.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="a2e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g>
+        <rect class="box" x="30" y="16" width="140" height="38" rx="6"/><text x="100" y="40" text-anchor="middle">Maintainer</text>
+        <rect class="box" x="230" y="16" width="140" height="38" rx="6"/><text x="300" y="40" text-anchor="middle">Docker</text>
+        <rect class="box" x="430" y="16" width="140" height="38" rx="6"/><text x="500" y="40" text-anchor="middle">Flips</text>
+        <rect class="box" x="630" y="16" width="140" height="38" rx="6"/><text x="700" y="40" text-anchor="middle">git</text>
+        <rect class="box pub" x="830" y="16" width="140" height="38" rx="6"/><text x="900" y="40" text-anchor="middle">GitHub</text>
+        <path class="life" d="M100 54V505M300 54V505M500 54V505M700 54V505M900 54V505"/>
+      </g>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="22" cy="96" r="12"/><text class="badge-t" x="22" y="100.5" text-anchor="middle">1</text>
+        <path class="edge" d="M100 96H296" marker-end="url(#a2)"/><text class="t-mono" x="112" y="88">docker compose run rom</text>
+        <path class="edge ret" d="M300 128H104" marker-end="url(#a2)"/><text class="t-sub" x="112" y="122">.gba + SHA1</text>
+      </g>
+      <g class="step" style="--i:1">
+        <circle class="badge" cx="22" cy="180" r="12"/><text class="badge-t" x="22" y="184.5" text-anchor="middle">2</text>
+        <path class="edge em" d="M100 180H496" marker-end="url(#a2e)"/><text class="t-mono t-em" x="112" y="172">flips --create (retail, build)</text>
+        <path class="edge ret" d="M500 212H104" marker-end="url(#a2)"/><text class="t-sub" x="112" y="206">emerald-coop-vX.Y.bps</text>
+      </g>
+      <g class="step" style="--i:2">
+        <circle class="badge" cx="22" cy="264" r="12"/><text class="badge-t" x="22" y="268.5" text-anchor="middle">3</text>
+        <path class="edge em" d="M100 264H496" marker-end="url(#a2e)"/><text class="t-mono t-em" x="112" y="256">flips --apply (.bps, retail)</text>
+        <path class="edge ret" d="M500 296H104" marker-end="url(#a2)"/><text class="t-sub" x="112" y="290">SHA1(check) = SHA1(build) ✓</text>
+      </g>
+      <g class="step" style="--i:3">
+        <circle class="badge" cx="22" cy="348" r="12"/><text class="badge-t" x="22" y="352.5" text-anchor="middle">4</text>
+        <path class="edge" d="M100 348H696" marker-end="url(#a2)"/><text class="t-mono" x="112" y="340">git archive HEAD client</text>
+        <path class="edge ret" d="M700 380H104" marker-end="url(#a2)"/><text class="t-sub" x="112" y="374">client.zip, committed files only</text>
+      </g>
+      <g class="step" style="--i:4">
+        <circle class="badge" cx="22" cy="432" r="12"/><text class="badge-t" x="22" y="436.5" text-anchor="middle">5</text>
+        <path class="edge em flow" d="M100 432H896" marker-end="url(#a2e)"/><text class="t-mono t-em" x="112" y="424">publish Release vX.Y: .bps + client.zip</text>
+        <rect class="box pub" x="790" y="452" width="200" height="44" rx="6"/>
+        <text class="t-sub" x="890" y="471" text-anchor="middle">notes record the</text>
+        <text class="t-sub" x="890" y="487" text-anchor="middle">patched ROM SHA1</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<!-- BPS -->
+<section id="bps">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>What's inside a .bps</h2>
+    <p>These are the real bytes of the 1,038-byte patch made during testing, between two 16 MiB dummy files. Select a part to see what it does. The three checksums at the end are why the guides can promise that Flips refuses a wrong ROM.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="segline"><span>offset 0x000</span><span>1,038 bytes</span><span>0x40E</span></div>
+    <div class="bytes" id="bytes">
+      <button class="seg" type="button" data-k="magic"><small>marker</small>42 50 53 31</button>
+      <button class="seg" type="button" data-k="src"><small>source size</small>00 7f 7e 86</button>
+      <button class="seg" type="button" data-k="tgt"><small>target size</small>68 06 7f 86</button>
+      <button class="seg" type="button" data-k="meta"><small>meta</small>80</button>
+      <button class="seg wide" type="button" data-k="act"><small>actions</small>1c 9e 8d 58 58 58 58 4c …</button>
+      <button class="seg crc" type="button" data-k="scrc"><small>source CRC32</small>0e d9 69 c2</button>
+      <button class="seg crc" type="button" data-k="tcrc"><small>target CRC32</small>10 96 3d 7f</button>
+      <button class="seg crc" type="button" data-k="pcrc"><small>patch CRC32</small>db 7a 37 f6</button>
+    </div>
+    <div class="detail" id="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- DECISIONS -->
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Two steps that look optional, and why they aren't</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Apply the patch before shipping it</h3>
+      <div class="term">
+        <div><span class="p">$</span> flips --apply emerald-coop-vX.Y.bps emerald-us.gba /tmp/check.gba</div>
+        <div><span class="p">$</span> sha1sum rom/pokeemerald_modern.gba /tmp/check.gba</div>
+        <div><span class="c"># both hashes must match</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>It takes seconds and catches the costly mistakes before a player does: a patch made against the wrong dump, a stale build, or an overwritten file. Without it, the first person to notice is a player whose hash doesn't match the notes.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Package the client with <code>git archive</code></h3>
+      <div class="tree" aria-label="client folder: committed files go in the zip, config.lua does not">
+        <div>emerald-coop-vX.Y-client/client/</div>
+        <div class="in">├── addresses.lua      <span class="note">generated by symgen (#4)</span></div>
+        <div class="in">├── bridge.lua         <span class="note">entry point (#10)</span></div>
+        <div class="in">├── lib/               <span class="note">pure modules (#16)</span></div>
+        <div class="in">├── config.example.lua</div>
+        <div class="in">├── README.md</div>
+        <div class="out">└── config.lua         </div><div><span class="note">    ignored by git, so never packaged</span></div>
+      </div>
+      <div class="why"><b>Why</b><p><strong>Only committed files go in</strong>, so a maintainer's own <code>config.lua</code> with a real join key can't leak into a public release. <strong>It's the same commit as the ROM</strong>, so <code>addresses.lua</code> matches the patched build.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PLAYER PATH -->
+<section id="player">
+  <div class="prose">
+    <span class="eyebrow">docs/installing.md</span>
+    <h2>A wrong ROM gets stopped four times</h2>
+    <p>The player guide puts a check before and after patching. Flips and, later, the client add two more. Each failure ends in a clear message, never a broken game.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Player path</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="Pipeline: retail dump, SHA1 check, flips apply with CRC32 check, patched ROM, SHA1 check against release notes, mGBA with startup ROM hash check. Each check has a failure branch.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="a3b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah bad" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <path id="mainline" class="edge em" d="M90 110H910"/>
+      <circle class="pulse" r="6"><animateMotion dur="6s" repeatCount="indefinite"><mpath href="#mainline"/></animateMotion></circle>
+      <g class="step" style="--i:0">
+        <rect class="box priv" x="20" y="80" width="140" height="60" rx="6"/>
+        <text x="90" y="106" text-anchor="middle" class="t-mono">their dump</text>
+        <text x="90" y="126" text-anchor="middle" class="t-sub">emerald-us.gba</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="gate" d="M230 82L258 110L230 138L202 110Z"/><text class="t-mono t-em" x="230" y="115" text-anchor="middle">1</text>
+        <text class="t-sub" x="230" y="68" text-anchor="middle">SHA1 = f3ae0881…?</text>
+        <path class="edge bad" d="M230 138V206" marker-end="url(#a3b)"/>
+        <text class="t-sub t-bad" x="230" y="228" text-anchor="middle">other region, revision</text>
+        <text class="t-sub t-bad" x="230" y="246" text-anchor="middle">or modified dump</text>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box pub" x="300" y="80" width="150" height="60" rx="6"/>
+        <text x="375" y="106" text-anchor="middle" class="t-mono t-em">flips --apply</text>
+        <text x="375" y="126" text-anchor="middle" class="t-sub">2 · CRC32 inside .bps</text>
+        <path class="edge bad" d="M375 140V206" marker-end="url(#a3b)"/>
+        <text class="t-sub t-bad" x="375" y="228" text-anchor="middle">"not intended for</text>
+        <text class="t-sub t-bad" x="375" y="246" text-anchor="middle">this ROM", no output</text>
+      </g>
+      <g class="step" style="--i:3">
+        <rect class="box priv" x="490" y="80" width="150" height="60" rx="6"/>
+        <text x="565" y="106" text-anchor="middle" class="t-mono">patched ROM</text>
+        <text x="565" y="126" text-anchor="middle" class="t-sub">emerald-coop-vX.Y.gba</text>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="gate" d="M700 82L728 110L700 138L672 110Z"/><text class="t-mono t-em" x="700" y="115" text-anchor="middle">3</text>
+        <text class="t-sub" x="700" y="68" text-anchor="middle">SHA1 = release notes?</text>
+        <path class="edge bad" d="M700 138V206" marker-end="url(#a3b)"/>
+        <text class="t-sub t-bad" x="700" y="228" text-anchor="middle">don't play it,</text>
+        <text class="t-sub t-bad" x="700" y="246" text-anchor="middle">re-download the patch</text>
+      </g>
+      <g class="step" style="--i:5">
+        <rect class="box" x="770" y="80" width="210" height="60" rx="6"/>
+        <text x="875" y="106" text-anchor="middle" class="t-mono">mGBA + bridge.lua</text>
+        <text x="875" y="126" text-anchor="middle" class="t-sub">4 · ROM hash at startup</text>
+        <path class="edge bad" d="M875 140V206" marker-end="url(#a3b)"/>
+        <text class="t-sub t-bad" x="875" y="228" text-anchor="middle">"ROM mismatch", script stops,</text>
+        <text class="t-sub t-bad" x="875" y="246" text-anchor="middle">game keeps running (#10)</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span>Checks 1 and 3: the player, by hand</span><span>Check 2: Flips, automatic</span><span>Check 4: the client, coming in #10</span></div>
+  </figure>
+</section>
+
+<!-- VERSION LOCK -->
+<section id="lock">
+  <div class="prose">
+    <span class="eyebrow">The invariant</span>
+    <h2>One commit, three files that must agree</h2>
+    <p>Memory addresses in <code>addresses.lua</code> are only valid for the exact ROM they came from. That's why the guides insist on building, patching and packaging from the same commit, and on publishing the patch and the scripts together.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Version lock</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="One release commit produces the patch, addresses.lua and the client zip; on the player's machine the client checks they belong together.">
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <rect class="box pub" x="20" y="120" width="180" height="60" rx="6"/>
+        <text x="110" y="146" text-anchor="middle" class="t-mono t-em">commit vX.Y</text>
+        <text x="110" y="166" text-anchor="middle" class="t-sub">tag on master</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em flow" d="M200 150C250 150 250 50 296 50" marker-end="url(#a4)"/>
+        <path class="edge em flow" d="M200 150H296" marker-end="url(#a4)"/>
+        <path class="edge em flow" d="M200 150C250 150 250 250 296 250" marker-end="url(#a4)"/>
+        <rect class="box" x="300" y="22" width="300" height="56" rx="6"/>
+        <text x="316" y="46" class="t-mono">emerald-coop-vX.Y.bps</text>
+        <text x="316" y="66" class="t-sub">patched SHA1 recorded in the notes</text>
+        <rect class="box" x="300" y="122" width="300" height="56" rx="6"/>
+        <text x="316" y="146" class="t-mono">client/addresses.lua</text>
+        <text x="316" y="166" class="t-sub">symgen output from the same .elf</text>
+        <rect class="box" x="300" y="222" width="300" height="56" rx="6"/>
+        <text x="316" y="246" class="t-mono">emerald-coop-vX.Y-client.zip</text>
+        <text x="316" y="266" class="t-sub">git archive of the same commit</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em" d="M600 50C660 50 650 150 696 150" marker-end="url(#a4)"/>
+        <path class="edge em" d="M600 150H696" marker-end="url(#a4)"/>
+        <path class="edge em" d="M600 250C660 250 650 150 696 150" marker-end="url(#a4)"/>
+        <rect class="box pub" x="700" y="110" width="280" height="80" rx="6"/>
+        <text x="716" y="138" class="t-mono t-em">player's mGBA</text>
+        <text x="716" y="160" class="t-sub">bridge.lua compares the loaded ROM</text>
+        <text x="716" y="178" class="t-sub">with romSha1 in addresses.lua (#10)</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<!-- TESTED -->
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>The commands were run, not just written</h2>
+    <p>Flips was built from source and the guides' exact commands were run on 16 MiB dummy files. No ROMs were involved.</p>
+  </div>
+  <div class="term" data-anim id="termlog">
+    <div style="--i:0"><span class="p">$</span> flips --create --bps a.bin b.bin p.bps</div>
+    <div style="--i:1">The patch was created successfully!</div>
+    <div style="--i:2"><span class="p">$</span> flips --apply p.bps a.bin out.bin &amp;&amp; sha1sum b.bin out.bin</div>
+    <div style="--i:3" class="ok">3b55d47809ce1720fb6b30ea8c54e95a0858b8b2  b.bin</div>
+    <div style="--i:4" class="ok">3b55d47809ce1720fb6b30ea8c54e95a0858b8b2  out.bin</div>
+    <div style="--i:5"><span class="p">$</span> flips --apply p.bps wrong.bin out2.bin</div>
+    <div style="--i:6" class="bad">This patch is not intended for this ROM. Expected checksum C269D90E, got 253764FB.</div>
+    <div style="--i:7" class="c"># exit 1, out2.bin not created</div>
+  </div>
+  <p class="small">Also: <code>go vet</code> and <code>go test -race</code> pass, relative links resolve, no forbidden files or secrets. The two-dev manual run was waived because the PR is docs only.</p>
+</section>
+
+<!-- NEXT -->
+<section id="next">
+  <div class="prose">
+    <span class="eyebrow">What's next</span>
+    <h2>A real release needs three more issues</h2>
+    <p>The process is complete, but the files it ships don't exist yet. The guides already point to where they'll be.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Dependencies</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 280" role="img" aria-label="Issues 4, 8, 10 and 5 must land before the first real release; this PR, issue 7, documents the process.">
+      <defs>
+        <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="a5e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <rect class="box" x="20" y="30" width="220" height="56" rx="6"/>
+        <text x="36" y="54" class="t-mono">#4 symgen</text><text x="36" y="74" class="t-sub">in progress · addresses.lua</text>
+        <rect class="box" x="20" y="130" width="220" height="56" rx="6"/>
+        <text x="36" y="154" class="t-mono">#8 mGBA spike</text><text x="36" y="174" class="t-sub">open · pins the mGBA version</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge" d="M240 58C290 58 290 130 336 130" marker-end="url(#a5)"/>
+        <path class="edge" d="M240 158C290 158 290 140 336 140" marker-end="url(#a5)"/>
+        <rect class="box" x="340" y="105" width="240" height="56" rx="6"/>
+        <text x="356" y="129" class="t-mono">#10 bridge.lua</text><text x="356" y="149" class="t-sub">blocked · ROM hash check</text>
+        <path class="edge" d="M130 86V226C130 236 140 236 150 236H336" marker-end="url(#a5)"/>
+        <rect class="box" x="340" y="210" width="240" height="56" rx="6"/>
+        <text x="356" y="234" class="t-mono">#5 CI</text><text x="356" y="254" class="t-sub">blocked · addresses.lua freshness</text>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box pub" x="340" y="10" width="240" height="56" rx="6"/>
+        <text x="356" y="34" class="t-mono t-em">#7 this PR</text><text x="356" y="54" class="t-sub">release + install guides</text>
+        <path class="edge em" d="M580 38C660 38 660 130 716 130" marker-end="url(#a5e)"/>
+        <path class="edge" d="M580 133H716" marker-end="url(#a5)"/>
+        <path class="edge" d="M580 238C660 238 660 140 716 140" marker-end="url(#a5)"/>
+        <rect class="box pub" x="720" y="100" width="260" height="66" rx="6"/>
+        <text x="736" y="128" class="t-mono t-em">first real release</text><text x="736" y="150" class="t-sub">v0.1 · .bps + client.zip</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<!-- REVIEW -->
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Read <code>docs/releasing.md</code> first, then <code>docs/installing.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks" id="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Could a dev who has never released follow <code>releasing.md</code> without asking anything?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is the release notes template enough for a player to verify their ROM?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Is <code>installing.md</code> plain enough for a friend who isn't a developer?</span></label>
+    <label class="check"><input type="checkbox" id="c4"><span>Nothing in either guide asks anyone to upload or share a ROM, a save or a join key.</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#8</b><span><code>installing.md</code> points to the mGBA version pinned in the README, which #8 adds.</span></div>
+    <div class="limit"><b>#10</b><span><code>client/bridge.lua</code> doesn't exist yet. Until it does, no real release can be cut.</span></div>
+    <div class="limit"><b>#5</b><span>Until CI checks <code>addresses.lua</code>, the release guide says to run <code>symgen</code> by hand.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#40 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #7 and the test run above.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagram animation: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var target = fig.classList.contains("term") ? fig : fig;
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(target); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { play(e.target); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // BPS explorer
+  var info = {
+    magic: ["\"BPS1\"", "Format marker. Every BPS patch starts with these four ASCII bytes."],
+    src: ["16,777,216 bytes", "Size of the base ROM, as a variable-length number. 16 MiB is the size of retail Emerald."],
+    tgt: ["16,778,216 bytes", "Size of the file the patch produces. The test target was 1,000 bytes longer than the base."],
+    meta: ["0 bytes", "Optional metadata. 0x80 encodes zero, so this patch has none."],
+    act: ["copy or write", "Instructions that rebuild the target byte by byte: copy a run from the base ROM, or write new bytes. The test changed four bytes to \"XXXX\", and you can see them here as 58 58 58 58."],
+    scrc: ["C269D90E", "CRC32 of the base ROM, stored little-endian. Flips checks it before writing anything. The wrong-ROM test failed with \"Expected checksum C269D90E\": this number."],
+    tcrc: ["7F3D9610", "CRC32 of the result. Flips checks it after patching, so a bad output is never left behind silently."],
+    pcrc: ["F6377ADB", "CRC32 of the patch itself. It catches a truncated or corrupted download before anything is applied."]
+  };
+  var detail = document.getElementById("detail");
+  var segs = document.querySelectorAll(".seg");
+  function select(btn) {
+    segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+    var d = info[btn.getAttribute("data-k")];
+    detail.innerHTML = "";
+    var h = document.createElement("h3"); h.textContent = btn.querySelector("small").textContent;
+    var v = document.createElement("span"); v.className = "v"; v.textContent = d[0];
+    var p = document.createElement("p"); p.textContent = d[1];
+    detail.append(h, v, p);
+  }
+  segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+  select(document.querySelector('.seg[data-k="scrc"]'));
+
+  // Reviewer checklist, remembered per browser
+  var KEY = "pr40-walkthrough-checks";
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll("#checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
