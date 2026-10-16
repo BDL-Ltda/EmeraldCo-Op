@@ -2,7 +2,7 @@
 
 This directory will contain the Lua 5.4 client for mGBA 0.10.5. No runnable
 client exists yet. The emulator version, frame callback, memory API and native
-non-blocking sockets were checked by the spike in
+sockets were studied against the mGBA 0.10.5 source by the spike in
 [issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8): see
 [mGBA scripting](../docs/mgba-scripting.md) and the throwaway script
 [`spike/hello.lua`](spike/hello.lua).

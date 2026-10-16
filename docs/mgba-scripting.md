@@ -63,7 +63,7 @@ relative to its entry script.
 | `socket.tcp()` | New TCP socket object. |
 | `sock:connect(host, port)` | Connect. Returns `1`, or `nil, err`. **Blocking.** |
 | `sock:add("received", fn)`, `sock:add("error", fn)` | Socket events, polled by mGBA once per frame. `fn` gets the socket as first argument; `error` also gets the message. |
-| `sock:send(data)` | Non-blocking send. Returns bytes written (may be fewer than `#data`), or `nil, err`. |
+| `sock:send(data)` | Non-blocking send. Returns bytes written (may be fewer than `#data`), or `nil, err` for errors mGBA maps. Unmapped errors look like success (see Gotchas). |
 | `sock:receive(maxBytes)` | Non-blocking receive. Returns a string, or `nil, err`. |
 | `sock:hasdata()` | `select()` with a zero timeout: `true`/`false`, or `nil, err`. |
 | `sock:close()` | Close and unhook the socket. |
@@ -80,12 +80,26 @@ variables; real addresses come from `client/addresses.lua`.
 
 - **Scripts run on the emulation thread.** Anything slow in a callback slows the
   game down. All per-frame work must be short and must never wait on I/O.
-- **`connect` blocks.** The docstring in 0.10.5 says so: the emulator does not
-  respond until the connection succeeds or fails. Against `127.0.0.1` it returns
-  at once (connected or refused). Against a remote host that drops packets it can
-  freeze the game for the OS connect timeout. There is no non-blocking connect in
-  0.10.5. The real client should keep reconnect attempts rare (back off) and
-  expect a short hitch on each attempt against an unreachable remote server.
+- **`connect` blocks, and so does name resolution.** The docstring in 0.10.5
+  says so: the emulator does not respond until the connection succeeds or fails.
+  Before connecting, mGBA resolves the host with a synchronous `getaddrinfo`, so
+  a hostname adds a DNS lookup to the stall. How long a failed attempt takes
+  depends on the OS:
+  - **Windows:** even a refused connect to `127.0.0.1` (no server listening)
+    takes about **2 s**, because Winsock retries the SYN after a reset. A plain
+    blocking connect measured 2.2–2.3 s on Windows 11.
+  - **Linux and macOS:** a refused local connect fails at once.
+  - **Any OS:** against a remote host that drops packets, the game freezes for
+    the OS connect timeout.
+
+  There is no non-blocking connect in 0.10.5. Every failed attempt is a visible
+  hitch, so reconnects must back off: the spike waits ~5 s, then doubles up to
+  ~60 s. A resolve failure returns the raw native error code, so its message can
+  be `error#N`.
+- **Each connect adds a frame callback that is never compacted.** A connected
+  socket registers a **frame** callback. Removing it clears the slot but never
+  shrinks the list, so reconnects slowly grow it. This doesn't matter for the
+  spike, but the real client should not reconnect in a tight loop.
 - **Everything after `connect` is non-blocking.** mGBA puts the socket into
   non-blocking mode after `connect`. `receive` returns `nil, socket.ERRORS.AGAIN`
   when there is nothing to read; `send` can write only part of the data.
@@ -98,6 +112,14 @@ variables; real addresses come from `client/addresses.lua`.
   error strings (`"unknown error"` for codes mGBA does not map). On Windows the
   error read after a zero-byte `recv` may be stale, so the spike also treats
   "readable, but the first read would block" as a closed connection.
+- **`send` can't detect a dead connection.** On failure, mGBA's native send
+  returns the negated error code, and the Lua wrapper only treats negative
+  results as errors. Errors mGBA doesn't map (connection reset, broken pipe)
+  become "unknown error" (-1), so `send` returns `1`, as if one byte was written.
+  Detect disconnects through `receive` and the `error` event, never through
+  `send`. (Unconfirmed: on Linux and macOS, mGBA writes without `MSG_NOSIGNAL`,
+  and no `SIGPIPE` handler was found, so sending to a reset socket might kill
+  mGBA there.)
 - **`receive` is not LuaSocket's `receive`.** It takes a byte count only, has no
   line mode and returns whatever is available. The caller does its own framing.
 - **`emu` is `nil` without a game.** Guard reads and use the **start** callback.
@@ -144,7 +166,8 @@ this does not matter: remote players are drawn by the ROM from milestone 0.4
    `ping N` every 300 frames, and logs each echoed line. Receiving is driven by
    the per-frame `select()` poll, so the game never waits for the network.
 5. When the server goes away it logs the error, keeps running and tries to
-   reconnect every 300 frames (about 5 seconds).
+   reconnect, first after 300 frames (about 5 seconds), then doubling the wait
+   after each failed attempt up to 3600 frames (about 60 seconds).
 
 ### Test it
 
@@ -157,6 +180,11 @@ go run ./cmd/echoserver
 
 Then open any ROM in mGBA 0.10.5, load `client/spike/hello.lua` as described
 above and play. The console should show the start line, a frame counter every
-second, the memory dump and the echoed lines. Stop the server: the console logs
-the disconnect and the reconnect attempts, and the game keeps running at full
-speed. Start the server again: the script reconnects.
+second, the memory dump and the echoed lines. Stop the server: the console should
+log the disconnect and the reconnect attempts, and the game should keep running.
+On Windows, expect a hitch of about 2 s on each reconnect attempt (see Gotchas).
+Start the server again: the script should reconnect.
+
+**Not yet verified in the emulator.** The behavior above is expected from the
+0.10.5 source and from a run with fake mGBA globals. Nobody has run the script
+in mGBA yet ([#8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8)).
