@@ -189,8 +189,11 @@ go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.
 All three flags are required. Supply the ELF and ROM from the **same build**.
 `symgen` uses Go's standard-library `debug/elf`, so no extra symbol tools are
 required. It writes the allowlisted symbol addresses and sizes from the ELF,
-plus the supplied ROM's lowercase SHA1 as `romSha1`. That hash identifies the ROM
-input; it cannot establish whether a separately supplied ELF belongs to it.
+plus the supplied ROM's lowercase SHA1 as `romSha1` and its CRC32 (IEEE, 8 hex
+digits) as `romCrc32`. These hashes identify the ROM input; they cannot
+establish whether a separately supplied ELF belongs to it. The client checks
+`romCrc32` at startup, because a CRC32 is the only ROM hash mGBA 0.10.5 gives
+scripts (see [client/README.md](client/README.md)).
 
 The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
 `gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr`, `gMain`,
