@@ -6,8 +6,9 @@ overworld. Saves, battles and items stay local in v1.
 
 The ROM build, ELF symbol generator and server connection lifecycle are
 available. The server accepts authenticated players and announces joins and
-leaves; presence relay and liveness are still pending (#14). The fake client
-remains a placeholder, and there is no working Lua client yet. Follow progress
+leaves; presence relay and liveness are still pending (#14). A terminal fake
+client simulates walking players for server tests; there is no working Lua
+network client yet. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -17,7 +18,7 @@ EmeraldCo-Op/
 ├── go.mod                    # one Go module for the server and tools
 ├── cmd/
 │   ├── server/               # presence relay entry point (placeholder)
-│   ├── fakeclient/           # simulated player entry point (placeholder)
+│   ├── fakeclient/           # simulated walking player for server tests
 │   ├── echoserver/           # line echo server for client socket tests
 │   └── symgen/               # ELF symbol generator and symbol allowlist
 ├── internal/                 # shared Go packages
@@ -65,9 +66,12 @@ Flags override the environment: `-addr` / `SERVER_ADDR` (default `:8765`),
 for lifecycle behavior, limitations and a two-client smoke test. Ctrl+C closes
 the listener and its connections.
 
-`go run ./cmd/fakeclient` still prints a placeholder message. `symgen` generates
-the client's global addresses from a ROM build, as described below. No external
-Go dependencies are required.
+Use [the fake client](docs/fakeclient.md) to test without mGBA: set the private
+`FAKECLIENT_JOIN_KEY` environment variable, then run
+`go run ./cmd/fakeclient -id bot1 -pattern square`. Full peer movement and pong
+checks require the relay from #14; the lifecycle-only server supports joins and
+leaves. `symgen` generates the client's global addresses from a ROM build, as
+described below. No external Go dependencies are required.
 
 The race check requires a supported C compiler with cgo enabled. The symbol
 generator's tests create synthetic ELF data in memory and compare Lua output with
@@ -241,6 +245,7 @@ See the [client README](client/README.md) for the planned configuration.
 - [Architecture](docs/architecture.md): agreed design and communication flow.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
+- [Fake client](docs/fakeclient.md): simulated walking, warp and idle players for terminal tests.
 - [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
 - [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.
 - [Playing online](docs/playing-online.md): stub for hosting and joining (#18).

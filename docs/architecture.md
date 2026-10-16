@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator and server connection lifecycle are available. Presence relay, client networking and ROM co-op behavior described here remain planned. See [server.md](server.md) for the implemented lifecycle and current limits. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, server connection lifecycle and terminal fake client are available. Presence relay, Lua client networking and ROM co-op behavior described here remain planned. See [server.md](server.md) for the implemented lifecycle and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests and their relay dependency. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
@@ -8,7 +8,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 | --- | --- |
 | `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
 | `cmd/server/` | Go relay server entry point. |
-| `cmd/fakeclient/` | Go client used to exercise the protocol without an emulator. |
+| `cmd/fakeclient/` | Go client that simulates square, idle and warp patterns without an emulator; see [fakeclient.md](fakeclient.md). |
 | `cmd/echoserver/` | Line echo server for testing client sockets ([mgba-scripting.md](mgba-scripting.md)); not the relay. |
 | `cmd/symgen/` | Go tool that generates Lua global addresses from the ROM build's ELF. |
 | `internal/` | Shared Go implementation packages. |
