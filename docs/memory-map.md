@@ -47,8 +47,9 @@ links.
 `gSaveBlock1Ptr` and `gSaveBlock2Ptr` are pointers, and the blocks they point at
 **move**. [`SetSaveBlocksPointers`][load_save-70] adds a random offset every time
 it runs, and [`MoveSaveBlocks_ResetHeap`][load_save-84] copies both blocks to the
-new place. It runs on every map load
-([`ResetMirageTowerAndSaveBlockPtrs`][overworld-2071]), at the start of every
+new place. It runs on every warp and other full map load
+([`ResetMirageTowerAndSaveBlockPtrs`][overworld-2071]; seamless route-edge
+crossings don't move them), at the start of every
 battle ([battle_main.c][battle_main-590]), and when a game is loaded.
 
 So read `gSaveBlock1Ptr` / `gSaveBlock2Ptr` **again on every read** and add the
@@ -158,9 +159,15 @@ Why each condition:
    ([overworld.c:1486][overworld-1486]).
 
 Consequence to keep in mind: `visible` also goes false while the player talks to
-an NPC or reads a sign (controls are locked). That matches "controllable"; if
-#11 finds it too flickery, drop condition 3 and rely on 1, 2 and 4, at the cost of
-the start menu staying visible.
+an NPC or reads a sign (controls are locked). That matches "in the overworld and
+controllable" from #9 and #11.
+
+**Open question, to settle before #11:** [protocol.md](protocol.md) defines
+`visible` as "whether the player should be drawn". With condition 3, other
+players would see this player vanish during every NPC talk, sign or Pokémon
+Center heal. Simply dropping condition 3 is not an option: the start menu would
+then count as visible, which breaks #11's acceptance criteria. Decide what
+`visible` means, then make this section and protocol.md agree.
 
 ### How the offsets were verified
 

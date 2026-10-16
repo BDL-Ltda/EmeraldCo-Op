@@ -3,6 +3,8 @@
 # function pointer stored in RAM (for example gMain.callback2). Thumb function
 # values keep their state bit (bit 0) in the ELF; symgen exports them verbatim,
 # which is exactly the value the game stores in such pointers.
+# A file-static symbol is allowed only if its name is unique in the ELF; symgen
+# fails on conflicting duplicates, so a rename or clash breaks loudly.
 # Keep struct field offsets in docs/memory-map.md, not in this allowlist.
 gObjectEvents
 gPlayerAvatar

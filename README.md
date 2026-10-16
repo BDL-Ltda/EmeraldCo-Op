@@ -196,7 +196,9 @@ output file. Successful writes use a temporary file in the output directory
 followed by replacement of the target file.
 
 Spot-check a generated symbol against its entry in
-`rom/pokeemerald_modern.map`, then rerun the command and check that
+`rom/pokeemerald_modern.map`. Function entries are the `.map` address plus 1
+(the Thumb bit), and file-static symbols such as `sLockFieldControls` are not in
+the `.map`: check those with `arm-none-eabi-readelf -s`. Then rerun the command and check that
 `git diff -- client/addresses.lua` shows no unexpected changes. Never edit
 `client/addresses.lua` by hand or copy its numeric addresses elsewhere.
 
