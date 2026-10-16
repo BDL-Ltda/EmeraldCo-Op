@@ -156,7 +156,8 @@ reproducibility.
 
 Address generation belongs to [issue #4](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/4)
 and is not performed by this command. All players will use our built ROM from
-milestone 0.1 onward, distributed as a `.bps` patch applied locally. Do not commit
+milestone 0.1 onward, distributed as a `.bps` patch applied locally (see
+[releasing.md](docs/releasing.md) and [installing.md](docs/installing.md)). Do not commit
 ROMs, saves, BIOS files, patches or build outputs.
 
 ## Client development
@@ -174,6 +175,8 @@ See the [client README](client/README.md) for the planned configuration.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
 - [Memory map](docs/memory-map.md): stub for sourced memory layouts (#9).
 - [Playing online](docs/playing-online.md): stub for hosting and joining (#18).
+- [Installing](docs/installing.md): patch your ROM and load the client (players).
+- [Releasing](docs/releasing.md): build, create the `.bps` patch and publish a release.
 
 ## Contributing
 
