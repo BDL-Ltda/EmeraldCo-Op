@@ -11,5 +11,5 @@ order to exercise deterministic sorting.
 
 The ROM input is the exact UTF-8 byte sequence
 `synthetic symgen ROM fixture\n`, where `\n` means one LF byte. The golden
-Lua file records the resulting SHA1 and symbol table. Keep the golden file
+Lua file records the resulting SHA1, CRC32 and symbol table. Keep the golden file
 LF-only so the comparison is byte-identical on every operating system.
