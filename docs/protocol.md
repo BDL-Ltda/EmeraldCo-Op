@@ -49,7 +49,7 @@ Every field listed for a type is required and must not be `null`, unless it is m
 | `mapGroup`, `mapNum` | integer | 0–255. |
 | `x`, `y` | integer | −32768–32767 (the game stores coordinates as `s16`). |
 | `facing` | integer | 1–4: `1` south, `2` north, `3` west, `4` east, the decomp's `DIR_SOUTH` / `DIR_NORTH` / `DIR_WEST` / `DIR_EAST`. |
-| `visible` | boolean | Whether the player should be drawn (false in menus, battles, etc.). |
+| `visible` | boolean | Whether the player is in a running game session. It is false only before a game starts (boot, title screen, main menu, new-game intro) and true everywhere else, including battles, menus, warps and NPC talk. Other clients don't draw a player whose `visible` is false. While the player is in a battle or menu, the position is the last one read on the field. See [memory-map.md](memory-map.md#visible-signal). |
 | `reason` | string | One of `disconnect`, `timeout`, `kicked`, `replaced`. |
 | `t` | integer | Milliseconds, ≥ 0. Only the sender interprets it; the receiver echoes it unchanged. |
 | `code` | string | One of the error codes below. |
@@ -218,3 +218,5 @@ sequenceDiagram
 - Breaking changes bump `v`: removing or renaming a field or type, changing a field's type, meaning or allowed range, making an optional field required, or changing the framing. The commit uses `!` and 💥 with a `BREAKING CHANGE:` line (see the `pre-commit` skill), and this document, the Go package and the Lua client change in the same PR.
 - The server speaks one version. A client with another `v` gets `error version_mismatch` and must be updated; there is no negotiation.
 - `clientVersion` is the client's release version. It is for logs only and does not affect compatibility.
+- **Pre-release revisions.** Until the first client release that sends `presence` ([#17](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/17)), v1 is a draft. Nothing in the field speaks it yet, so a field's meaning can still be revised without a bump, provided the revision is recorded here. From that release on, the rules above apply in full.
+  - `visible`: changed from "in controllable overworld play" to "in a running game session" ([decision on #11](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/11#issuecomment-6223791724), PR [#48](https://github.com/BDL-Ltda/EmeraldCo-Op/pull/48)). The server only relays the value, so no released component changes behavior.
