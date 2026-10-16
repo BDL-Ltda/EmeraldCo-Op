@@ -27,8 +27,9 @@ go run ./cmd/server -addr localhost:8765
 
 The default address binds all interfaces; actual online hosting and port
 forwarding remain in [#18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18).
-Keep keys and public addresses private. Ctrl+C closes the listener, accepted
-players and connections still waiting for hello, and waits for handlers to exit.
+Keep keys and public addresses private. Ctrl+C (or SIGTERM on a service host)
+closes the listener, accepted players and connections still waiting for hello,
+and waits for handlers to exit.
 
 ## Connection lifecycle
 
@@ -44,12 +45,23 @@ players and connections still waiting for hello, and waits for handlers to exit.
 6. On disconnect, remove that exact connection and announce `leave(disconnect)`.
    Cleanup of a replaced connection cannot remove its successor.
 
+Replacement is keyed by `playerId`, as specified in #13, even if a new save
+changes `trainerId`. The trainer ID is self-reported metadata, not proof that
+a client owns a player ID. Requiring matching trainer IDs would change that
+contract and needs a separate identity-policy decision.
+
 The room uses a mutex to serialize membership and notification order. Each
 connection also serializes writes so errors and broadcasts cannot interleave
 JSON lines. Writes have a five-second deadline. A failed write closes that
 peer; its reader performs removal. Writes currently hold the room mutex, so a
 slow reader can delay lifecycle events. Buffered queues and slow-client isolation
 belong to #14; this is not yet a complete public relay.
+
+Temporary listener accept failures retry after 5 ms, doubling up to one second,
+without removing existing players. A successful accept resets the delay;
+cancellation interrupts the wait. Permanent listener errors still stop the
+server. Join keys use the shared protocol validator and a constant-time content
+comparison for equal-length keys (unequal lengths are rejected immediately).
 
 Rejections send one `error` and close. Wrong versions produce `version_mismatch`,
 wrong keys `bad_key`, and full rooms `room_full`. A valid non-hello first message,
@@ -58,6 +70,14 @@ Malformed envelopes/JSON and oversized lines produce `bad_message`. After
 admission, malformed messages and known server-only messages (or another hello)
 are rejected; unknown types remain ignored. An orderly socket close produces
 only the leave notification.
+
+A reset or closed socket during hello is a transport failure, not a
+`bad_message` rejection; no error response is attempted. The five-second hello
+timeout still produces `bad_hello`. Unknown messages are ignored in both phases,
+with only the first one logged per connection. This bounds unknown-message logs,
+not incoming message rates (#14) or the number of unauthenticated sockets
+([#50](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/50)). Those overload
+limits remain follow-up work.
 
 Logs include the event, remote address, player ID when validated, and rejection
 or leave reason. Raw messages, unknown type names and decoder errors are not

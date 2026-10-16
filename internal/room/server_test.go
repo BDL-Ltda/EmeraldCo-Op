@@ -34,6 +34,11 @@ func testServer(t *testing.T, capacity int, configure func(*Server)) (*Server, s
 	if err != nil {
 		t.Fatal(err)
 	}
+	return s, ln.Addr().String(), serveTestListener(t, s, ln)
+}
+
+func serveTestListener(t *testing.T, s *Server, ln net.Listener) func() {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- s.Serve(ctx, ln) }()
@@ -52,7 +57,7 @@ func testServer(t *testing.T, capacity int, configure func(*Server)) (*Server, s
 		})
 	}
 	t.Cleanup(stop)
-	return s, ln.Addr().String(), stop
+	return stop
 }
 
 func dial(t *testing.T, addr string) *testPeer {
@@ -173,6 +178,7 @@ func TestRejections(t *testing.T) {
 	good, _ := protocol.Encode(hello("a"))
 	for _, tc := range []struct{ name, line, code string }{
 		{"wrong key", strings.Replace(string(good), "test-key", "wrong-key", 1), protocol.CodeBadKey},
+		{"same-length wrong key", strings.Replace(string(good), "test-key", "test-kez", 1), protocol.CodeBadKey},
 		{"wrong version", `{"v":2}` + "\n", protocol.CodeVersionMismatch},
 		{"garbage", "not JSON\n", protocol.CodeBadMessage},
 		{"oversized", strings.Repeat("x", protocol.MaxLineLength+1) + "\n", protocol.CodeBadMessage},

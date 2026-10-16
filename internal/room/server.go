@@ -3,6 +3,7 @@ package room
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"log"
@@ -24,17 +25,17 @@ func (c Config) Validate() error {
 	if c.MaxPlayers < 1 || c.MaxPlayers > protocol.MaxRemotePlayers+1 {
 		return errors.New("max-players must be from 1 to 5")
 	}
-	hello := protocol.Hello{PlayerID: "config", JoinKey: c.JoinKey, ClientVersion: "config"}
-	if hello.Validate() != nil {
+	if protocol.ValidateJoinKey(c.JoinKey) != nil {
 		return errors.New("join-key is required and must contain 1-64 characters without control characters")
 	}
 	return nil
 }
 
 type client struct {
-	conn    net.Conn
-	player  protocol.Player
-	writeMu sync.Mutex
+	conn          net.Conn
+	player        protocol.Player
+	writeMu       sync.Mutex
+	unknownLogged bool // Owned by this connection's reader, across both phases.
 }
 
 // Server accepts authenticated players. Construct one Server per listener.
@@ -83,14 +84,36 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 		closeAll()
 		handlers.Wait()
 	}()
+	var retryDelay time.Duration
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
+			// Like net/http, retry temporary accept failures (including descriptor
+			// exhaustion) without disconnecting established players. Permanent
+			// failures still stop Serve; cancellation interrupts the backoff.
+			var temporary interface{ Temporary() bool }
+			if errors.As(err, &temporary) && temporary.Temporary() {
+				if retryDelay == 0 {
+					retryDelay = 5 * time.Millisecond
+				} else {
+					retryDelay = min(retryDelay*2, time.Second)
+				}
+				s.logger.Printf("event=accept_retry delay=%s", retryDelay)
+				timer := time.NewTimer(retryDelay)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return nil
+				case <-timer.C:
+				}
+				continue
+			}
 			return err
 		}
+		retryDelay = 0
 		activeMu.Lock()
 		if ctx.Err() != nil {
 			activeMu.Unlock()
@@ -139,6 +162,19 @@ func (s *Server) reject(c *client, code string) {
 	_ = s.send(c, protocol.Error{Code: code, Message: code})
 }
 
+func isProtocolError(err error) bool {
+	return errors.Is(err, protocol.ErrVersionMismatch) || errors.Is(err, protocol.ErrMalformed) ||
+		errors.Is(err, protocol.ErrInvalid) || errors.Is(err, protocol.ErrLineTooLong) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
+}
+
+func (s *Server) unknown(c *client) {
+	if !c.unknownLogged {
+		s.event(c, "unknown", "")
+		c.unknownLogged = true
+	}
+}
+
 func decodeCode(err error, handshake bool) string {
 	if errors.Is(err, protocol.ErrVersionMismatch) {
 		return protocol.CodeVersionMismatch
@@ -164,13 +200,14 @@ func (s *Server) handle(conn net.Conn) {
 	for {
 		msg, err := decoder.Decode()
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
+			var netErr net.Error
+			if isProtocolError(err) || (errors.As(err, &netErr) && netErr.Timeout()) {
 				s.reject(c, decodeCode(err, true))
 			}
 			return
 		}
 		if _, unknown := msg.(protocol.Unknown); unknown {
-			s.event(c, "unknown", "")
+			s.unknown(c)
 			continue // The original hello deadline still applies.
 		}
 		hello, ok := msg.(protocol.Hello)
@@ -180,7 +217,7 @@ func (s *Server) handle(conn net.Conn) {
 		}
 		c.player = protocol.Player{PlayerID: hello.PlayerID, TrainerID: hello.TrainerID, Gender: hello.Gender}
 		s.event(c, "hello", "")
-		if hello.JoinKey != s.cfg.JoinKey {
+		if subtle.ConstantTimeCompare([]byte(hello.JoinKey), []byte(s.cfg.JoinKey)) != 1 {
 			s.reject(c, protocol.CodeBadKey)
 			return
 		}
@@ -192,16 +229,14 @@ func (s *Server) handle(conn net.Conn) {
 	for {
 		msg, err := decoder.Decode()
 		if err != nil {
-			if errors.Is(err, protocol.ErrVersionMismatch) || errors.Is(err, protocol.ErrMalformed) ||
-				errors.Is(err, protocol.ErrInvalid) || errors.Is(err, protocol.ErrLineTooLong) ||
-				errors.Is(err, io.ErrUnexpectedEOF) {
+			if isProtocolError(err) {
 				s.reject(c, decodeCode(err, false))
 			}
 			return
 		}
 		switch msg.(type) {
 		case protocol.Unknown:
-			s.event(c, "unknown", "")
+			s.unknown(c)
 		case protocol.Presence, protocol.Ping:
 			// Validated but not processed until #14 implements presence/liveness.
 		default:

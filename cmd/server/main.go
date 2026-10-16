@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/DaviAlencastro/EmeraldCo-Op/internal/room"
 )
@@ -81,7 +82,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 }
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Args[1:], os.Getenv, os.Stderr); err != nil {
 		log.Print(err)

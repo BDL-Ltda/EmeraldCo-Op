@@ -1,14 +1,53 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"os"
+	"os/exec"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func env(values map[string]string) func(string) string {
 	return func(name string) string { return values[name] }
+}
+
+func TestSIGTERMShutdown(t *testing.T) {
+	if os.Getenv("EMERALD_SIGNAL_TEST") == "1" {
+		os.Args = []string{"server"}
+		main()
+		return
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("sending SIGTERM is a Unix process test")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSIGTERMShutdown$")
+	cmd.Env = append(os.Environ(), "EMERALD_SIGNAL_TEST=1", "SERVER_JOIN_KEY=test-key", "SERVER_ADDR=127.0.0.1:0", "SERVER_MAX_PLAYERS=5")
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	lines := bufio.NewScanner(stderr)
+	if !lines.Scan() || !strings.Contains(lines.Text(), "listening addr=") {
+		t.Fatalf("child did not start listener: %s", lines.Text())
+	}
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("SIGTERM did not take graceful exit path: %v", err)
+	}
 }
 
 func TestConfigDefaultsAndOverrides(t *testing.T) {
