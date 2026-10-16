@@ -2,7 +2,7 @@
 return {
   romSha1 = "466dcdee6ad8e38a2cf530bec29f8a079d1106c5",
   symbols = {
-    ["gMain"] = { addr = 0x030036CC, size = 1084 },
+    ["gMain"] = { addr = 0x030036D0, size = 1084 },
     ["gObjectEvents"] = { addr = 0x02006620, size = 576 },
     ["gPlayerAvatar"] = { addr = 0x02006860, size = 36 },
     ["gSaveBlock1Ptr"] = { addr = 0x030071F0, size = 4 },
