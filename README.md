@@ -4,9 +4,10 @@ A co-op mod for Pokémon Emerald, with a Go presence server and an mGBA Lua
 client. The first release aims to let up to five players see each other in the
 overworld. Saves, battles and items stay local in v1.
 
-The project is at **0.0 Foundations**. The ROM build and ELF symbol generator are
-available; the server and fake client still print placeholder messages and exit.
-There is no working Lua client yet. Follow progress
+The ROM build, ELF symbol generator and server connection lifecycle are
+available. The server accepts authenticated players and announces joins and
+leaves; presence relay and liveness are still pending (#14). The fake client
+remains a placeholder, and there is no working Lua client yet. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -49,10 +50,23 @@ go test -race ./...
 go run ./cmd/server
 ```
 
-The server prints a startup placeholder message and exits without opening a
-network listener. `go run ./cmd/fakeclient` also prints a placeholder message.
-`symgen` generates the client's global addresses from a ROM build, as described
-below. No external Go dependencies are required.
+The server requires a private join key before opening its TCP listener. In
+PowerShell, set it locally and start the server:
+
+```powershell
+$env:SERVER_JOIN_KEY = Read-Host "Join key"
+go run ./cmd/server
+```
+
+Flags override the environment: `-addr` / `SERVER_ADDR` (default `:8765`),
+`-join-key` / `SERVER_JOIN_KEY` (required), and `-max-players` /
+`SERVER_MAX_PLAYERS` (default 5, allowed 1–5). See [Server development](docs/server.md)
+for lifecycle behavior, limitations and a two-client smoke test. Ctrl+C closes
+the listener and its connections.
+
+`go run ./cmd/fakeclient` still prints a placeholder message. `symgen` generates
+the client's global addresses from a ROM build, as described below. No external
+Go dependencies are required.
 
 The race check requires a supported C compiler with cgo enabled. The symbol
 generator's tests create synthetic ELF data in memory and compare Lua output with

@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build and symbol generator are available; the gameplay runtime components and communication described here are planned, not implemented. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator and server connection lifecycle are available. Presence relay, client networking and ROM co-op behavior described here remain planned. See [server.md](server.md) for the implemented lifecycle and current limits. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
