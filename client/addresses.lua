@@ -2,10 +2,14 @@
 return {
   romSha1 = "466dcdee6ad8e38a2cf530bec29f8a079d1106c5",
   symbols = {
+    ["CB1_Overworld"] = { addr = 0x0813D169, size = 36 },
+    ["CB2_Overworld"] = { addr = 0x0813D1E5, size = 108 },
     ["gMain"] = { addr = 0x030036CC, size = 1084 },
     ["gObjectEvents"] = { addr = 0x02006620, size = 576 },
+    ["gPaletteFade"] = { addr = 0x02036B4C, size = 12 },
     ["gPlayerAvatar"] = { addr = 0x02006860, size = 36 },
     ["gSaveBlock1Ptr"] = { addr = 0x030071F0, size = 4 },
     ["gSaveBlock2Ptr"] = { addr = 0x030071F4, size = 4 },
+    ["sLockFieldControls"] = { addr = 0x03000E7C, size = 1 },
   },
 }

@@ -178,7 +178,9 @@ plus the supplied ROM's lowercase SHA1 as `romSha1`. That hash identifies the RO
 input; it cannot establish whether a separately supplied ELF belongs to it.
 
 The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
-`gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr` and `gMain`.
+`gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr`, `gMain`,
+`gPaletteFade`, `sLockFieldControls`, `CB1_Overworld` and `CB2_Overworld` (see
+the [memory map](docs/memory-map.md) for what each is used for).
 The file is embedded when the tool is compiled. `go run` picks up edits
 automatically; rebuild any existing `symgen` binary after changing the list.
 For diagnostics, add `-symbols PATH` to read a different allowlist, for example

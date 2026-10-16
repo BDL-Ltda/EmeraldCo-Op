@@ -1,9 +1,15 @@
 # Global symbols exported to the Lua client, one C identifier per line.
-# Add data objects only, not functions. Thumb function values encode a state
-# bit in the ELF; symgen exports symbol values verbatim without normalizing it.
+# Add data objects. Add a function only when the client compares it with a
+# function pointer stored in RAM (for example gMain.callback2). Thumb function
+# values keep their state bit (bit 0) in the ELF; symgen exports them verbatim,
+# which is exactly the value the game stores in such pointers.
 # Keep struct field offsets in docs/memory-map.md, not in this allowlist.
 gObjectEvents
 gPlayerAvatar
 gSaveBlock1Ptr
 gSaveBlock2Ptr
 gMain
+gPaletteFade
+sLockFieldControls
+CB1_Overworld
+CB2_Overworld
