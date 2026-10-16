@@ -11,18 +11,21 @@
 --      mGBA's own memory domains, no address literals);
 --   4. a TCP line round trip with the echo server, polled from the frame
 --      callback so the game never waits on the network;
---   5. if the server goes away it logs the error, keeps running and retries.
+--   5. if the server goes away it logs the error, keeps running and retries
+--      with backoff, because each connect() attempt stalls the game.
 
 local HOST = "127.0.0.1"
 local PORT = 8765
 local REPORT_EVERY = 60 -- frames (about 1 s at the GBA's ~59.7 fps)
 local PING_EVERY = 300 -- frames between test lines while connected
-local RETRY_EVERY = 300 -- frames between reconnect attempts
+local RETRY_FIRST = 300 -- frames before the first reconnect attempt (~5 s)
+local RETRY_MAX = 3600 -- backoff cap in frames (~60 s)
 local RECV_CHUNK = 1024
 
 local frames = 0
 local sock = nil
 local nextRetry = 0
+local retryDelay = RETRY_FIRST -- doubles after each failed connect
 local inbox = "" -- bytes received but not yet split into lines
 local outbox = "" -- bytes queued but not yet accepted by send()
 local pings = 0
@@ -53,13 +56,17 @@ local function disconnect(reason)
 	end
 	inbox = ""
 	outbox = ""
-	nextRetry = frames + RETRY_EVERY
+	retryDelay = RETRY_FIRST
+	nextRetry = frames + retryDelay
 end
 
 local function flush()
 	if not sock or outbox == "" then
 		return
 	end
+	-- send() can't be trusted to notice a dead connection: in 0.10.5, errors
+	-- mGBA doesn't map (e.g. connection reset) come back as "1 byte sent".
+	-- The "received" and "error" events catch disconnects instead.
 	local sent, err = sock:send(outbox)
 	if not sent then
 		if err ~= socket.ERRORS.AGAIN then
@@ -101,19 +108,23 @@ local function onReceived()
 	end
 end
 
--- (4) and (5). connect() is the only blocking call in the socket API; against
--- localhost it fails or succeeds immediately. See docs/mgba-scripting.md.
+-- (4) and (5). connect() is the only blocking call in the socket API: the game
+-- stalls until it succeeds or fails. On Windows even a refused connect to
+-- localhost takes about 2 s, so failed attempts back off from ~5 s to ~60 s.
+-- See docs/mgba-scripting.md.
 local function tryConnect()
-	nextRetry = frames + RETRY_EVERY
 	console:log(string.format("[net] connecting to %s:%d", HOST, PORT))
 	local s = socket.tcp()
 	local ok, err = s:connect(HOST, PORT)
 	if not ok then
-		console:error("[net] connect failed: " .. tostring(err) .. "; retrying in " .. RETRY_EVERY .. " frames")
+		console:error("[net] connect failed: " .. tostring(err) .. "; retrying in " .. retryDelay .. " frames")
 		s:close()
+		nextRetry = frames + retryDelay
+		retryDelay = math.min(retryDelay * 2, RETRY_MAX)
 		return
 	end
 	sock = s
+	retryDelay = RETRY_FIRST
 	-- mGBA polls connected sockets once per frame and dispatches these events.
 	sock:add("received", onReceived)
 	sock:add("error", function(_, e) disconnect(e) end)
