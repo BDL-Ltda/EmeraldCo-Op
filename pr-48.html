@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Player State Memory Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+.legend i.bad { border: 0; border-top: 2px dashed var(--danger); height: 0; vertical-align: 3px; }
+
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg.warn { border-color: var(--amber); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 14px; }
+.fact { background: var(--panel); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.fact b { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.fact span { font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; }
+.fact.warn span { color: var(--amber); }
+.fact p { font-size: 0.9rem; color: var(--muted); }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#48</span>
+  <h1>Where the player's state lives in RAM, verified rather than guessed</h1>
+  <p class="lede">This PR documents in <code>docs/memory-map.md</code> exactly where the client reads map, position, facing, gender and trainer ID, and proposes a signal for "in the overworld and controllable". Every offset was checked against the real <code>make modern</code> build, so #11 can write the Lua without guessing.</p>
+  <div class="meta">
+    <span>closes <b>#9</b></span>
+    <span>branch <b>docs/9-player-state-memory-map</b></span>
+    <span>files <b>4</b></span>
+    <span>lines <b>+242 / −10</b></span>
+    <span>milestone <b>0.1 Read state</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#next">What's next</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>Two sources, never a guess</h2>
+    <p>From 0.1 to 0.3 the Lua client reads the player's state straight from the game's RAM. AGENTS.md splits that knowledge in two. <strong>Global addresses</strong> come from <code>symgen</code>, which reads the ROM build's ELF and writes <code>client/addresses.lua</code>. <strong>Struct offsets</strong> are written by hand in <code>docs/memory-map.md</code>, sourced from the decomp headers.</p>
+    <p>This PR fills in the second half for the player, and adds the four globals the "visible" signal needs to the symgen allowlist.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where each number comes from</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="The decomp source in rom/ is built by make modern into an ELF and ROM, which stay local. symgen reads the ELF using the allowlist symbols.txt, which this PR extends, and writes client/addresses.lua, which this PR regenerates. docs/memory-map.md, which this PR extends, documents struct offsets from the decomp headers. The future memory.lua in issue 11 combines addresses and offsets to read the game RAM.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <rect class="box" x="20" y="40" width="210" height="60" rx="6"/>
+        <text class="t-mono" x="36" y="66">rom/ (decomp)</text>
+        <text class="t-sub" x="36" y="86">pinned submodule 731ad5b</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge" d="M230 70H286" marker-end="url(#m-a)"/>
+        <text class="t-sub" x="240" y="60">build</text>
+        <rect class="box priv" x="290" y="40" width="200" height="60" rx="6"/>
+        <text class="t-mono" x="306" y="66">.elf + .gba</text>
+        <text class="t-sub" x="306" y="86">local only, SHA1 466dcdee…</text>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box pub" x="290" y="140" width="200" height="60" rx="6"/>
+        <text class="t-mono t-em" x="306" y="166">symbols.txt</text>
+        <text class="t-sub" x="306" y="186">+4 symbols, +rules</text>
+        <path class="edge em" d="M490 170H556" marker-end="url(#m-ae)"/>
+        <path class="edge" d="M490 70H530V150H556" marker-end="url(#m-a)"/>
+        <rect class="box" x="560" y="140" width="160" height="60" rx="6"/>
+        <text class="t-mono" x="576" y="166">cmd/symgen</text>
+        <text class="t-sub" x="576" y="186">ELF → Lua</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge em flow" d="M720 170H766" marker-end="url(#m-ae)"/>
+        <rect class="box pub" x="770" y="140" width="210" height="60" rx="6"/>
+        <text class="t-mono t-em" x="786" y="166">addresses.lua</text>
+        <text class="t-sub" x="786" y="186">regenerated: 4 new entries</text>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="edge em" d="M125 100V256" marker-end="url(#m-ae)"/>
+        <text class="t-sub" x="135" y="190">headers, read by hand</text>
+        <rect class="box pub" x="20" y="260" width="300" height="56" rx="6"/>
+        <text class="t-mono t-em" x="36" y="284">docs/memory-map.md</text>
+        <text class="t-sub" x="36" y="304">offsets, sizes, visible signal</text>
+      </g>
+      <g class="step" style="--i:5">
+        <path class="edge flow em" d="M320 288H646" marker-end="url(#m-ae)"/>
+        <path class="edge flow em" d="M875 200V250H756" marker-end="url(#m-ae)"/>
+        <rect class="box dim" x="650" y="250" width="200" height="66" rx="6"/>
+        <text class="t-mono" x="666" y="276">memory.lua</text>
+        <text class="t-sub" x="666" y="296">#11, not in this PR</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added or changed by this PR</span><span><i class="d"></i>private, stays local</span><span><i class="m"></i>existing or future</span><span><i class="flow"></i>what #11 will combine</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>Two pointer chases, redone every frame</h2>
+    <p>Position and facing live in the player's object event. <code>gPlayerAvatar.objectEventId</code> picks one of the 16 entries in <code>gObjectEvents</code>, and each entry is 0x24 bytes. Map, gender and trainer ID live in the save blocks, which <strong>move</strong>. <code>SetSaveBlocksPointers</code> adds a random offset on every warp or full map load, at the start of every battle, and when a game is loaded. So the client has to re-read the pointer every time and never cache an address.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Reading x, y, facing and the map</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 340" role="img" aria-label="Top path: read gPlayerAvatar plus 0x05 to get the object id, then gObjectEvents plus id times 0x24, then read x at 0x10, y at 0x12, and facing at byte 0x18 masked with 0x0F. Bottom path: read the 32-bit pointer at gSaveBlock1Ptr, add 0x04 for mapGroup and 0x05 for mapNum; read gSaveBlock2Ptr, add 0x08 for gender and 0x0A for trainerId. Both pointers are re-read each time because the blocks move.">
+      <defs>
+        <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-be" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <text class="t-zone" x="20" y="30">OBJECT EVENT PATH (EWRAM)</text>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="34" cy="72" r="12"/><text class="badge-t" x="30" y="77">1</text>
+        <rect class="box" x="54" y="44" width="220" height="56" rx="6"/>
+        <text class="t-mono" x="70" y="68">gPlayerAvatar + 0x05</text>
+        <text class="t-sub" x="70" y="88">u8 objectEventId (0–15)</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em" d="M274 72H316" marker-end="url(#m-be)"/>
+        <circle class="badge" cx="334" cy="72" r="12"/><text class="badge-t" x="330" y="77">2</text>
+        <rect class="box" x="354" y="44" width="250" height="56" rx="6"/>
+        <text class="t-mono" x="370" y="68">gObjectEvents + id × 0x24</text>
+        <text class="t-sub" x="370" y="88">base of the player's object</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em" d="M604 72H646" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="650" y="30" width="330" height="90" rx="6"/>
+        <text class="t-mono t-em" x="666" y="54">+0x10 x · +0x12 y   (s16, −7)</text>
+        <text class="t-mono t-em" x="666" y="78">+0x18 facing = byte &amp; 0x0F</text>
+        <text class="t-sub" x="666" y="102">1 south · 2 north · 3 west · 4 east</text>
+      </g>
+      <text class="t-zone" x="20" y="180">SAVE BLOCK PATH (POINTERS MOVE)</text>
+      <g class="step" style="--i:3">
+        <circle class="badge" cx="34" cy="222" r="12"/><text class="badge-t" x="30" y="227">3</text>
+        <rect class="box" x="54" y="194" width="220" height="56" rx="6"/>
+        <text class="t-mono" x="70" y="218">[gSaveBlock1Ptr]</text>
+        <text class="t-sub" x="70" y="238">re-read the u32 every time</text>
+        <path class="edge em" d="M274 222H646" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="650" y="194" width="330" height="56" rx="6"/>
+        <text class="t-mono t-em" x="666" y="218">+0x04 mapGroup · +0x05 mapNum</text>
+        <text class="t-sub" x="666" y="238">s8, read as u8</text>
+      </g>
+      <g class="step" style="--i:4">
+        <circle class="badge" cx="34" cy="296" r="12"/><text class="badge-t" x="30" y="301">4</text>
+        <rect class="box" x="54" y="270" width="220" height="56" rx="6"/>
+        <text class="t-mono" x="70" y="294">[gSaveBlock2Ptr]</text>
+        <text class="t-sub" x="70" y="314">re-read the u32 every time</text>
+        <path class="edge em" d="M274 298H646" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="650" y="270" width="330" height="56" rx="6"/>
+        <text class="t-mono t-em" x="666" y="294">+0x08 gender · +0x0A trainerId</text>
+        <text class="t-sub" x="666" y="314">u8 · u8[4] little-endian, 2-aligned</text>
+      </g>
+      <g class="step" style="--i:5">
+        <path class="edge bad" d="M380 250V270" />
+        <text class="t-sub t-bad" x="300" y="264">never cache: moves on warps and battles</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>documented by this PR</span><span><i class="m"></i>global from addresses.lua</span></div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>The visible signal, one condition at a time</h2>
+    <p><code>visible</code> is true only when all four conditions hold, and the client reads them every frame. Click a condition to see what it catches. The offsets and symbol values are the ones the PR verified. The independent review rebuilt the ROM and got the same values.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg crc" type="button" data-selected data-title="gMain.callback2 == CB2_Overworld" data-value="gMain + 0x004 · u32 · CB2_Overworld = 0x0813D1E5" data-text="The field's main loop. Every full-screen mode replaces it: battles (switched to CB2_OverworldBasic as soon as the battle transition starts), the bag, party and Pokédex screens, map loads (CB2_DoChangeMap), and the title screen and intro."><small>condition 1</small>callback2</button>
+      <button class="seg" type="button" data-title="gMain.callback1 == CB1_Overworld" data-value="gMain + 0x000 · u32 · CB1_Overworld = 0x0813D169" data-text="The field input handler. It's NULL during map loads and CB1_OverworldLink in link/cable-club rooms, where the link drives the player rather than our input."><small>condition 2</small>callback1</button>
+      <button class="seg warn" type="button" data-title="sLockFieldControls == 0" data-value="symbol itself · bool8 · 0x03000E7C" data-text="DoCB1_Overworld only handles input when controls are unlocked. The game locks them for the start menu, every warp and warp-exit fade, the start of wild battles, and every script. That last case makes visible false during NPC talk and signs too; see the open question below. It's a file-static, but it's in the ELF symbol table with a unique name."><small>condition 3</small>field lock</button>
+      <button class="seg" type="button" data-title="gPaletteFade.active == 0" data-value="gPaletteFade + 0x07 · bit 7 (mask 0x80)" data-text="A safety net for fades that happen without a control lock. CB2_Overworld itself checks this flag. Bitfield verified by setting only that field in a constant struct and dumping its bytes: byte 7 = 0x80."><small>condition 4</small>fade</button>
+      <button class="seg wide" type="button" data-title="Thumb bit: compare as exported" data-value="odd values, bit 0 set" data-text="Both callbacks are Thumb functions, so their ELF values are odd, and the game stores that same odd value in gMain. The disassembly shows CB1_Overworld comparing gMain.callback2 against the literal 0x0813D1E5. Never clear bit 0 before comparing. Also, the .map file lists these functions one lower (0x0813D168, 0x0813D1E4)."><small>gotcha</small>bit 0</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Three choices worth checking</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Offsets come from the compiler, not from reading headers</h3>
+      <div class="term">
+        <div>_Static_assert(offsetof(struct ObjectEvent,</div>
+        <div>  currentCoords) == 0x10, "");</div>
+        <div><span class="c"># + bitfield byte dumps, DWARF, disassembly</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>Issue #9 requires it: bitfields such as <code>facingDirection</code>, which shares byte 0x18 with <code>movementDirection</code>, are easy to get wrong by eye. The offsets were checked three ways: disassembly of the real ELF, a scratch build with the exact modern flags, and DWARF. The review then repeated the asserts on its own clean build.</p></div>
+    </div>
+    <div class="decision">
+      <h3>trainerId is read as two u16s, never one u32</h3>
+      <div class="term">
+        <div>tid = u16[sb2+0x0A] | u16[sb2+0x0C] &lt;&lt; 16</div>
+        <div><span class="c"># sb2 is 4-aligned, so +0x0A is only 2-aligned</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>The save block's base is kept 4-aligned (<code>load_save.c</code> masks its random offset), so <code>playerTrainerId</code> at +0x0A is only 2-aligned. A single 32-bit read there would be misaligned, so the doc says to read two u16 values or four bytes instead.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Functions and a file-static in the symgen allowlist</h3>
+      <div class="term">
+        <div>gPaletteFade</div>
+        <div>sLockFieldControls</div>
+        <div>CB1_Overworld</div>
+        <div>CB2_Overworld</div>
+      </div>
+      <div class="why"><b>Why</b><p>The allowlist used to say "data objects only". The visible signal needs to compare function pointers stored in RAM, and it needs the control lock, which is a <code>static</code>. The new rules in <code>symbols.txt</code> allow these two cases only. symgen fails loudly on a name conflict or a missing symbol.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Offsets verified twice; emulator check still to do</h2>
+    <p>The output below is from rechecking the PR head after the review fixes (<code>c323f82</code>), with Go 1.27.2. <code>client/addresses.lua</code> was regenerated from the reviewer's independent clean <code>make modern</code> build and compared with the committed file.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> go vet ./... &amp;&amp; go test ./...</div>
+    <div style="--i:1" class="c">?   	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	[no test files]</div>
+    <div style="--i:2" class="c">?   	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	[no test files]</div>
+    <div style="--i:3" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	0.679s</div>
+    <div style="--i:4" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	(cached)</div>
+    <div style="--i:5">&nbsp;</div>
+    <div style="--i:6"><span class="p">$</span> go run ./cmd/symgen -elf …/pokeemerald_modern.elf -rom …/pokeemerald_modern.gba -out client/addresses.lua</div>
+    <div style="--i:7">symgen: wrote client/addresses.lua</div>
+    <div style="--i:8"><span class="p">$</span> git diff --quiet -- client/addresses.lua &amp;&amp; echo identical</div>
+    <div style="--i:9" class="ok">addresses.lua: identical after regeneration from independent clean build</div>
+  </div>
+  <div class="prose">
+    <p><strong>Manual check in the emulator: pending.</strong> Issue #9 asks someone to watch <code>x</code>, <code>y</code>, <code>facing</code> and the map in mGBA's memory viewer while walking, turning and warping. That needs a human. The PR body has the steps, and the PR stays a draft until it's done.</p>
+  </div>
+</section>
+
+<section id="next">
+  <div class="prose">
+    <span class="eyebrow">What's next</span>
+    <h2>#11 builds on this, after one decision</h2>
+    <p>#11 (<code>memory.lua getPlayerState()</code>) needs this PR and #10. Before #11 starts, a human has to decide what <code>visible</code> means. <code>protocol.md</code> says "whether the player should be drawn", but condition 3 hides the player whenever they talk to an NPC. Just dropping condition 3 would make the start menu count as visible, which breaks #11's acceptance criteria.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Issue dependencies</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 220" role="img" aria-label="Issue 9, this PR, and issue 10 both unblock issue 11. A decision on the meaning of visible is also needed before issue 11. Issue 10 depends on issue 8, PR 47.">
+      <defs>
+        <marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ce" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <rect class="box pub" x="20" y="20" width="250" height="56" rx="6"/>
+        <text class="t-mono t-em" x="36" y="44">#9 this PR</text>
+        <text class="t-sub" x="36" y="64">player-state memory map</text>
+      </g>
+      <g class="step" style="--i:1">
+        <rect class="box" x="20" y="150" width="250" height="56" rx="6"/>
+        <text class="t-mono" x="36" y="174">#8 → #10</text>
+        <text class="t-sub" x="36" y="194">mGBA spike, then client loader</text>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box priv" x="370" y="85" width="260" height="56" rx="6"/>
+        <text class="t-mono" x="386" y="109">decision: "visible"</text>
+        <text class="t-sub" x="386" y="129">controllable vs. should be drawn</text>
+        <path class="edge em" d="M270 48H330V100H366" marker-end="url(#m-ce)"/>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge" d="M630 113H726" marker-end="url(#m-c)"/>
+        <path class="edge" d="M270 178H700V125H726" marker-end="url(#m-c)"/>
+        <rect class="box" x="730" y="85" width="250" height="56" rx="6"/>
+        <text class="t-mono" x="746" y="109">#11</text>
+        <text class="t-sub" x="746" y="129">memory.lua getPlayerState()</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Read the "Player state" section of <code>docs/memory-map.md</code> first, then <code>cmd/symgen/symbols.txt</code>, then the diff of <code>client/addresses.lua</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>What should <code>visible</code> mean: "controllable" (hidden during NPC talk) or "should be drawn" (protocol.md)?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is it OK for the allowlist to accept functions compared with stored pointers and a uniquely named file-static (<code>sLockFieldControls</code>)?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Do the decomp links open the right lines at the pinned submodule commit?</span></label>
+    <label class="check"><input type="checkbox" id="c4"><span>Is the "save blocks move" rule clear enough for whoever writes #11?</span></label>
+    <label class="check"><input type="checkbox" id="c5"><span>Did someone watch x, y, facing and the map in mGBA's memory viewer and paste the result?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>manual test</b><span>The memory-viewer check while walking, turning and warping hasn't been done yet.</span></div>
+    <div class="limit"><b>open question</b><span>What <code>visible</code> means. Settle it before #11 and make <code>protocol.md</code> and <code>memory-map.md</code> agree.</span></div>
+    <div class="limit"><b>#11</b><span>The Lua that reads all of this. It's out of scope here.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#48 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #9, an independent review and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
