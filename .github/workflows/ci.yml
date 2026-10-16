@@ -53,6 +53,9 @@ jobs:
       # Same Dockerfile as `docker compose run --build --rm rom`, with layers cached between runs.
       - name: Build the ROM build image
         uses: docker/build-push-action@v6
+        env:
+          # The ELF and map below are the only artifacts this workflow keeps.
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker/rom
           platforms: linux/amd64
