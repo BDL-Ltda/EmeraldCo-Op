@@ -1,0 +1,228 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PR 49 · Authenticated server connections</title><style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+
+pre { white-space:pre; margin:0; } .meta {overflow-wrap:anywhere} .scroll {max-width:100%} main {min-width:0} .detail {margin-top:14px} </style></head><body><main>
+<header class="top"><span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#49</span><h1>A server that knows who joined</h1><p class="lede">The placeholder now accepts authenticated TCP connections, lists existing players and announces arrivals and departures. An authenticated reconnect replaces the old session safely.</p><div class="meta"><span>Closes <b>#13</b></span><span>Branch <b>feat/13-server-lifecycle</b></span><span>8 files · +909 / −11 lines</span><span>0.2 Networking</span></div><ul class="toc"><li><a href="#picture">Big picture</a></li><li><a href="#flow">How it works</a></li><li><a href="#identity">Connection identity</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#tested">Tests</a></li><li><a href="#review">Review</a></li></ul></header>
+<section id="picture"><div class="prose"><span class="eyebrow">Big picture</span><h2>The lifecycle before the relay</h2><p>Protocol messages already existed in #12. This PR connects that contract to a listener and a single room. Gameplay synchronization stays in later issues.</p></div><div class="plate" data-anim><div class="plate-head"><span class="cap">Implemented boundary</span><button class="replay">Replay</button></div><div class="scroll"><svg viewBox="0 0 880 230" role="img" aria-label="Clients connect through the TCP listener and protocol decoder to one room. Presence relay is a later issue."><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="ah em" d="M0 0L8 4L0 8Z"/></marker></defs><g class="step" style="--i:0"><rect class="box dim" x="20" y="60" width="170" height="80" rx="8"/><text x="105" y="95" text-anchor="middle">TCP clients</text><text class="t-sub" x="105" y="120" text-anchor="middle">Lua client: #17</text></g><g class="step" style="--i:1"><path class="edge em flow" marker-end="url(#arrow)" d="M190 100H245"/><rect class="box pub" x="250" y="60" width="170" height="80" rx="8"/><text x="335" y="95" text-anchor="middle">cmd/server</text><text class="t-sub" x="335" y="120" text-anchor="middle">flags → TCP listener</text></g><g class="step" style="--i:2"><path class="edge em flow" marker-end="url(#arrow)" d="M420 100H475"/><rect class="box pub" x="480" y="60" width="180" height="80" rx="8"/><text x="570" y="95" text-anchor="middle">internal/room</text><text class="t-sub" x="570" y="120" text-anchor="middle">one player map + mutex</text></g><g class="step" style="--i:3"><path class="edge ret" d="M570 140V185H335V140"/><text class="t-sub" x="450" y="210" text-anchor="middle">welcome · join · leave · error</text><rect class="box dim" x="700" y="60" width="160" height="80" rx="8"/><text x="780" y="95" text-anchor="middle">Presence relay</text><text class="t-sub" x="780" y="120" text-anchor="middle">#14 · not implemented</text></g></svg></div></div></section>
+<section id="flow"><div class="prose"><span class="eyebrow">How it works</span><h2>Authenticate before replacing anyone</h2><p>A new ID needs a free slot. An existing ID can reconnect at capacity, but only after supplying the correct key. Other players see the old session leave before the replacement joins.</p></div><div class="plate" data-anim><div class="plate-head"><span class="cap">Duplicate-ID path</span><button class="replay">Replay</button></div><div class="scroll"><svg viewBox="0 0 850 350" role="img" aria-label="Hello arrives, key is checked, old session is closed, leave is broadcast, welcome is sent and join is broadcast."><path class="life" d="M130 60V330M420 60V330M720 60V330"/><text x="130" y="35" text-anchor="middle">New connection</text><text x="420" y="35" text-anchor="middle">Room</text><text x="720" y="35" text-anchor="middle">Other players</text><g class="step" style="--i:0"><path class="edge em flow" marker-end="url(#arrow)" d="M130 85H415"/><text x="270" y="75" text-anchor="middle">hello, within 5 s</text></g><g class="step" style="--i:1"><rect class="box pub" x="340" y="105" width="160" height="44" rx="5"/><text x="420" y="132" text-anchor="middle">validate + check key</text></g><g class="step" style="--i:2"><text class="t-sub" x="420" y="180" text-anchor="middle">close old session</text><path class="edge em flow" marker-end="url(#arrow)" d="M420 205H715"/><text x="570" y="195" text-anchor="middle">leave(replaced)</text></g><g class="step" style="--i:3"><path class="edge ret" marker-end="url(#arrow)" d="M420 250H135"/><text x="270" y="240" text-anchor="middle">welcome [other players]</text></g><g class="step" style="--i:4"><path class="edge em flow" marker-end="url(#arrow)" d="M420 300H715"/><text x="570" y="290" text-anchor="middle">join</text></g></svg></div></div></section>
+<section id="identity"><div class="prose"><span class="eyebrow">Under the hood</span><h2>One ID, two connections, one current owner</h2><p>Click a step to explore the cleanup check. The player ID alone is not enough to decide which session may leave.</p></div><div class="plate"><div class="bytes"><button class="seg wide" data-selected data-title="Old session" data-value="players[id] = old" data-text="The room currently maps this player ID to the original connection.">Connected</button><button class="seg wide" data-title="Authenticated replacement" data-value="players[id] = replacement" data-text="Under the room mutex, remove the old entry, close its socket, send leave(replaced), then welcome and register the new connection before broadcasting join.">Replaced</button><button class="seg wide" data-title="Old handler finishes" data-value="players[id] != old" data-text="Cleanup compares connection identity. The old handler sees that it is no longer the current session and returns without removing or announcing the replacement.">Old cleanup</button><button class="seg wide" data-title="Current session disconnects" data-value="players[id] == replacement" data-text="Only the current session removes the entry and broadcasts leave(disconnect). This preserves the room after successive reconnects.">Final leave</button></div><div class="detail" aria-live="polite"></div></div></section>
+<section id="decisions"><div class="prose"><span class="eyebrow">Decisions</span><h2>Small room, explicit ownership</h2></div><div class="decisions"><div class="decision"><h3>A mutex orders membership events</h3><p>The issue permits mutex or channel ownership. The mutex makes snapshots and leave-before-join ordering atomic for this five-player room. Each connection also serializes writes.</p><div class="why"><b>Limit</b><p>Writes hold the room lock and have a five-second deadline. Per-client queues and slow-reader isolation are still #14.</p></div></div><div class="decision"><h3>Configuration follows the wire limits</h3><p>Flags override SERVER_ADDR, SERVER_JOIN_KEY and SERVER_MAX_PLAYERS. Capacity is 1–5 because protocol v1 welcome permits four remote entries. Invalid settings fail before listening.</p><div class="why"><b>Secrets</b><p>Help uses static text. Logs contain lifecycle fields, never raw messages, decoder errors or the key.</p></div></div></div></section>
+<section id="tested"><div class="prose"><span class="eyebrow">How it was tested</span><h2>Race checks and native Windows sockets</h2><p>Actual Go 1.27.2 Docker output follows. go vet also passed. Lua lint reported zero warnings/errors; the Lua test runner remains #16. ROM inputs were unchanged.</p></div><div class="term"><pre>	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient		coverage: 0.0% of statements
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	1.026s	coverage: 86.7% of statements
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	1.050s	coverage: 90.2% of statements
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	1.048s	coverage: 94.6% of statements
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	1.222s	coverage: 92.0% of statements
+</pre></div><div class="prose"><p>Codex also launched a temporary Windows server and exchanged JSON lines through PowerShell TCP streams, equivalent to the issue's two nc sessions. Welcome/join, replacement at capacity, old-socket closure and disconnect passed. A silent connection received bad_hello after 4.99 seconds. This was agent-operated, not a human multiplayer test.</p></div></section>
+<section id="next"><div class="prose"><span class="eyebrow">What's next</span><h2>Two direct dependents</h2><p>#13 → #14 adds presence relay, liveness and limits. #13 → #18 enables hosting setup. Successful implementation here does not yet make online gameplay available.</p></div></section>
+<section id="review"><div class="prose"><span class="eyebrow">For the reviewer</span><h2>Review the invariants</h2><p>Start with internal/room/server.go and its TCP tests, then cmd/server configuration and docs/server.md.</p></div><div class="checks"><label class="check"><input id="auth" type="checkbox"><span>Does authentication happen before capacity checks and replacement?</span></label><label class="check"><input id="order" type="checkbox"><span>Do observers see leave(replaced) before join, without stale cleanup removing the successor?</span></label><label class="check"><input id="key" type="checkbox"><span>Are errors, logs and help free of the join key?</span></label><label class="check"><input id="scope" type="checkbox"><span>Are the #14 boundaries explicit and acceptable?</span></label></div><div class="limits"><div class="limit"><b>#14</b><span>No presence updates/relay, ping/pong, rate cap, inactivity timeout or slow-client queues yet.</span></div><div class="limit"><b>#18</b><span>Public hosting and port forwarding remain separate.</span></div><div class="limit"><b>Human review</b><span>Approval and merge are still required. This walkthrough does not approve the PR.</span></div></div></section>
+<footer>Generated by Codex using the pr-walkthrough skill. Based on PR #49 at a17bcc0, issue #13 and executed checks. No runtime keys or game artifacts are included.</footer></main><script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script></body></html>
