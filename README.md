@@ -7,7 +7,7 @@ overworld. Saves, battles and items stay local in v1.
 The project is at **0.0 Foundations**. The ROM build and ELF symbol generator are
 available; the server and fake client still print placeholder messages and exit.
 There is no working Lua client yet. Follow progress
-in the [milestones](https://github.com/DaviAlencastro/EmeraldCo-Op/milestones).
+in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
 
@@ -208,7 +208,7 @@ future work in [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
 ## Client development
 
 The client targets mGBA with Lua 5.4 and native sockets, subject to validation in
-[issue #8](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/8).
+[issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8).
 See the [client README](client/README.md) for the planned configuration.
 `client/config.example.lua` is tracked; private settings belong in the ignored
 `client/config.lua`. Keep join keys and public IP addresses private.
@@ -240,6 +240,12 @@ Follow the shared [pick-task](.claude/skills/pick-task/SKILL.md) and
   whose tooling does not exist yet in the PR.
 - Open a PR into `master`, include `Closes #N` and the manual test results, and
   complete the template's Definition of Done checklist.
-- Obtain one human approval and passing available CI before squash merging.
-  Branch protection and CI setup are tracked in issues #6 and #5; never push
-  directly to `master` or merge your own PR without that approval.
+- Obtain one human approval and passing available CI, then merge with a merge commit.
+
+`master` is protected by a repository ruleset, with no bypass for admins:
+
+- Changes reach `master` only through a PR. Direct pushes, force pushes and
+  deleting the branch are rejected.
+- A PR needs one approval, and pushing new commits dismisses earlier approvals.
+- PRs merge with a merge commit; squash and rebase merges are disabled.
+- Required status checks will be added once CI exists (#5).

@@ -15,7 +15,7 @@ Design decisions are recorded in `docs/architecture.md` and in the issues. Don't
 
 ## Picking a task
 
-Work comes **only** from GitHub issues in `DaviAlencastro/EmeraldCo-Op`. Board: https://github.com/users/bernardosevero/projects/5
+Work comes **only** from GitHub issues in `BDL-Ltda/EmeraldCo-Op`. Board: https://github.com/users/bernardosevero/projects/5
 
 You may only take an issue that meets **all** of these:
 
