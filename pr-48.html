@@ -333,7 +333,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div class="bytes">
       <button class="seg crc" type="button" data-selected data-title="gMain.callback2 == CB2_Overworld" data-value="gMain + 0x004 · u32 · CB2_Overworld = 0x0813D1E5" data-text="The field's main loop. Every full-screen mode replaces it: battles (switched to CB2_OverworldBasic as soon as the battle transition starts), the bag, party and Pokédex screens, map loads (CB2_DoChangeMap), and the title screen and intro."><small>condition 1</small>callback2</button>
       <button class="seg" type="button" data-title="gMain.callback1 == CB1_Overworld" data-value="gMain + 0x000 · u32 · CB1_Overworld = 0x0813D169" data-text="The field input handler. It's NULL during map loads and CB1_OverworldLink in link/cable-club rooms, where the link drives the player rather than our input."><small>condition 2</small>callback1</button>
-      <button class="seg warn" type="button" data-title="sLockFieldControls == 0" data-value="symbol itself · bool8 · 0x03000E7C" data-text="DoCB1_Overworld only handles input when controls are unlocked. The game locks them for the start menu, every warp and warp-exit fade, the start of wild battles, and every script. That last case makes visible false during NPC talk and signs too; see the open question below. It's a file-static, but it's in the ELF symbol table with a unique name."><small>condition 3</small>field lock</button>
+      <button class="seg warn" type="button" data-title="sLockFieldControls == 0" data-value="symbol itself · bool8 · 0x03000E7C" data-text="DoCB1_Overworld only handles input when controls are unlocked. The game locks them for the start menu, every warp and warp-exit fade, the start of wild battles, and every script. That last case makes visible false during NPC talk and signs too; that's intended: #9 and #11 define visible as controllable overworld play. It's a file-static, but it's in the ELF symbol table with a unique name."><small>condition 3</small>field lock</button>
       <button class="seg" type="button" data-title="gPaletteFade.active == 0" data-value="gPaletteFade + 0x07 · bit 7 (mask 0x80)" data-text="A safety net for fades that happen without a control lock. CB2_Overworld itself checks this flag. Bitfield verified by setting only that field in a constant struct and dumping its bytes: byte 7 = 0x80."><small>condition 4</small>fade</button>
       <button class="seg wide" type="button" data-title="Thumb bit: compare as exported" data-value="odd values, bit 0 set" data-text="Both callbacks are Thumb functions, so their ELF values are odd, and the game stores that same odd value in gMain. The disassembly shows CB1_Overworld comparing gMain.callback2 against the literal 0x0813D1E5. Never clear bit 0 before comparing. Also, the .map file lists these functions one lower (0x0813D168, 0x0813D1E4)."><small>gotcha</small>bit 0</button>
     </div>
@@ -403,13 +403,13 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="next">
   <div class="prose">
     <span class="eyebrow">What's next</span>
-    <h2>#11 builds on this, after one decision</h2>
-    <p>#11 (<code>memory.lua getPlayerState()</code>) needs this PR and #10. Before #11 starts, a human has to decide what <code>visible</code> means. <code>protocol.md</code> says "whether the player should be drawn", but condition 3 hides the player whenever they talk to an NPC. Just dropping condition 3 would make the start menu count as visible, which breaks #11's acceptance criteria.</p>
+    <h2>#11 builds on this</h2>
+    <p>#11 (<code>memory.lua getPlayerState()</code>) needs this PR and #10. <code>visible</code> follows #9 and #11: it's false outside controllable overworld play, including NPC talk. This PR aligns <code>protocol.md</code> with that. Keeping players drawn during scripts would need its own issue, because simply dropping condition 3 would make the start menu count as visible.</p>
   </div>
   <figure class="plate" data-anim style="margin:0">
     <div class="plate-head"><span class="cap">Issue dependencies</span><button class="replay" type="button">Replay</button></div>
     <div class="scroll">
-    <svg viewBox="0 0 1000 220" role="img" aria-label="Issue 9, this PR, and issue 10 both unblock issue 11. A decision on the meaning of visible is also needed before issue 11. Issue 10 depends on issue 8, PR 47.">
+    <svg viewBox="0 0 1000 220" role="img" aria-label="Issue 9, this PR, and issue 10 both unblock issue 11. The meaning of visible is settled as controllable overworld play. Issue 10 depends on issue 8, PR 47.">
       <defs>
         <marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
         <marker id="m-ce" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
@@ -426,8 +426,8 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
       </g>
       <g class="step" style="--i:2">
         <rect class="box priv" x="370" y="85" width="260" height="56" rx="6"/>
-        <text class="t-mono" x="386" y="109">decision: "visible"</text>
-        <text class="t-sub" x="386" y="129">controllable vs. should be drawn</text>
+        <text class="t-mono" x="386" y="109">visible: decided</text>
+        <text class="t-sub" x="386" y="129">controllable overworld play</text>
         <path class="edge em" d="M270 48H330V100H366" marker-end="url(#m-ce)"/>
       </g>
       <g class="step" style="--i:3">
@@ -449,14 +449,14 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <p>Read the "Player state" section of <code>docs/memory-map.md</code> first, then <code>cmd/symgen/symbols.txt</code>, then the diff of <code>client/addresses.lua</code>. Your ticks are saved in this browser only.</p>
   </div>
   <div class="checks">
-    <label class="check"><input type="checkbox" id="c1"><span>What should <code>visible</code> mean: "controllable" (hidden during NPC talk) or "should be drawn" (protocol.md)?</span></label>
+    <label class="check"><input type="checkbox" id="c1"><span>Do <code>protocol.md</code> and <code>memory-map.md</code> now say the same thing about <code>visible</code>, including NPC talk?</span></label>
     <label class="check"><input type="checkbox" id="c2"><span>Is it OK for the allowlist to accept functions compared with stored pointers and a uniquely named file-static (<code>sLockFieldControls</code>)?</span></label>
     <label class="check"><input type="checkbox" id="c3"><span>Do the decomp links open the right lines at the pinned submodule commit?</span></label>
     <label class="check"><input type="checkbox" id="c4"><span>Is the "save blocks move" rule clear enough for whoever writes #11?</span></label>
     <label class="check"><input type="checkbox" id="c5"><span>Does the emulator log in the PR comment show the values the doc predicts?</span></label>
   </div>
   <div class="limits">
-    <div class="limit"><b>open question</b><span>What <code>visible</code> means. Settle it before #11 and make <code>protocol.md</code> and <code>memory-map.md</code> agree.</span></div>
+    <div class="limit"><b>NPC talk</b><span>Players vanish for others while talking to NPCs or reading signs. That's intended for now; changing it needs its own issue.</span></div>
     <div class="limit"><b>#11</b><span>The Lua that reads all of this. It's out of scope here.</span></div>
   </div>
 </section>
