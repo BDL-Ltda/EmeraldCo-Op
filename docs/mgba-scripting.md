@@ -165,7 +165,8 @@ this does not matter: remote players are drawn by the ROM from milestone 0.4
    title.
 4. Connects to `127.0.0.1:8765`, sends `hello from Emerald Co-Op at frame N`, then
    `ping N` every 300 frames, and logs each echoed line. Receiving is driven by
-   the per-frame `select()` poll, so the game never waits for the network.
+   the per-frame `select()` poll. Receive polling and queued sends don't wait
+   for network data; connection attempts still block the emulator.
 5. When the server goes away it logs the error, keeps running and tries to
    reconnect, first after 300 frames (about 5 seconds), then doubling the wait
    after each failed attempt up to 3600 frames (about 60 seconds).

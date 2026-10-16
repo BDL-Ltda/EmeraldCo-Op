@@ -10,7 +10,8 @@
 --   3. emu:read8/16/32 at the base of EWRAM and of the ROM (bases come from
 --      mGBA's own memory domains, no address literals);
 --   4. a TCP line round trip with the echo server, polled from the frame
---      callback so the game never waits on the network;
+--      callback. Receive polling and queued sends don't wait for network
+--      data; connection attempts still block the emulator;
 --   5. if the server goes away it logs the error, keeps running and retries
 --      with backoff, because each connect() attempt stalls the game.
 
