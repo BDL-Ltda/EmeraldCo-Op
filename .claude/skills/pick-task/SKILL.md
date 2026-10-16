@@ -5,14 +5,14 @@ description: Choose the next GitHub issue to work on in Emerald Co-Op. Use when 
 
 # Pick a task
 
-Repo: `DaviAlencastro/EmeraldCo-Op`. Board: project #5 owned by `bernardosevero`.
+Repo: `BDL-Ltda/EmeraldCo-Op`. Board: project #5 owned by `bernardosevero`.
 
 ## 1. List candidates
 
 Open, unassigned, not epics, ordered by milestone then number:
 
 ```bash
-gh issue list --repo DaviAlencastro/EmeraldCo-Op --state open --search "no:assignee -label:type:epic" \
+gh issue list --repo BDL-Ltda/EmeraldCo-Op --state open --search "no:assignee -label:type:epic" \
   --limit 100 --json number,title,milestone,labels \
   --jq 'sort_by(.milestone.title, .number)[] | "#\(.number) [\(.milestone.title)] \(.title)"'
 ```
@@ -23,9 +23,9 @@ Each issue body has a `## Dependencies` section listing the issues it's blocked 
 
 ```bash
 N=12
-gh issue view $N --repo DaviAlencastro/EmeraldCo-Op --json body --jq .body \
+gh issue view $N --repo BDL-Ltda/EmeraldCo-Op --json body --jq .body \
   | sed -n '/^## Dependencies/,/^## /p' | grep -o '#[0-9]\+' | tr -d '#' | sort -u \
-  | while read d; do echo "#$d $(gh issue view $d --repo DaviAlencastro/EmeraldCo-Op --json state --jq .state)"; done
+  | while read d; do echo "#$d $(gh issue view $d --repo BDL-Ltda/EmeraldCo-Op --json state --jq .state)"; done
 ```
 
 All `CLOSED` (or no dependencies) → ready. Any `OPEN` → skip it and check the next candidate.
@@ -35,7 +35,7 @@ Pick the **first ready issue** in the step 1 order. If none are ready, say so an
 ## 3. Claim it
 
 ```bash
-gh issue edit $N --repo DaviAlencastro/EmeraldCo-Op --add-assignee @me
+gh issue edit $N --repo BDL-Ltda/EmeraldCo-Op --add-assignee @me
 ```
 
 (When an agent works for a human, `@me` is that human's account, which is correct.)

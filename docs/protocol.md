@@ -1,6 +1,6 @@
 # Protocol
 
-The wire protocol between the mGBA Lua client and the Go relay server, as agreed in [issue #12](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/12). The Go implementation is `internal/protocol`; its tests check that every example on this page decodes and re-encodes to exactly the same line. See [architecture.md](architecture.md) for the relay, identity and v1 synchronization boundary.
+The wire protocol between the mGBA Lua client and the Go relay server, as agreed in [issue #12](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/12). The Go implementation is `internal/protocol`; its tests check that every example on this page decodes and re-encodes to exactly the same line. See [architecture.md](architecture.md) for the relay, identity and v1 synchronization boundary.
 
 ## Framing
 
@@ -128,7 +128,7 @@ In Go, `protocol.Decoder` reports these cases as errors matching `ErrVersionMism
 
 ## Connection sequences
 
-The server rules (timeouts, relaying, rate limits) are implemented in [#13](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/13) and [#14](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/14).
+The server rules (timeouts, relaying, rate limits) are implemented in [#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13) and [#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14).
 
 ### Join
 

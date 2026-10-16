@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/2). The repository currently provides a skeleton; the runtime components and communication described here are planned, not implemented. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The repository currently provides a skeleton; the runtime components and communication described here are planned, not implemented. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
@@ -14,7 +14,7 @@ This document records the design agreed in [issue #2](https://github.com/DaviAle
 | `client/` | mGBA Lua scripts, local configuration and generated addresses. |
 | `docs/` | Architecture, protocol, memory layout, hosting instructions and roadmap. |
 
-There is one Go module at the repository root: `github.com/DaviAlencastro/EmeraldCo-Op`. The server and tools share it and use only the Go standard library. Code, comments, documentation, commits, issues and pull requests are written in English.
+There is one Go module at the repository root: `github.com/DaviAlencastro/EmeraldCo-Op`. That module path is an identifier kept from before the repository moved to `BDL-Ltda/EmeraldCo-Op`; it is not the repository's GitHub location, and Go import paths keep using it. The server and tools share it and use only the Go standard library. Code, comments, documentation, commits, issues and pull requests are written in English.
 
 The emulator is **mGBA**, using its **Lua 5.4** scripting support and native sockets. Modules in `client/lib/` must remain pure: no `emu`, `socket` or `callbacks`, so they can run in the project's tiny Lua test runner.
 
@@ -54,11 +54,11 @@ Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a 
 
 ## Networking, identity and hosting
 
-The protocol is **JSON lines over TCP**, with a generic envelope containing `v`, `type` and message-specific fields. [Issue #12](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/12) defines the detailed contract in [protocol.md](protocol.md).
+The protocol is **JSON lines over TCP**, with a generic envelope containing `v`, `type` and message-specific fields. [Issue #12](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/12) defines the detailed contract in [protocol.md](protocol.md).
 
 For **v1**, the Go server is a **dumb relay**. There is **one global room** with a maximum of **5 players total**, leaving **4 remote player slots** for each client. No accounts are required. Identity combines **`PLAYER_ID` from the local client configuration** with the **in-game trainer ID** (`trainerId`, a 32-bit integer on the wire; see [protocol.md](protocol.md)).
 
-For the MVP, **leomayca hosts the server with port forwarding**. Access uses a **shared join key** and **basic limits**. The details of hosting, local configuration and limits belong to [#18](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/18) and [playing-online.md](playing-online.md). Never commit or publish the join key, public IPs or other secrets. `client/config.lua` is local-only; [client/config.example.lua](../client/config.example.lua) provides placeholder settings until the configuration loader is implemented.
+For the MVP, **leomayca hosts the server with port forwarding**. Access uses a **shared join key** and **basic limits**. The details of hosting, local configuration and limits belong to [#18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18) and [playing-online.md](playing-online.md). Never commit or publish the join key, public IPs or other secrets. `client/config.lua` is local-only; [client/config.example.lua](../client/config.example.lua) provides placeholder settings until the configuration loader is implemented.
 
 ## v1 synchronization boundary
 
