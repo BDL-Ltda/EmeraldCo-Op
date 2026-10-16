@@ -9,6 +9,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 | `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
 | `cmd/server/` | Go relay server entry point. |
 | `cmd/fakeclient/` | Go client used to exercise the protocol without an emulator. |
+| `cmd/echoserver/` | Line echo server for testing client sockets ([mgba-scripting.md](mgba-scripting.md)); not the relay. |
 | `cmd/symgen/` | Go tool that generates Lua global addresses from the ROM build's ELF. |
 | `internal/` | Shared Go implementation packages. |
 | `client/` | mGBA Lua scripts, local configuration and generated addresses. |
@@ -16,7 +17,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 
 There is one Go module at the repository root: `github.com/DaviAlencastro/EmeraldCo-Op`. That module path is an identifier kept from before the repository moved to `BDL-Ltda/EmeraldCo-Op`; it is not the repository's GitHub location, and Go import paths keep using it. The server and tools share it and use only the Go standard library. Code, comments, documentation, commits, issues and pull requests are written in English.
 
-The emulator is **mGBA**, using its **Lua 5.4** scripting support and native sockets. Modules in `client/lib/` must remain pure: no `emu`, `socket` or `callbacks`, so they can run in the project's tiny Lua test runner.
+The emulator is **mGBA 0.10.5** (pinned; see [mgba-scripting.md](mgba-scripting.md)), using its **Lua 5.4** scripting support and native sockets. Modules in `client/lib/` must remain pure: no `emu`, `socket` or `callbacks`, so they can run in the project's tiny Lua test runner.
 
 ## Hybrid approach and ROM builds
 

@@ -17,6 +17,7 @@ EmeraldCo-Op/
 ├── cmd/
 │   ├── server/               # presence relay entry point (placeholder)
 │   ├── fakeclient/           # simulated player entry point (placeholder)
+│   ├── echoserver/           # line echo server for client socket tests
 │   └── symgen/               # ELF symbol generator and symbol allowlist
 ├── internal/                 # shared Go packages
 ├── client/                   # mGBA Lua client and example configuration
@@ -207,8 +208,12 @@ future work in [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
 
 ## Client development
 
-The client targets mGBA with Lua 5.4 and native sockets, subject to validation in
-[issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8).
+Install **[mGBA 0.10.5](https://github.com/mgba-emu/mgba/releases/tag/0.10.5)**,
+the pinned emulator version. Everyone uses exactly this release: the scripting
+API differs between versions, and development builds are not supported. The
+client uses mGBA's Lua 5.4 scripting and native sockets; see
+[mGBA scripting](docs/mgba-scripting.md) for the API, gotchas, how to load a
+script and the spike script `client/spike/hello.lua`.
 See the [client README](client/README.md) for the planned configuration.
 `client/config.example.lua` is tracked; private settings belong in the ignored
 `client/config.lua`. Keep join keys and public IP addresses private.
@@ -219,6 +224,7 @@ See the [client README](client/README.md) for the planned configuration.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
 - [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
+- [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.
 - [Playing online](docs/playing-online.md): stub for hosting and joining (#18).
 - [Installing](docs/installing.md): patch your ROM and load the client (players).
 - [Releasing](docs/releasing.md): build, create the `.bps` patch and publish a release.
