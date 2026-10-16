@@ -195,6 +195,12 @@ Follow the shared [pick-task](.claude/skills/pick-task/SKILL.md) and
   whose tooling does not exist yet in the PR.
 - Open a PR into `master`, include `Closes #N` and the manual test results, and
   complete the template's Definition of Done checklist.
-- Obtain one human approval and passing available CI before squash merging.
-  Branch protection and CI setup are tracked in issues #6 and #5; never push
-  directly to `master` or merge your own PR without that approval.
+- Obtain one human approval and passing available CI, then squash merge.
+
+`master` is protected by a repository ruleset, with no bypass for admins:
+
+- Changes reach `master` only through a PR. Direct pushes, force pushes and
+  deleting the branch are rejected.
+- A PR needs one approval, and pushing new commits dismisses earlier approvals.
+- Squash is the only merge method.
+- Required status checks will be added once CI exists (#5).
