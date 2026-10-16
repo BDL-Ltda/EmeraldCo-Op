@@ -125,6 +125,17 @@ variables; real addresses come from `client/addresses.lua`.
   line mode and returns whatever is available. The caller does its own framing.
 - **`emu` is `nil` without a game.** Guard reads and use the **start** callback.
 - **`print` is not the scripting console.** Use `console:log`.
+- **Lua can't open non-ASCII paths on Windows.** mGBA loads the script itself
+  from any folder, but Lua's own `io.open`, `loadfile` and `require` use the C
+  library's ANSI `fopen`. They fail with "No such file or directory" when the
+  path has characters such as `á` (e.g. a user folder named `Usuário`). The
+  file dialog expands 8.3 short paths back to the long name, so that doesn't
+  help. Keep the client in an ASCII-only folder (e.g. `C:\EmeraldCoop`);
+  `client/bridge.lua` detects the problem and says so.
+- **The only ROM hash is a CRC32.** `emu:checksum()` (default type CRC32) returns
+  the loaded ROM's CRC32 as 4 big-endian bytes. mGBA computes it once when the
+  ROM loads, so calling it costs nothing. There is no SHA1, so `cmd/symgen`
+  writes `romCrc32` for the client to compare.
 
 ## Framing
 
