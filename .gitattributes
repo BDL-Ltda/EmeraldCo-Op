@@ -7,3 +7,5 @@
 /client/addresses.lua text eol=lf
 /cmd/symgen/symbols.txt text eol=lf
 /cmd/symgen/testdata/*.lua text eol=lf
+/.github/workflows/*.yml text eol=lf
+/.luacheckrc text eol=lf

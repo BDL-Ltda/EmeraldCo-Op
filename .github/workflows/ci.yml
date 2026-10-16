@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  lua:
+    name: Lua
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Lua 5.4 and luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.4 lua-check
+      - run: luacheck client/
+      - name: Lua tests
+        run: |
+          if [ -f client/tests/run.lua ]; then
+            lua5.4 client/tests/run.lua
+          else
+            echo "client/tests/run.lua does not exist yet (#16); skipping."
+          fi
+
+  rom:
+    name: ROM
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      # Same Dockerfile as `docker compose run --build --rm rom`, with layers cached between runs.
+      - name: Build the ROM build image
+        uses: docker/build-push-action@v6
+        env:
+          # The ELF and map below are the only artifacts this workflow keeps.
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: docker/rom
+          platforms: linux/amd64
+          tags: emerald-coop-rom:ci
+          load: true
+          cache-from: type=gha,scope=rom-image
+          cache-to: type=gha,mode=max,scope=rom-image
+      # Mirrors the `rom` service in docker-compose.yml.
+      - name: Build the ROM
+        run: >
+          docker run --rm --platform linux/amd64 --network none
+          --mount type=bind,source="$PWD/rom",target=/source
+          emerald-coop-rom:ci
+      # Debug outputs only. Never upload the .gba: the repository is public.
+      - name: Upload ELF and linker map
+        uses: actions/upload-artifact@v4
+        with:
+          name: rom-symbols
+          path: |
+            rom/pokeemerald_modern.elf
+            rom/pokeemerald_modern.map
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Check client/addresses.lua is up to date
+        run: |
+          go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua
+          if ! git diff --exit-code -- client/addresses.lua; then
+            echo "::error file=client/addresses.lua::client/addresses.lua does not match this ROM build. The ROM changed but addresses.lua wasn't regenerated (or it was edited by hand). Rebuild the ROM and run: go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua"
+            exit 1
+          fi

@@ -248,4 +248,7 @@ Follow the shared [pick-task](.claude/skills/pick-task/SKILL.md) and
   deleting the branch are rejected.
 - A PR needs one approval, and pushing new commits dismisses earlier approvals.
 - PRs merge with a merge commit; squash and rebase merges are disabled.
-- Required status checks will be added once CI exists (#5).
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs Go, Lua and ROM
+  checks on every PR and on pushes to `master`. The ROM check fails if
+  `client/addresses.lua` was not regenerated after a ROM change. Making these
+  checks required is tracked in #6.
