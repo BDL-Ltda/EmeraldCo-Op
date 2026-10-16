@@ -36,11 +36,17 @@ func (e *ValidationError) Error() string {
 
 func (e *ValidationError) Unwrap() error { return ErrInvalid }
 
+// ValidateJoinKey checks the shared key's wire-format rules without requiring
+// unrelated hello fields. Errors identify the field but never include its value.
+func ValidateJoinKey(key string) error {
+	return validateText(TypeHello, "joinKey", key, 1, MaxJoinKeyLength)
+}
+
 func (m Hello) Validate() error {
 	if err := validatePlayerID(TypeHello, "playerId", m.PlayerID); err != nil {
 		return err
 	}
-	if err := validateText(TypeHello, "joinKey", m.JoinKey, 1, MaxJoinKeyLength); err != nil {
+	if err := ValidateJoinKey(m.JoinKey); err != nil {
 		return err
 	}
 	if err := validateGender(TypeHello, "gender", m.Gender); err != nil {
