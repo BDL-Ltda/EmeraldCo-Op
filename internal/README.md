@@ -1,7 +1,8 @@
 # Internal Go packages
 
 Shared server and tool packages belong here, inside the root Go module
-`github.com/DaviAlencastro/EmeraldCo-Op`. Use the standard library only.
+`github.com/DaviAlencastro/EmeraldCo-Op` (the module path predates the move to
+`BDL-Ltda/EmeraldCo-Op` and is kept unchanged). Use the standard library only.
 
 | Package | Purpose |
 | --- | --- |

@@ -6,7 +6,7 @@ overworld. Saves, battles and items stay local in v1.
 
 The project is at **0.0 Foundations**. The Go commands currently print placeholder
 messages and exit; there is no working server or Lua client yet. Follow progress
-in the [milestones](https://github.com/DaviAlencastro/EmeraldCo-Op/milestones).
+in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
 
@@ -163,7 +163,7 @@ ROMs, saves, BIOS files, patches or build outputs.
 ## Client development
 
 The client targets mGBA with Lua 5.4 and native sockets, subject to validation in
-[issue #8](https://github.com/DaviAlencastro/EmeraldCo-Op/issues/8).
+[issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8).
 See the [client README](client/README.md) for the planned configuration.
 `client/config.example.lua` is tracked; private settings belong in the ignored
 `client/config.lua`. Keep join keys and public IP addresses private.
