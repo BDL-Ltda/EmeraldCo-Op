@@ -86,8 +86,9 @@ variables; real addresses come from `client/addresses.lua`.
   a hostname adds a DNS lookup to the stall. How long a failed attempt takes
   depends on the OS:
   - **Windows:** even a refused connect to `127.0.0.1` (no server listening)
-    takes about **2 s**, because Winsock retries the SYN after a reset. A plain
-    blocking connect measured 2.2–2.3 s on Windows 11.
+    takes about **2 s**, because Winsock retries the SYN after a reset. In
+    mGBA 0.10.5 on Windows 11, each refused attempt froze the game for
+    2.03–2.06 s.
   - **Linux and macOS:** a refused local connect fails at once.
   - **Any OS:** against a remote host that drops packets, the game freezes for
     the OS connect timeout.
@@ -185,6 +186,10 @@ log the disconnect and the reconnect attempts, and the game should keep running.
 On Windows, expect a hitch of about 2 s on each reconnect attempt (see Gotchas).
 Start the server again: the script should reconnect.
 
-**Not yet verified in the emulator.** The behavior above is expected from the
-0.10.5 source and from a run with fake mGBA globals. Nobody has run the script
-in mGBA yet ([#8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8)).
+**Verified in mGBA 0.10.5 on Windows 11** with our built ROM
+([#8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8)):
+- The game held 59.9–60.1 fps while walking and echoing lines.
+- Killing the server was logged as `disconnected: unknown error` (a reset, not a
+  clean close).
+- Each refused reconnect froze the game for about 2 s, at backed-off intervals.
+- Restarting the server reconnected the script on its next attempt.
