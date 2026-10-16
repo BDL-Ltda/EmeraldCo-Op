@@ -406,7 +406,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="tested">
   <div class="prose">
     <span class="eyebrow">How it was tested</span>
-    <h2>Automated checks pass; the emulator run is still to do</h2>
+    <h2>Automated checks and the emulator run pass</h2>
     <p>Go vet and tests ran with Go 1.27.2. luacheck ran in an Ubuntu 24.04 container with the <code>lua-check</code> package, the same setup CI uses. It was run again after the review fixes (<code>5c09439</code>) and still reported 0 warnings / 0 errors.</p>
   </div>
   <div class="term" data-anim>
@@ -428,7 +428,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   </div>
   <div class="prose">
     <p><strong>Smoke run with fakes.</strong> The author also ran <code>hello.lua</code> under Lua 5.4 against hand-written fake mGBA globals, which weren't committed. The PR reports that it reconnected after a refused connect, echoed lines across partial sends, logged the disconnect, and kept counting frames. That helps, but it isn't the emulator.</p>
-    <p><strong>Manual in-emulator test: pending.</strong> Neither mGBA nor a ROM was available on the machine that prepared the PR. One acceptance criterion depends on this run: "the game stays at full speed during network I/O". The PR body has the exact steps, so the PR stays a draft until they're done. Step 6 asks the tester to note the hitch on each reconnect attempt.</p>
+    <p><strong>In-emulator test: done in mGBA 0.10.5 on Windows 11.</strong> It was run by Claude Code using a scratch harness that drives input and logs frame pacing. The game held 59.9–60.1 fps while walking and echoing lines. Each refused reconnect froze it for 2.03–2.06 s, at backed-off intervals, and restarting the server reconnected the script. The full log is in a PR comment.</p>
   </div>
 </section>
 
@@ -487,10 +487,10 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <label class="check"><input type="checkbox" id="c3"><span>Is the <code>.luacheckrc</code> exemption limited to <code>client/spike</code>, so <code>client/lib/</code> stays pure?</span></label>
     <label class="check"><input type="checkbox" id="c4"><span>Should <code>cmd/echoserver</code> stay once the relay and <code>fakeclient</code> exist, or be removed?</span></label>
     <label class="check"><input type="checkbox" id="c5"><span>Is <code>docs</code> the right PR type for a spike that also adds a small script and tool?</span></label>
-    <label class="check"><input type="checkbox" id="c6"><span>Did someone run the manual mGBA steps from the PR body and paste the log?</span></label>
+    <label class="check"><input type="checkbox" id="c6"><span>Does the emulator log in the PR comment show full speed and the backed-off reconnects?</span></label>
   </div>
   <div class="limits">
-    <div class="limit"><b>manual test</b><span>Nobody has run the script in mGBA yet, so "full speed during network I/O" is still open.</span></div>
+    <div class="limit"><b>Windows hitch</b><span>Each refused reconnect still freezes the game for about 2 s. Backoff makes it rare, but it can't remove it.</span></div>
     <div class="limit"><b>#10</b><span>Real client entry point and ROM-hash check. It also needs to back off on reconnect, because <code>connect</code> blocks.</span></div>
     <div class="limit"><b>#16</b><span>Line framing as a pure, unit-tested module in <code>client/lib/</code>.</span></div>
   </div>

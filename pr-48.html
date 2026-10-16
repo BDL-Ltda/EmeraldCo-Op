@@ -380,7 +380,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="tested">
   <div class="prose">
     <span class="eyebrow">How it was tested</span>
-    <h2>Offsets verified twice; emulator check still to do</h2>
+    <h2>Offsets verified at build time and in the emulator</h2>
     <p>The output below is from rechecking the PR head after the review fixes (<code>c323f82</code>), with Go 1.27.2. <code>client/addresses.lua</code> was regenerated from the reviewer's independent clean <code>make modern</code> build and compared with the committed file.</p>
   </div>
   <div class="term" data-anim>
@@ -396,7 +396,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div style="--i:9" class="ok">addresses.lua: identical after regeneration from independent clean build</div>
   </div>
   <div class="prose">
-    <p><strong>Manual check in the emulator: pending.</strong> Issue #9 asks someone to watch <code>x</code>, <code>y</code>, <code>facing</code> and the map in mGBA's memory viewer while walking, turning and warping. That needs a human. The PR body has the steps, and the PR stays a draft until it's done.</p>
+    <p><strong>In-emulator check: done in mGBA 0.10.5.</strong> It was run by Claude Code using a scratch harness that reads every field as documented. Turning gave facing 3/2/1/4 for left/up/down/right, and each step moved x or y by 1. The map read 25.40 in the truck, 0.9 in Littleroot and 1.0 in the house. <code>visible</code> went false with the start menu open and during the warp. <code>gSaveBlock1Ptr</code> moved on both warps. The full log is in a PR comment.</p>
   </div>
 </section>
 
@@ -453,10 +453,9 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <label class="check"><input type="checkbox" id="c2"><span>Is it OK for the allowlist to accept functions compared with stored pointers and a uniquely named file-static (<code>sLockFieldControls</code>)?</span></label>
     <label class="check"><input type="checkbox" id="c3"><span>Do the decomp links open the right lines at the pinned submodule commit?</span></label>
     <label class="check"><input type="checkbox" id="c4"><span>Is the "save blocks move" rule clear enough for whoever writes #11?</span></label>
-    <label class="check"><input type="checkbox" id="c5"><span>Did someone watch x, y, facing and the map in mGBA's memory viewer and paste the result?</span></label>
+    <label class="check"><input type="checkbox" id="c5"><span>Does the emulator log in the PR comment show the values the doc predicts?</span></label>
   </div>
   <div class="limits">
-    <div class="limit"><b>manual test</b><span>The memory-viewer check while walking, turning and warping hasn't been done yet.</span></div>
     <div class="limit"><b>open question</b><span>What <code>visible</code> means. Settle it before #11 and make <code>protocol.md</code> and <code>memory-map.md</code> agree.</span></div>
     <div class="limit"><b>#11</b><span>The Lua that reads all of this. It's out of scope here.</span></div>
   </div>
