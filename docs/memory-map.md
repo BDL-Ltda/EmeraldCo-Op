@@ -162,11 +162,37 @@ is `NULL` during map loads ([overworld.c:1577][overworld-1577]) and
 [`CB1_Overworld`][overworld-1459] once the field is back
 ([overworld.c:1582][overworld-1582]).
 
-So the client keeps sending `visible = true` in battles and menus, but sends the
-**last position read while `positionValid` was true**. Before the first valid
-read of a session there is no position to send, so it sends none. In an mGBA
-0.10.5 run, `positionValid` was false for about 10 frames on each map load, and
-during those frames `x`/`y` still showed the previous map's coordinates.
+In an mGBA 0.10.5 run, `positionValid` was false for about 10 frames on each map
+load, and during those frames `x`/`y` still showed the previous map's
+coordinates.
+
+#### Cached position across sessions
+
+The client keeps one **position snapshot**: `mapGroup`, `mapNum`, `x`, `y` and
+`facing`, read together in the same frame while `positionValid` is true. It
+replaces the whole snapshot at once and never updates single fields while
+`positionValid` is false, so a new map ID is never paired with the old map's
+coordinates. Each frame:
+
+1. **`visible` is false and was never true** (boot, title, intro): there is no
+   snapshot and nothing to publish.
+2. **`visible` is true and `positionValid` is true:** take a fresh snapshot.
+   Publish it if it changed.
+3. **`visible` is true and `positionValid` is false** (map load, battle,
+   full-screen menu): keep the last snapshot unchanged. If this session has no
+   snapshot yet (the first frames after starting or continuing a game), publish
+   nothing.
+4. **`visible` goes from true to false** (soft or hard reset): first announce
+   the player as invisible, using the last snapshot with `visible = false` (or
+   disconnect), so peers don't keep drawing a player who has gone back to the
+   title screen. **Then** discard the snapshot.
+5. **`visible` becomes true again** (next session): case 2 or 3 applies. Publish
+   nothing until the new session has a fresh snapshot.
+
+How this goes over the wire (presence messages, disconnect) belongs to
+[#17](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/17). #11 only reads the
+values and must test both the snapshot during map loads and the reset to a new
+session.
 
 ### How the offsets were verified
 
