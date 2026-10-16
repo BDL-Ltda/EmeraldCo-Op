@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Fake players without an emulator · Emerald Co-Op</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Emerald Co-Op walkthrough: shared template tokens and diagram classes.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#53</span>
+  <h1>Fake players.<br>Real protocol.</h1>
+  <p class="lede">Exercise multiplayer from a terminal: connect simulated players, watch them walk and warp, and verify that a departing peer is announced. No emulator or ROM is needed.</p>
+  <div class="meta">
+    <span>closes <b>#15</b></span>
+    <span>branch <b>feat/15-fakeclient</b></span>
+    <span>diff <b>9 files · +1046 / −11</b></span>
+    <span>milestone <b>0.2 Networking</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>A test player, not another server</h2>
+    <p>Issue #15 asks for a simulated player using the existing <code>internal/protocol</code>. This PR replaces the fakeclient placeholder; it does not change the server, game memory or Lua runtime.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">One existing wire contract</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="The shared protocol feeds fakeclient, which exchanges JSON lines with the existing server.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="980" height="280" rx="10"/>
+      <text class="t-zone" x="30" y="38">GO STANDARD LIBRARY · NO EMULATOR</text>
+      <g class="step" style="--i:0">
+        <rect class="box" x="40" y="120" width="260" height="56" rx="6"/>
+        <text class="t-mono" x="56" y="144">internal/protocol</text>
+        <text class="t-sub" x="56" y="164">Existing validation + JSON line codec</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em flow" d="M300 148H396" marker-end="url(#m-ae)"/>
+        <rect class="box pub" x="400" y="120" width="260" height="56" rx="6"/>
+        <text class="t-mono t-em" x="416" y="144">cmd/fakeclient</text>
+        <text class="t-sub" x="416" y="164">Patterns, heartbeat, readable events</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge" d="M660 148H756" marker-end="url(#m-a)"/>
+        <rect class="box" x="760" y="120" width="200" height="56" rx="6"/>
+        <text class="t-mono" x="776" y="144">cmd/server</text>
+        <text class="t-sub" x="776" y="164">Lifecycle #13 · relay #14</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added by this PR</span><span><i class="m"></i>existing component</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>Authenticate before the simulation starts</h2>
+    <p>The hello/welcome order comes from protocol #12. The client waits up to five seconds for welcome, then sends an initial presence. Movement, map switches and heartbeats share one serialized writer; cancellation closes the socket and joins the decoder.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Connection sequence</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll"><svg viewBox="0 0 1000 360" role="img" aria-label="Fakeclient sends hello, waits for welcome, sends presence updates and pings every five seconds; the server replies with pong.">
+      <defs><marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="box pub" x="110" y="12" width="240" height="44" rx="6"/><text x="230" y="40" text-anchor="middle" class="t-mono">fakeclient</text>
+      <rect class="box" x="650" y="12" width="240" height="44" rx="6"/><text x="770" y="40" text-anchor="middle" class="t-mono">server</text>
+      <path class="life" d="M230 56V342M770 56V342"/>
+      <g class="step" style="--i:0"><path class="edge em flow" d="M230 96H770" marker-end="url(#s-a)"/><text x="500" y="85" text-anchor="middle">hello · synthetic trainer metadata</text></g>
+      <g class="step" style="--i:1"><path class="edge em ret" d="M770 146H230" marker-end="url(#s-a)"/><text x="500" y="135" text-anchor="middle">welcome · existing players + last presence</text></g>
+      <g class="step" style="--i:2"><path class="edge em flow" d="M230 202H770" marker-end="url(#s-a)"/><text x="500" y="191" text-anchor="middle">initial presence, then changed positions</text></g>
+      <g class="step" style="--i:3"><path class="edge em flow" d="M230 260H770" marker-end="url(#s-a)"/><text x="500" y="249" text-anchor="middle">ping · Unix milliseconds · every 5 seconds</text></g>
+      <g class="step" style="--i:4"><path class="edge em ret" d="M770 316H230" marker-end="url(#s-a)"/><text x="500" y="305" text-anchor="middle">pong · same timestamp</text></g>
+    </svg></div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>Three patterns, independent clocks</h2>
+    <p>Choose a pattern to inspect its behavior. These are synthetic coordinates from <code>pattern.go</code>, not memory addresses or measurements from a running ROM.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg wide" type="button" data-selected data-title="Square: facing follows each step" data-value="map 0:9 · start (5,3) · 16-step loop" data-text="Walk four tiles east, four south, four west and four north. Default speed is four steps per second. Each changed state produces a presence update."><small>Movement</small>square</button>
+      <button class="seg wide" type="button" data-title="Idle: no redundant presence" data-value="one initial presence · ping every 5 seconds" data-text="The position stays fixed. The client still reads remote events and sends heartbeats, so an idle player does not become an inactive connection."><small>Heartbeat check</small>idle</button>
+      <button class="seg wide" type="button" data-title="Warp: map changes do not depend on step speed" data-value="0:9 ↔ 1:0 · every 3 seconds" data-text="Continue the square while a separate ticker toggles both mapGroup and mapNum. Even a slow walking rate does not delay map changes."><small>Map transitions</small>warp</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Keep the simulator small and safe</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Reuse the protocol, including validation</h3>
+      <div class="term">
+        <div>protocol.Encode(message)</div>
+        <div>protocol.NewDecoder(conn)</div>
+      </div>
+      <div class="why"><b>Why</b><p>Issue #15 explicitly requires the shared codec. A second JSON implementation could silently accept invalid fields or lose exact ping timestamps.</p></div>
+    </div>
+    <div class="decision"><h3>Do not expose the join key</h3><div class="term"><div>FAKECLIENT_JOIN_KEY</div><div>static help · structured logs</div></div><div class="why"><b>Why</b><p>The key need not appear in shell arguments. Remote error text is redacted before quoting, unknown payloads are never printed, and decoder errors become safe diagnostics.</p></div></div>
+    <div class="decision"><h3>Leave headroom below the server limit</h3><div class="term"><div>0 &lt; steps-per-sec ≤ 40</div><div>+ heartbeat + periodic warp</div></div><div class="why"><b>Why</b><p>The #14 relay caps each connection at 50 messages per second. The simulator validates finite, representable timer intervals and leaves space for control messages.</p></div></div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Unit contracts and real processes</h2>
+    <p>Native Windows tests use official Go 1.27.2. Scripted TCP peers check the protocol independently. Real process tests cover the master lifecycle and the approved relay revision from PR #52, isolated without merging its code. Local Docker could not start; race, Lua and ROM CI results are recorded on the PR.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> go test -cover ./cmd/fakeclient</div>
+    <div style="--i:1" class="ok">ok  github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient  5.875s  coverage: 86.8% of statements</div>
+    <div style="--i:2"><span class="p">$</span> node bin/test-fakeclients.cjs relay</div>
+    <div style="--i:3" class="ok">PASS: mutual presence, correct facing, warp 0:9 -&gt; 1:0 -&gt; 0:9, no self-echo</div>
+    <div style="--i:4">[presence] bot2 1:0 5,7 WEST visible=true</div>
+    <div style="--i:5" class="ok">PASS: terminating bot2 makes bot1 print leave(disconnect)</div>
+    <div style="--i:6">[leave] bot2 reason=disconnect</div>
+    <div style="--i:7" class="ok">PASS: idle sends one presence and remains connected for &gt;15 seconds with heartbeat</div>
+    <div style="--i:8" class="ok">PASS: no test join key in client or server output</div>
+  </div>
+  <p class="small">The integration harness and portable toolchain are ignored local test artifacts, not part of the PR. Public source tests live under <code>cmd/fakeclient/*_test.go</code>. Server revision tested: <code>9da291afdbbe94f0651e0e653cf8342eb8586ef0</code>.</p>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with <code>pattern.go</code>, then <code>client.go</code>, the TCP tests and <code>docs/fakeclient.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Does hello precede welcome, with no simulation traffic before admission?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Do facing, independent warps and idle heartbeat match the documented patterns?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Do cancellation, socket failures and output failures release the decoder?</span></label>
+    <label class="check"><input type="checkbox" id="c4"><span>Can help, malformed messages or remote text disclose the key?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#14 · Server relay</b><span>The current #13-only server supports joins and leaves but ignores presence and ping. Full multiplayer behavior needs #14; that code is not added by this PR.</span></div>
+    <div class="limit"><b>#17 · Real client</b><span>No mGBA integration, rendering, real save identity or automatic reconnect. The fake client tests the wire behavior only.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#53 by Codex with the pr-walkthrough skill. Based on the PR diff, issue #15 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
