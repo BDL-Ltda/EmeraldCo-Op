@@ -49,7 +49,7 @@ Every field listed for a type is required and must not be `null`, unless it is m
 | `mapGroup`, `mapNum` | integer | 0–255. |
 | `x`, `y` | integer | −32768–32767 (the game stores coordinates as `s16`). |
 | `facing` | integer | 1–4: `1` south, `2` north, `3` west, `4` east, the decomp's `DIR_SOUTH` / `DIR_NORTH` / `DIR_WEST` / `DIR_EAST`. |
-| `visible` | boolean | Whether the player should be drawn (false in menus, battles, etc.). |
+| `visible` | boolean | Whether the player is in controllable overworld play: false in battles, menus, warps, fades and scripts such as NPC talk. Other clients don't draw a player whose `visible` is false. See [memory-map.md](memory-map.md#visible-signal). |
 | `reason` | string | One of `disconnect`, `timeout`, `kicked`, `replaced`. |
 | `t` | integer | Milliseconds, ≥ 0. Only the sender interprets it; the receiver echoes it unchanged. |
 | `code` | string | One of the error codes below. |

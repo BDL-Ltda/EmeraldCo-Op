@@ -158,16 +158,12 @@ Why each condition:
    control lock. `CB2_Overworld` itself checks this flag
    ([overworld.c:1486][overworld-1486]).
 
-Consequence to keep in mind: `visible` also goes false while the player talks to
-an NPC or reads a sign (controls are locked). That matches "in the overworld and
-controllable" from #9 and #11.
-
-**Open question, to settle before #11:** [protocol.md](protocol.md) defines
-`visible` as "whether the player should be drawn". With condition 3, other
-players would see this player vanish during every NPC talk, sign or Pokémon
-Center heal. Simply dropping condition 3 is not an option: the start menu would
-then count as visible, which breaks #11's acceptance criteria. Decide what
-`visible` means, then make this section and protocol.md agree.
+`visible` also goes false while the player talks to an NPC, reads a sign or
+watches a cutscene, because scripts lock the controls. This is intended:
+`visible` means "in controllable overworld play", as decided in #9 and #11, and
+[protocol.md](protocol.md) uses the same definition. Don't drop condition 3 to
+keep players drawn during scripts: the start menu would then count as visible,
+which breaks #11. A different meaning would need its own issue.
 
 ### How the offsets were verified
 
