@@ -19,7 +19,7 @@ addresses. `cmd/symgen` reads the built ELF using Go's standard-library
 Symbol selection lives in
 [`cmd/symgen/symbols.txt`](../cmd/symgen/symbols.txt). The allowlist names global
 data objects, plus the few functions the client compares with function pointers
-stored in RAM (see [Visible signal](#visible-signal)). Later issues can extend it
+stored in RAM (see [Position validity](#position-validity)). Later issues can extend it
 as needed, for example when `gCoopMailbox` is introduced.
 
 See [Generating client addresses](../README.md#generating-client-addresses) for
@@ -107,24 +107,47 @@ Sources:
 
 ### Visible signal
 
-`visible` ([protocol.md](protocol.md)) must be true only while the player is in
-the overworld **and controllable**: false in battles, menus, warps and fades
-([issue #11](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/11)). Proposed
-signal, all four conditions read every frame:
+`visible` ([protocol.md](protocol.md)) is **true for the whole time a game
+session is running**. That includes battles, menus, warps, fades, cutscenes and
+NPC talk. It is **false only before a game is started**: the boot screens, the
+title screen, the main menu and the new-game intro (Professor Birch). One byte
+gives this:
 
 ```text
-visible = [gMain + 0x000] == CB1_Overworld   -- gMain.callback1, u32 function pointer
-      and [gMain + 0x004] == CB2_Overworld   -- gMain.callback2, u32 function pointer
-      and u8 [sLockFieldControls] == 0       -- bool8
-      and (u8 [gPaletteFade + 0x07] & 0x80) == 0   -- gPaletteFade.active, bit 7 of byte 7
+visible = u8 [sPlayTimeCounterState] ~= 0   -- 0 STOPPED, 1 RUNNING, 2 MAXED_OUT
+```
+
+| Value | Offset (from) | Size, type | Source |
+| --- | --- | --- | --- |
+| `sPlayTimeCounterState` | the symbol itself | 1 byte, `u8` | [play_time.c:11][play_time-11] (file `static`; it is still in the ELF symbol table) |
+
+Why it works:
+
+- It is `STOPPED` (0) at power-on and after every soft reset, because
+  [`DoSoftReset`][main-437] calls `SoftReset(RESET_ALL)`, which clears all RAM.
+  The new-game setup also resets it ([new_game.c:165][new_game-165]).
+- The only places that start it are [`CB2_NewGame`][overworld-1539] and
+  [`CB2_ContinueSavedGame`][overworld-1735]: the first overworld load of a new
+  or continued game.
+- Nothing stops it during play. [`PlayTimeCounter_Stop`][play_time-31] exists
+  but nothing calls it. After 999 hours it becomes `MAXED_OUT` (2), which is
+  still a running session, hence `~= 0` rather than `== 1`.
+
+#### Position validity
+
+While a map is loading, the player's object event is torn down and rebuilt, so
+`x` and `y` can briefly hold stale or meaningless values. Read the position only
+when the field is running:
+
+```text
+positionValid = [gMain + 0x000] == CB1_Overworld   -- gMain.callback1, u32 function pointer
+            and [gMain + 0x004] == CB2_Overworld   -- gMain.callback2, u32 function pointer
 ```
 
 | Value | Offset (from) | Size, type | Source |
 | --- | --- | --- | --- |
 | `gMain.callback1` | `0x000` (`struct Main`) | 4 bytes, function pointer | [main.h:10][main-10] |
 | `gMain.callback2` | `0x004` (`struct Main`) | 4 bytes, function pointer | [main.h:11][main-11] |
-| `sLockFieldControls` | the symbol itself | 1 byte, `bool8` | [script.c:28][script-28] (file `static`; it is still in the ELF symbol table) |
-| `gPaletteFade.active` | byte `0x07`, **bit 7** (`struct PaletteFadeControl`) | 1-bit bitfield | [palette.h:42][palette-42] |
 
 Compare the callback pointers with `symbols["CB1_Overworld"].addr` and
 `symbols["CB2_Overworld"].addr` as exported, **without** clearing bit 0. Both
@@ -132,38 +155,18 @@ are Thumb functions, so the ELF value is odd, and the game stores that same odd
 value: the literal `CB1_Overworld` loads to compare with `gMain.callback2` is
 exactly the exported `CB2_Overworld` value, odd bit included.
 
-Why each condition:
+`callback2` is [`CB2_Overworld`][overworld-1484] whenever the field is running
+and changes for battles ([`BattleTransition_StartOnField`][transition-1026]),
+full-screen menus and map loads ([`CB2_LoadMap`][overworld-1572]). `callback1`
+is `NULL` during map loads ([overworld.c:1577][overworld-1577]) and
+[`CB1_Overworld`][overworld-1459] once the field is back
+([overworld.c:1582][overworld-1582]).
 
-1. **`callback2 == CB2_Overworld`**: the field's main loop
-   ([overworld.c:1484][overworld-1484]). Every full-screen mode replaces it:
-   battles ([`BattleTransition_StartOnField`][transition-1026] switches to
-   `CB2_OverworldBasic` as soon as the battle transition starts, then the battle
-   sets its own), the bag, party, Pokédex and other start-menu screens, map loads
-   ([`CB2_LoadMap`][overworld-1572] switches to `CB2_DoChangeMap`), and the title
-   screen and intro.
-2. **`callback1 == CB1_Overworld`**: the field input handler
-   ([overworld.c:1459][overworld-1459]), restored together with `callback2` when
-   the overworld is entered ([overworld.c:1582][overworld-1582]). It is `NULL`
-   during map loads ([overworld.c:1577][overworld-1577]) and `CB1_OverworldLink`
-   in link/cable-club rooms, where the player is driven by the link and not by us.
-3. **`sLockFieldControls == 0`**: [`DoCB1_Overworld`][overworld-1438] only
-   processes player input when controls are unlocked. The game locks them for the
-   start menu ([start_menu.c:590][start_menu-590]), for every warp
-   ([`DoWarp`][screen_effect-484] and the warp-exit fade-in,
-   [`FieldCB_DefaultWarpExit`][screen_effect-273]), at the start of wild battles
-   ([battle_setup.c:404][battle_setup-404]), and for every script (NPC talk,
-   signs, cutscenes). This catches menus and warps that keep `CB2_Overworld`
-   running. Lock / unlock: [script.c:182][script-182].
-4. **`gPaletteFade.active == 0`**: a safety net for fades that happen without a
-   control lock. `CB2_Overworld` itself checks this flag
-   ([overworld.c:1486][overworld-1486]).
-
-`visible` also goes false while the player talks to an NPC, reads a sign or
-watches a cutscene, because scripts lock the controls. This is intended:
-`visible` means "in controllable overworld play", as decided in #9 and #11, and
-[protocol.md](protocol.md) uses the same definition. Don't drop condition 3 to
-keep players drawn during scripts: the start menu would then count as visible,
-which breaks #11. A different meaning would need its own issue.
+So the client keeps sending `visible = true` in battles and menus, but sends the
+**last position read while `positionValid` was true**. Before the first valid
+read of a session there is no position to send, so it sends none. In an mGBA
+0.10.5 run, `positionValid` was false for about 10 frames on each map load, and
+during those frames `x`/`y` still showed the previous map's coordinates.
 
 ### How the offsets were verified
 
@@ -185,10 +188,10 @@ Never by eye. On the pinned commit, inside the ROM build image
    -fno-toplevel-reorder`), `_Static_assert`s every byte offset and size above.
    Bitfields were probed by initializing a constant struct with only that field
    set to all ones and dumping its bytes: `facingDirection` → byte `0x18` =
-   `0x0F`; `gPaletteFade.active` → byte `0x07` = `0x80`.
+   `0x0F`.
 3. **DWARF.** A `make modern DINFO=1` build (adds only `-g`) dumped with
    `readelf --debug-dump=info` gives the same layouts, e.g.
-   `PaletteFadeControl.active` `data_bit_offset=63`, `Main.callback2` offset 4,
+   `Main.callback2` offset 4,
    `SaveBlock2.playerTrainerId` offset 10. Note: this debug build's ROM SHA1
    differs from the normal build, so step 1, not this one, is the reference for
    the shipped ROM; struct layout does not depend on `-g`.
@@ -198,19 +201,11 @@ Never by eye. On the pinned commit, inside the ROM build image
 [load_save-84]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L84-L119
 [battle_main-590]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_main.c#L590
 [overworld-2071]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L2071-L2075
-[overworld-1438]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1438-L1457
 [overworld-1459]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1459-L1463
 [overworld-1484]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1484-L1492
-[overworld-1486]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1486
 [overworld-1572]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1572-L1580
 [overworld-1577]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1577
 [overworld-1582]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1582-L1588
-[script-28]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/script.c#L28
-[script-182]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/script.c#L182-L195
-[start_menu-590]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/start_menu.c#L590
-[screen_effect-273]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_screen_effect.c#L273-L279
-[screen_effect-484]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_screen_effect.c#L484-L488
-[battle_setup-404]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_setup.c#L402-L404
 [transition-1026]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_transition.c#L1026-L1030
 [avatar-37]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L37-L38
 [avatar-1141]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L1141-L1145
@@ -237,9 +232,14 @@ Never by eye. On the pinned commit, inside the ROM build image
 [const-113]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L113-L114
 [const-138]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L138-L141
 [maps-12]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/maps.h#L12
+[play_time-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L4-L11
+[play_time-31]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L31-L34
+[main-437]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L428-L438
+[new_game-165]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/new_game.c#L165
+[overworld-1539]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1532-L1540
+[overworld-1735]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1705-L1736
 [main-10]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L10
 [main-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L11
-[palette-42]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/palette.h#L35-L55
 
 ## Future layouts
 
