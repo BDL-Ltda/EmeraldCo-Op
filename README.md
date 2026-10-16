@@ -4,8 +4,9 @@ A co-op mod for Pokémon Emerald, with a Go presence server and an mGBA Lua
 client. The first release aims to let up to five players see each other in the
 overworld. Saves, battles and items stay local in v1.
 
-The project is at **0.0 Foundations**. The Go commands currently print placeholder
-messages and exit; there is no working server or Lua client yet. Follow progress
+The project is at **0.0 Foundations**. The ROM build and ELF symbol generator are
+available; the server and fake client still print placeholder messages and exit.
+There is no working Lua client yet. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -16,7 +17,7 @@ EmeraldCo-Op/
 ├── cmd/
 │   ├── server/               # presence relay entry point (placeholder)
 │   ├── fakeclient/           # simulated player entry point (placeholder)
-│   └── symgen/               # ELF symbol generator entry point (placeholder)
+│   └── symgen/               # ELF symbol generator and symbol allowlist
 ├── internal/                 # shared Go packages
 ├── client/                   # mGBA Lua client and example configuration
 ├── rom/                      # pokeemerald sources (git submodule)
@@ -49,11 +50,13 @@ go run ./cmd/server
 ```
 
 The server prints a startup placeholder message and exits without opening a
-network listener. `go run ./cmd/fakeclient` and `go run ./cmd/symgen` also print
-placeholder messages. No external Go dependencies are required.
+network listener. `go run ./cmd/fakeclient` also prints a placeholder message.
+`symgen` generates the client's global addresses from a ROM build, as described
+below. No external Go dependencies are required.
 
-The race check requires a supported C compiler with cgo enabled. There are no
-tests yet because the commands have no behavior beyond their placeholder logs.
+The race check requires a supported C compiler with cgo enabled. The symbol
+generator's tests create synthetic ELF data in memory and compare Lua output with
+a golden file under `cmd/symgen/testdata/`; no ELF or ROM fixture is committed.
 
 ## Building the ROM
 
@@ -114,7 +117,7 @@ these three outputs back to the checkout:
 | Output | Purpose |
 | --- | --- |
 | `rom/pokeemerald_modern.gba` | ROM to open in mGBA. |
-| `rom/pokeemerald_modern.elf` | Build symbols for the future address generator. |
+| `rom/pokeemerald_modern.elf` | Build symbols for the address generator. |
 | `rom/pokeemerald_modern.map` | Linker map. |
 
 ROM source files are not modified. There is no persistent incremental build
@@ -154,11 +157,53 @@ the truck. Record both developers' hashes and emulator results in the pull
 request; a build on one machine alone does not establish cross-machine
 reproducibility.
 
-Address generation belongs to [issue #4](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/4)
-and is not performed by this command. All players will use our built ROM from
-milestone 0.1 onward, distributed as a `.bps` patch applied locally (see
-[releasing.md](docs/releasing.md) and [installing.md](docs/installing.md)). Do not commit
-ROMs, saves, BIOS files, patches or build outputs.
+Address generation is a separate step below. All players will use our built ROM
+from milestone 0.1 onward, distributed as a `.bps` patch applied locally (see
+[releasing.md](docs/releasing.md) and [installing.md](docs/installing.md)). Do not
+commit ROMs, saves, BIOS files, patches or build outputs.
+
+## Generating client addresses
+
+After [building the ROM](#building-the-rom), use the Go version pinned in
+`go.mod` and run this command from the repository root:
+
+```sh
+go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua
+```
+
+All three flags are required. Supply the ELF and ROM from the **same build**.
+`symgen` uses Go's standard-library `debug/elf`, so no extra symbol tools are
+required. It writes the allowlisted symbol addresses and sizes from the ELF,
+plus the supplied ROM's lowercase SHA1 as `romSha1`. That hash identifies the ROM
+input; it cannot establish whether a separately supplied ELF belongs to it.
+
+The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
+`gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr` and `gMain`.
+The file is embedded when the tool is compiled. `go run` picks up edits
+automatically; rebuild any existing `symgen` binary after changing the list.
+For diagnostics, add `-symbols PATH` to read a different allowlist, for example
+one containing a fake symbol to verify the missing-symbol error.
+
+The generated Lua module returns a table with `romSha1` and `symbols`.
+Each `symbols["NAME"]` entry contains `addr` and `size`. Entries are sorted by
+symbol name, with LF line endings, a generated-file header and no timestamps,
+so identical inputs produce byte-identical output. Missing allowlisted symbols,
+malformed inputs and empty or invalid allowlists cause a non-zero exit; a
+missing-symbol error names the symbol. Validation failures preserve an existing
+output file. Successful writes use a temporary file in the output directory
+followed by replacement of the target file.
+
+Spot-check a generated symbol against its entry in
+`rom/pokeemerald_modern.map`, then rerun the command and check that
+`git diff -- client/addresses.lua` shows no unexpected changes. Never edit
+`client/addresses.lua` by hand or copy its numeric addresses elsewhere.
+
+**Rebuild and regenerate after every ROM source, submodule, toolchain or build
+configuration change. Commit `client/addresses.lua` in the same pull request.**
+Keep the ELF, ROM and map local. Struct field offsets belong to
+[issue #9](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/9), not this generator;
+see the [memory map](docs/memory-map.md). Runtime client integration remains
+future work in [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
 
 ## Client development
 
@@ -173,7 +218,7 @@ See the [client README](client/README.md) for the planned configuration.
 - [Architecture](docs/architecture.md): agreed design and communication flow.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
-- [Memory map](docs/memory-map.md): stub for sourced memory layouts (#9).
+- [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
 - [Playing online](docs/playing-online.md): stub for hosting and joining (#18).
 - [Installing](docs/installing.md): patch your ROM and load the client (players).
 - [Releasing](docs/releasing.md): build, create the `.bps` patch and publish a release.

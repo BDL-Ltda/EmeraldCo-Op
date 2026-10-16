@@ -18,8 +18,18 @@ ignored by Git. Set a unique `PLAYER_ID` and keep any real join key private.
 Connection settings and configuration loading will be defined with the network
 client in [issue #17](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/17).
 
-Generated addresses will live in `addresses.lua` after
-[issue #4](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/4). Do not create
-that file by guessing addresses. Future pure modules belong in `lib/`, with a
-small test runner in `tests/` added by
+## Generated addresses
+
+[`addresses.lua`](addresses.lua) is generated and committed. It is the only
+source of global memory addresses for the client; never guess addresses, edit
+the generated file or copy numeric values into other modules. The
+[memory map](../docs/memory-map.md) describes the generated data format and will
+document struct offsets sourced from decompilation headers.
+
+See [Generating client addresses](../README.md#generating-client-addresses) for
+the command, required build inputs, allowlist, validation and regeneration rules.
+
+The generated data does not yet implement a runnable client; runtime integration
+belongs to [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
+Future pure modules belong in `lib/`, with a small test runner in `tests/` added by
 [issue #16](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/16).
