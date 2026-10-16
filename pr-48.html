@@ -175,12 +175,12 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <header class="top">
   <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#48</span>
   <h1>Where the player's state lives in RAM, verified rather than guessed</h1>
-  <p class="lede">This PR documents in <code>docs/memory-map.md</code> exactly where the client reads map, position, facing, gender and trainer ID, and proposes a signal for "in the overworld and controllable". Every offset was checked against the real <code>make modern</code> build, so #11 can write the Lua without guessing.</p>
+  <p class="lede">This PR documents in <code>docs/memory-map.md</code> exactly where the client reads map, position, facing, gender and trainer ID, and defines when a player is <code>visible</code> and when their position can be trusted. Every offset was checked against the real <code>make modern</code> build, so #11 can write the Lua without guessing.</p>
   <div class="meta">
     <span>closes <b>#9</b></span>
     <span>branch <b>docs/9-player-state-memory-map</b></span>
-    <span>files <b>4</b></span>
-    <span>lines <b>+242 / −10</b></span>
+    <span>files <b>5</b></span>
+    <span>lines <b>+237 / −11</b></span>
     <span>milestone <b>0.1 Read state</b></span>
   </div>
   <ul class="toc">
@@ -199,7 +199,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <span class="eyebrow">Big picture</span>
     <h2>Two sources, never a guess</h2>
     <p>From 0.1 to 0.3 the Lua client reads the player's state straight from the game's RAM. AGENTS.md splits that knowledge in two. <strong>Global addresses</strong> come from <code>symgen</code>, which reads the ROM build's ELF and writes <code>client/addresses.lua</code>. <strong>Struct offsets</strong> are written by hand in <code>docs/memory-map.md</code>, sourced from the decomp headers.</p>
-    <p>This PR fills in the second half for the player, and adds the four globals the "visible" signal needs to the symgen allowlist.</p>
+    <p>This PR fills in the second half for the player, and adds the three globals the <code>visible</code> and <code>positionValid</code> signals need to the symgen allowlist.</p>
   </div>
   <figure class="plate" data-anim style="margin:0">
     <div class="plate-head"><span class="cap">Where each number comes from</span><button class="replay" type="button">Replay</button></div>
@@ -224,7 +224,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
       <g class="step" style="--i:2">
         <rect class="box pub" x="290" y="140" width="200" height="60" rx="6"/>
         <text class="t-mono t-em" x="306" y="166">symbols.txt</text>
-        <text class="t-sub" x="306" y="186">+4 symbols, +rules</text>
+        <text class="t-sub" x="306" y="186">+3 symbols, +rules</text>
         <path class="edge em" d="M490 170H556" marker-end="url(#m-ae)"/>
         <path class="edge" d="M490 70H530V150H556" marker-end="url(#m-a)"/>
         <rect class="box" x="560" y="140" width="160" height="60" rx="6"/>
@@ -235,7 +235,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
         <path class="edge em flow" d="M720 170H766" marker-end="url(#m-ae)"/>
         <rect class="box pub" x="770" y="140" width="210" height="60" rx="6"/>
         <text class="t-mono t-em" x="786" y="166">addresses.lua</text>
-        <text class="t-sub" x="786" y="186">regenerated: 4 new entries</text>
+        <text class="t-sub" x="786" y="186">regenerated: 3 new entries</text>
       </g>
       <g class="step" style="--i:4">
         <path class="edge em" d="M125 100V256" marker-end="url(#m-ae)"/>
@@ -326,15 +326,15 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="detail">
   <div class="prose">
     <span class="eyebrow">Under the hood</span>
-    <h2>The visible signal, one condition at a time</h2>
-    <p><code>visible</code> is true only when all four conditions hold, and the client reads them every frame. Click a condition to see what it catches. The offsets and symbol values are the ones the PR verified. The independent review rebuilt the ROM and got the same values.</p>
+    <h2>Two signals: visible and positionValid</h2>
+    <p>bernardosevero decided that players stay visible for the whole running game, including battles, menus, warps and NPC talk, and are hidden only before a game starts. A separate signal says when the position can be trusted. Click a value to see where it comes from. Symbol values come from <code>client/addresses.lua</code>; both signals were checked in mGBA 0.10.5.</p>
   </div>
   <div class="plate" style="display:grid;gap:14px">
     <div class="bytes">
-      <button class="seg crc" type="button" data-selected data-title="gMain.callback2 == CB2_Overworld" data-value="gMain + 0x004 · u32 · CB2_Overworld = 0x0813D1E5" data-text="The field's main loop. Every full-screen mode replaces it: battles (switched to CB2_OverworldBasic as soon as the battle transition starts), the bag, party and Pokédex screens, map loads (CB2_DoChangeMap), and the title screen and intro."><small>condition 1</small>callback2</button>
-      <button class="seg" type="button" data-title="gMain.callback1 == CB1_Overworld" data-value="gMain + 0x000 · u32 · CB1_Overworld = 0x0813D169" data-text="The field input handler. It's NULL during map loads and CB1_OverworldLink in link/cable-club rooms, where the link drives the player rather than our input."><small>condition 2</small>callback1</button>
-      <button class="seg warn" type="button" data-title="sLockFieldControls == 0" data-value="symbol itself · bool8 · 0x03000E7C" data-text="DoCB1_Overworld only handles input when controls are unlocked. The game locks them for the start menu, every warp and warp-exit fade, the start of wild battles, and every script. That last case makes visible false during NPC talk and signs too; that's intended: #9 and #11 define visible as controllable overworld play. It's a file-static, but it's in the ELF symbol table with a unique name."><small>condition 3</small>field lock</button>
-      <button class="seg" type="button" data-title="gPaletteFade.active == 0" data-value="gPaletteFade + 0x07 · bit 7 (mask 0x80)" data-text="A safety net for fades that happen without a control lock. CB2_Overworld itself checks this flag. Bitfield verified by setting only that field in a constant struct and dumping its bytes: byte 7 = 0x80."><small>condition 4</small>fade</button>
+      <button class="seg crc" type="button" data-selected data-title="visible = sPlayTimeCounterState != 0" data-value="symbol itself · u8 · 0x03000B56 · 0 stopped, 1 running, 2 maxed out" data-text="The play-time counter is STOPPED at power-on and after every soft reset (SoftReset(RESET_ALL) clears all RAM). Only CB2_NewGame and CB2_ContinueSavedGame start it, and nothing stops it during play. So it's 0 on the boot screens, title screen, main menu and Birch intro, and non-zero for the whole session. In mGBA: false through the intro, true from the truck onward (start menu, warps and cutscene included), false again after a soft reset."><small>visible</small>play time</button>
+      <button class="seg" type="button" data-title="positionValid: gMain.callback2 == CB2_Overworld" data-value="gMain + 0x004 · u32 · CB2_Overworld = 0x0813D1E5" data-text="The field's main loop. It changes for battles, full-screen menus and map loads. While it isn't CB2_Overworld, the client keeps sending the last valid position."><small>positionValid</small>callback2</button>
+      <button class="seg" type="button" data-title="positionValid: gMain.callback1 == CB1_Overworld" data-value="gMain + 0x000 · u32 · CB1_Overworld = 0x0813D169" data-text="The field input handler. It's NULL during map loads. In mGBA, positionValid was false for about 10 frames per map load, and x/y still showed the previous map's coordinates during that time, which is why the client must not trust them."><small>positionValid</small>callback1</button>
+      <button class="seg warn" type="button" data-title="What was dropped" data-value="sLockFieldControls, gPaletteFade" data-text="The first proposal hid the player whenever controls were locked or a fade was running, which also hid them during NPC talk. Under the new decision those conditions aren't needed, so the symbols were removed from the allowlist."><small>history</small>dropped</button>
       <button class="seg wide" type="button" data-title="Thumb bit: compare as exported" data-value="odd values, bit 0 set" data-text="Both callbacks are Thumb functions, so their ELF values are odd, and the game stores that same odd value in gMain. The disassembly shows CB1_Overworld comparing gMain.callback2 against the literal 0x0813D1E5. Never clear bit 0 before comparing. Also, the .map file lists these functions one lower (0x0813D168, 0x0813D1E4)."><small>gotcha</small>bit 0</button>
     </div>
     <div class="detail" aria-live="polite"></div>
@@ -367,12 +367,11 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div class="decision">
       <h3>Functions and a file-static in the symgen allowlist</h3>
       <div class="term">
-        <div>gPaletteFade</div>
-        <div>sLockFieldControls</div>
         <div>CB1_Overworld</div>
         <div>CB2_Overworld</div>
+        <div>sPlayTimeCounterState</div>
       </div>
-      <div class="why"><b>Why</b><p>The allowlist used to say "data objects only". The visible signal needs to compare function pointers stored in RAM, and it needs the control lock, which is a <code>static</code>. The new rules in <code>symbols.txt</code> allow these two cases only. symgen fails loudly on a name conflict or a missing symbol.</p></div>
+      <div class="why"><b>Why</b><p>The allowlist used to say "data objects only". <code>positionValid</code> compares function pointers stored in RAM, and <code>visible</code> needs the play-time counter, which is a <code>static</code>. The new rules in <code>symbols.txt</code> allow these two cases only. symgen fails loudly on a name conflict or a missing symbol.</p></div>
     </div>
   </div>
 </section>
@@ -396,7 +395,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div style="--i:9" class="ok">addresses.lua: identical after regeneration from independent clean build</div>
   </div>
   <div class="prose">
-    <p><strong>In-emulator check: done in mGBA 0.10.5.</strong> It was run by Claude Code using a scratch harness that reads every field as documented. Turning gave facing 3/2/1/4 for left/up/down/right, and each step moved x or y by 1. The map read 25.40 in the truck, 0.9 in Littleroot and 1.0 in the house. <code>visible</code> went false with the start menu open and during the warp. <code>gSaveBlock1Ptr</code> moved on both warps. The full log is in a PR comment.</p>
+    <p><strong>In-emulator check: done in mGBA 0.10.5.</strong> It was run by Claude Code using a scratch harness that reads every field as documented. Turning gave facing 3/2/1/4 for left/up/down/right, and each step moved x or y by 1. The map read 25.40 in the truck, 0.9 in Littleroot and 1.0 in the house. In a second run with the final signal, <code>visible</code> was false through the intro, stayed true with the start menu open and across both warps, and went false after a soft reset. <code>gSaveBlock1Ptr</code> moved on both warps. The full log is in a PR comment.</p>
   </div>
 </section>
 
@@ -404,12 +403,12 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="prose">
     <span class="eyebrow">What's next</span>
     <h2>#11 builds on this</h2>
-    <p>#11 (<code>memory.lua getPlayerState()</code>) needs this PR and #10. <code>visible</code> follows #9 and #11: it's false outside controllable overworld play, including NPC talk. This PR aligns <code>protocol.md</code> with that. Keeping players drawn during scripts would need its own issue, because simply dropping condition 3 would make the start menu count as visible.</p>
+    <p>#11 (<code>memory.lua getPlayerState()</code>) needs this PR and #10. <code>visible</code> is now "in a running game session", and the client holds the last valid position while <code>positionValid</code> is false. #11's Scope and acceptance criteria were updated to match, and the decision is recorded there.</p>
   </div>
   <figure class="plate" data-anim style="margin:0">
     <div class="plate-head"><span class="cap">Issue dependencies</span><button class="replay" type="button">Replay</button></div>
     <div class="scroll">
-    <svg viewBox="0 0 1000 220" role="img" aria-label="Issue 9, this PR, and issue 10 both unblock issue 11. The meaning of visible is settled as controllable overworld play. Issue 10 depends on issue 8, PR 47.">
+    <svg viewBox="0 0 1000 220" role="img" aria-label="Issue 9, this PR, and issue 10 both unblock issue 11. The meaning of visible is settled as in a running game session. Issue 10 depends on issue 8, PR 47.">
       <defs>
         <marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
         <marker id="m-ce" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
@@ -427,7 +426,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
       <g class="step" style="--i:2">
         <rect class="box priv" x="370" y="85" width="260" height="56" rx="6"/>
         <text class="t-mono" x="386" y="109">visible: decided</text>
-        <text class="t-sub" x="386" y="129">controllable overworld play</text>
+        <text class="t-sub" x="386" y="129">whole game session</text>
         <path class="edge em" d="M270 48H330V100H366" marker-end="url(#m-ce)"/>
       </g>
       <g class="step" style="--i:3">
@@ -450,13 +449,13 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   </div>
   <div class="checks">
     <label class="check"><input type="checkbox" id="c1"><span>Do <code>protocol.md</code> and <code>memory-map.md</code> now say the same thing about <code>visible</code>, including NPC talk?</span></label>
-    <label class="check"><input type="checkbox" id="c2"><span>Is it OK for the allowlist to accept functions compared with stored pointers and a uniquely named file-static (<code>sLockFieldControls</code>)?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is it OK for the allowlist to accept functions compared with stored pointers and a uniquely named file-static (<code>sPlayTimeCounterState</code>)?</span></label>
     <label class="check"><input type="checkbox" id="c3"><span>Do the decomp links open the right lines at the pinned submodule commit?</span></label>
     <label class="check"><input type="checkbox" id="c4"><span>Is the "save blocks move" rule clear enough for whoever writes #11?</span></label>
     <label class="check"><input type="checkbox" id="c5"><span>Does the emulator log in the PR comment show the values the doc predicts?</span></label>
   </div>
   <div class="limits">
-    <div class="limit"><b>NPC talk</b><span>Players vanish for others while talking to NPCs or reading signs. That's intended for now; changing it needs its own issue.</span></div>
+    <div class="limit"><b>battles</b><span>Wild battles weren't reachable in the scripted emulator run; #11's test plan covers <code>positionValid</code> there.</span></div>
     <div class="limit"><b>#11</b><span>The Lua that reads all of this. It's out of scope here.</span></div>
   </div>
 </section>
