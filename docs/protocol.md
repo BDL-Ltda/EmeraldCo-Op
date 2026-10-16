@@ -7,6 +7,10 @@ The wire protocol between the mGBA Lua client and the Go relay server, as agreed
 - JSON over TCP, one message per line. Each message is a single JSON object followed by `\n`. A message never contains a raw newline (JSON escapes newlines inside strings).
 - Maximum line length: 4096 bytes, not counting the `\n`. A receiver stops reading a longer line once it passes the limit, so it never buffers more than 4097 bytes per line. The server answers `error bad_message` and closes.
 - Text is UTF-8. `<`, `>` and `&` are sent as is, not as `\u` escapes.
+- The server accepts at most 50 complete messages per connection in any rolling
+  one-second window, including `hello` and unknown types. The 51st message gets
+  `error bad_message` and the connection closes. See [server.md](server.md) for
+  per-client send queues and slow-reader handling.
 
 ## Envelope
 
@@ -179,7 +183,7 @@ sequenceDiagram
 
 ### Timeout
 
-If nothing arrives from a client for 15 seconds (pings included), the server closes the connection.
+If no complete message arrives from a client for 15 seconds after hello (pings and unknown types included), the server closes the connection and broadcasts `leave(timeout)`. Partial lines do not extend this deadline. The separate pre-hello deadline remains 5 seconds.
 
 ```mermaid
 sequenceDiagram

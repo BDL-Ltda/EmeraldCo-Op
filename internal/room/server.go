@@ -1,4 +1,4 @@
-// Package room implements the connection lifecycle for one global room.
+// Package room implements the single-room presence relay and connection lifecycle.
 package room
 
 import (
@@ -36,19 +36,35 @@ type client struct {
 	player        protocol.Player
 	writeMu       sync.Mutex
 	unknownLogged bool // Owned by this connection's reader, across both phases.
+	outbox        chan []byte
+	stop          chan struct{}
+	stopOnce      sync.Once
+	writerDone    chan struct{}
+	messageTimes  []time.Time // Reader-owned rolling one-second rate window.
+	nextMessage   int
+}
+
+func (c *client) stopWriter() { c.stopOnce.Do(func() { close(c.stop) }) }
+
+func (c *client) close() {
+	c.stopWriter()
+	c.conn.Close()
 }
 
 // Server accepts authenticated players. Construct one Server per listener.
 type Server struct {
-	cfg          Config
-	logger       *log.Logger
-	helloTimeout time.Duration
-	writeTimeout time.Duration
+	cfg           Config
+	logger        *log.Logger
+	helloTimeout  time.Duration
+	writeTimeout  time.Duration
+	idleTimeout   time.Duration
+	rateLimit     int
+	sendQueueSize int
 
 	// The mutex serializes membership changes and their notifications, so an
 	// observer always sees leave(replaced) before join for a replacement.
-	// Writes currently run under this lock with a bounded deadline. Per-client
-	// queues and slow-reader isolation belong to issue #14.
+	// Only non-blocking queue operations run under the lock. Each authenticated
+	// connection has its own writer, so socket backpressure never locks the room.
 	mu      sync.Mutex
 	players map[string]*client
 }
@@ -61,7 +77,8 @@ func New(cfg Config, logger *log.Logger) (*Server, error) {
 		logger = log.New(io.Discard, "", 0)
 	}
 	return &Server{cfg: cfg, logger: logger, helloTimeout: 5 * time.Second,
-		writeTimeout: 5 * time.Second, players: make(map[string]*client)}, nil
+		writeTimeout: 5 * time.Second, idleTimeout: 15 * time.Second,
+		rateLimit: 50, sendQueueSize: 64, players: make(map[string]*client)}, nil
 }
 
 // Serve owns listener and all accepted connections. Cancellation closes even
@@ -145,6 +162,10 @@ func (s *Server) send(c *client, msg protocol.Message) error {
 	if err != nil {
 		return err
 	}
+	return s.write(c, line)
+}
+
+func (s *Server) write(c *client, line []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	if err := c.conn.SetWriteDeadline(time.Now().Add(s.writeTimeout)); err != nil {
@@ -159,7 +180,77 @@ func (s *Server) send(c *client, msg protocol.Message) error {
 
 func (s *Server) reject(c *client, code string) {
 	s.event(c, "reject", code)
+	// Stop queued output before sending the terminal error. Waiting affects
+	// only this connection and is bounded by the writer's existing deadline.
+	if c.writerDone != nil {
+		// Detach before stopping the writer: concurrent broadcasts must not
+		// close this socket before its terminal error can be sent.
+		s.mu.Lock()
+		s.forgetLocked(c, protocol.LeaveDisconnect)
+		s.mu.Unlock()
+		c.stopWriter()
+		<-c.writerDone
+	}
 	_ = s.send(c, protocol.Error{Code: code, Message: code})
+}
+
+func (s *Server) startWriter(c *client) {
+	c.writerDone = make(chan struct{})
+	go func() {
+		defer close(c.writerDone)
+		for {
+			select {
+			case <-c.stop:
+				return
+			case line := <-c.outbox:
+				select {
+				case <-c.stop:
+					return
+				default:
+				}
+				if err := s.write(c, line); err != nil {
+					s.event(c, "write_failed", "disconnect")
+					c.close()
+					return
+				}
+			}
+		}
+	}()
+}
+
+// enqueue never waits for a socket or queue space. Frames are immutable, and
+// outbox is never closed, so shutdown cannot race a producer into a panic.
+func (s *Server) enqueue(c *client, msg protocol.Message) bool {
+	line, err := protocol.Encode(msg)
+	if err != nil {
+		return false
+	}
+	select {
+	case <-c.stop:
+		return false
+	default:
+	}
+	select {
+	case <-c.stop:
+		return false
+	case c.outbox <- line:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) allowMessage(c *client, now time.Time) bool {
+	if len(c.messageTimes) < s.rateLimit {
+		c.messageTimes = append(c.messageTimes, now)
+		return true
+	}
+	if now.Sub(c.messageTimes[c.nextMessage]) < time.Second {
+		return false
+	}
+	c.messageTimes[c.nextMessage] = now
+	c.nextMessage = (c.nextMessage + 1) % s.rateLimit
+	return true
 }
 
 func isProtocolError(err error) bool {
@@ -189,9 +280,14 @@ func decodeCode(err error, handshake bool) string {
 }
 
 func (s *Server) handle(conn net.Conn) {
-	c := &client{conn: conn}
-	defer conn.Close()
-	defer s.leave(c)
+	c := &client{conn: conn, outbox: make(chan []byte, s.sendQueueSize), stop: make(chan struct{})}
+	defer func() {
+		c.close()
+		if c.writerDone != nil {
+			<-c.writerDone
+		}
+		s.leave(c)
+	}()
 	s.event(c, "connect", "")
 	if conn.SetReadDeadline(time.Now().Add(s.helloTimeout)) != nil {
 		return
@@ -204,6 +300,10 @@ func (s *Server) handle(conn net.Conn) {
 			if isProtocolError(err) || (errors.As(err, &netErr) && netErr.Timeout()) {
 				s.reject(c, decodeCode(err, true))
 			}
+			return
+		}
+		if !s.allowMessage(c, time.Now()) {
+			s.reject(c, protocol.CodeBadMessage)
 			return
 		}
 		if _, unknown := msg.(protocol.Unknown); unknown {
@@ -221,24 +321,42 @@ func (s *Server) handle(conn net.Conn) {
 			s.reject(c, protocol.CodeBadKey)
 			return
 		}
-		if conn.SetReadDeadline(time.Time{}) != nil || !s.join(c) {
+		if conn.SetReadDeadline(time.Time{}) != nil {
+			return
+		}
+		s.startWriter(c)
+		if !s.join(c) {
 			return
 		}
 		break
 	}
 	for {
+		if conn.SetReadDeadline(time.Now().Add(s.idleTimeout)) != nil {
+			return
+		}
 		msg, err := decoder.Decode()
 		if err != nil {
-			if isProtocolError(err) {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				s.mu.Lock()
+				s.removeLocked(c, protocol.LeaveTimeout)
+				s.mu.Unlock()
+			} else if isProtocolError(err) {
 				s.reject(c, decodeCode(err, false))
 			}
 			return
 		}
-		switch msg.(type) {
+		if !s.allowMessage(c, time.Now()) {
+			s.reject(c, protocol.CodeBadMessage)
+			return
+		}
+		switch msg := msg.(type) {
 		case protocol.Unknown:
 			s.unknown(c)
-		case protocol.Presence, protocol.Ping:
-			// Validated but not processed until #14 implements presence/liveness.
+		case protocol.Presence:
+			s.presence(c, msg)
+		case protocol.Ping:
+			s.pong(c, msg)
 		default:
 			s.reject(c, protocol.CodeBadMessage)
 			return
@@ -247,25 +365,28 @@ func (s *Server) handle(conn net.Conn) {
 }
 
 func (s *Server) broadcast(msg protocol.Message, except *client) {
-	// Caller holds s.mu. A failed peer is closed; its handler removes it.
+	// Caller holds s.mu. Dropping a full queue may notify/drop other peers;
+	// recursion is bounded by the room's maximum five members.
 	for _, peer := range s.players {
-		if peer != except && s.send(peer, msg) != nil {
-			peer.conn.Close()
+		if peer != except && !s.enqueue(peer, msg) {
+			s.event(peer, "drop", "send_queue_full")
+			s.removeLocked(peer, protocol.LeaveDisconnect)
 		}
 	}
 }
 
 func (s *Server) join(c *client) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	old := s.players[c.player.PlayerID]
 	if old == nil && len(s.players) >= s.cfg.MaxPlayers {
+		s.mu.Unlock()
 		s.reject(c, protocol.CodeRoomFull)
 		return false
 	}
+	defer s.mu.Unlock()
 	if old != nil {
 		delete(s.players, old.player.PlayerID)
-		old.conn.Close()
+		old.close()
 		s.event(old, "leave", protocol.LeaveReplaced)
 		s.broadcast(protocol.Leave{PlayerID: old.player.PlayerID, Reason: protocol.LeaveReplaced}, nil)
 	}
@@ -274,7 +395,7 @@ func (s *Server) join(c *client) bool {
 		players = append(players, peer.player)
 	}
 	sort.Slice(players, func(i, j int) bool { return players[i].PlayerID < players[j].PlayerID })
-	if s.send(c, protocol.Welcome{Players: players}) != nil {
+	if !s.enqueue(c, protocol.Welcome{Players: players}) {
 		return false
 	}
 	s.players[c.player.PlayerID] = c
@@ -286,11 +407,47 @@ func (s *Server) join(c *client) bool {
 func (s *Server) leave(c *client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.removeLocked(c, protocol.LeaveDisconnect)
+}
+
+func (s *Server) removeLocked(c *client, reason string) {
+	if s.players[c.player.PlayerID] != c {
+		return
+	}
+	c.close()
+	s.forgetLocked(c, reason)
+}
+
+func (s *Server) forgetLocked(c *client, reason string) {
 	// An old handler must never remove the replacement with the same ID.
 	if s.players[c.player.PlayerID] != c {
 		return
 	}
 	delete(s.players, c.player.PlayerID)
-	s.event(c, "leave", protocol.LeaveDisconnect)
-	s.broadcast(protocol.Leave{PlayerID: c.player.PlayerID, Reason: protocol.LeaveDisconnect}, nil)
+	s.event(c, "leave", reason)
+	s.broadcast(protocol.Leave{PlayerID: c.player.PlayerID, Reason: reason}, nil)
+}
+
+func (s *Server) presence(c *client, msg protocol.Presence) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.players[c.player.PlayerID] != c {
+		return
+	}
+	state := msg.PresenceState
+	c.player.Presence = &state
+	msg.PlayerID = c.player.PlayerID
+	s.broadcast(msg, c)
+}
+
+func (s *Server) pong(c *client, msg protocol.Ping) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.players[c.player.PlayerID] != c {
+		return
+	}
+	if !s.enqueue(c, protocol.Pong{T: msg.T}) {
+		s.event(c, "drop", "send_queue_full")
+		s.removeLocked(c, protocol.LeaveDisconnect)
+	}
 }

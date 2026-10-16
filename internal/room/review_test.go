@@ -143,7 +143,7 @@ func TestUnknownLogsAreBoundedAcrossHandshake(t *testing.T) {
 	var logs bytes.Buffer
 	_, addr, stop := testServer(t, 5, func(s *Server) { s.logger = log.New(&logs, "", 0) })
 	a := dial(t, addr)
-	unknown := strings.Repeat(`{"v":1,"type":"future"}`+"\n", 100)
+	unknown := strings.Repeat(`{"v":1,"type":"future"}`+"\n", 20)
 	a.raw(t, unknown)
 	a.send(t, hello("a"))
 	want(t, a, protocol.Welcome{Players: []protocol.Player{}})
