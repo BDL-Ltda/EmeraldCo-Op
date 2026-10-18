@@ -73,9 +73,10 @@ Re-download the patch and try again.
 
 ## 3. Set up the client scripts
 
-Unzip `emerald-coop-vX.Y-client.zip` somewhere permanent, for example next to
-your ROM. Inside its `client/` folder, copy `config.example.lua` to
-`config.lua` and fill it in:
+Unzip `emerald-coop-vX.Y-client.zip` somewhere permanent whose path has **only
+ASCII characters**, for example `C:\EmeraldCoop`. Lua in mGBA can't open files
+under folders with accents, such as `C:\Users\Usuário\Downloads`. Inside its
+`client/` folder, copy `config.example.lua` to `config.lua` and fill it in:
 
 - `PLAYER_ID`: a name that is unique among the players.
 - The server and join-key settings: the host sends them to you privately. See

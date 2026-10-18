@@ -50,15 +50,13 @@ sessions and invalid settings exit non-zero. There is no automatic reconnect.
 
 ## Verify two clients locally
 
-The server's connection lifecycle from
-[#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13) supports welcome, joins,
-replacement and leave. **Full presence and heartbeat checks require the relay
-implementation from [#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14)
-([PR #52](https://github.com/BDL-Ltda/EmeraldCo-Op/pull/52)).** A checkout with
-only #13 decodes valid presence and ping messages but does nothing with them:
-expect lifecycle events, not relayed movement or pong. See
-[Server development](server.md#current-boundary). This client does not add those
-server behaviors.
+The server includes the connection lifecycle from
+[#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13) and the presence relay
+and heartbeat from [#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14),
+merged in [PR #52](https://github.com/BDL-Ltda/EmeraldCo-Op/pull/52). These checks
+work with the server in this checkout; see
+[Server development](server.md#presence-liveness-and-limits) for its behavior
+and limits. The fake client does not implement server-side relay behavior.
 
 Use three terminals in the same checkout. In the server terminal, enter a
 private local test key and bind only to localhost:
@@ -82,8 +80,8 @@ $env:FAKECLIENT_JOIN_KEY = Read-Host "Local test join key"
 go run ./cmd/fakeclient -addr localhost:8765 -id bot2 -pattern warp -steps-per-sec 2
 ```
 
-A receives B's join. B's welcome lists A and, with #14, its last known presence.
-With that relay available, both clients print the other player's movement; A
+A receives B's join. B's welcome lists A and its last known presence, if A has
+sent one. Both clients print the other player's movement; A
 also shows B switching maps every three seconds. The server does not echo a
 client's own presence. Wait at least five seconds to see pong responses.
 
@@ -95,6 +93,6 @@ You can remove the test key from each client shell with
 `Remove-Item Env:SERVER_JOIN_KEY`.
 
 Record joins, peer presence, map switches, heartbeat and leave results in the
-pull request. Mark any relay-dependent checks pending if #14 is not in the
-tested server revision; lifecycle-only output is not evidence of a complete
-multiplayer relay test.
+pull request, including the tested revision. Older lifecycle-only checkouts
+without #14 do not relay movement or answer pings; their join/leave output is
+not evidence of a complete multiplayer relay test.

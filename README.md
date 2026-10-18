@@ -4,11 +4,11 @@ A co-op mod for Pokémon Emerald, with a Go presence server and an mGBA Lua
 client. The first release aims to let up to five players see each other in the
 overworld. Saves, battles and items stay local in v1.
 
-The ROM build, ELF symbol generator and server connection lifecycle are
-available. The server accepts authenticated players and announces joins and
-leaves; presence relay and liveness are still pending (#14). A terminal fake
-client simulates walking players for server tests; there is no working Lua
-network client yet. Follow progress
+The ROM build, ELF symbol generator and single-room presence server are
+available. The server authenticates players, relays presence, answers pings
+and removes inactive, flooding or slow connections. A terminal fake client
+simulates walking players for server tests; there is no working Lua network
+client yet. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -17,7 +17,7 @@ in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 EmeraldCo-Op/
 ├── go.mod                    # one Go module for the server and tools
 ├── cmd/
-│   ├── server/               # presence relay entry point (placeholder)
+│   ├── server/               # authenticated single-room presence relay
 │   ├── fakeclient/           # simulated walking player for server tests
 │   ├── echoserver/           # line echo server for client socket tests
 │   └── symgen/               # ELF symbol generator and symbol allowlist
@@ -68,9 +68,9 @@ the listener and its connections.
 
 Use [the fake client](docs/fakeclient.md) to test without mGBA: set the private
 `FAKECLIENT_JOIN_KEY` environment variable, then run
-`go run ./cmd/fakeclient -id bot1 -pattern square`. Full peer movement and pong
-checks require the relay from #14; the lifecycle-only server supports joins and
-leaves. `symgen` generates the client's global addresses from a ROM build, as
+`go run ./cmd/fakeclient -id bot1 -pattern square`. Run a second client with a
+different ID to check peer movement, heartbeat and leave events against the
+server. `symgen` generates the client's global addresses from a ROM build, as
 described below. No external Go dependencies are required.
 
 The race check requires a supported C compiler with cgo enabled. The symbol
@@ -193,8 +193,11 @@ go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.
 All three flags are required. Supply the ELF and ROM from the **same build**.
 `symgen` uses Go's standard-library `debug/elf`, so no extra symbol tools are
 required. It writes the allowlisted symbol addresses and sizes from the ELF,
-plus the supplied ROM's lowercase SHA1 as `romSha1`. That hash identifies the ROM
-input; it cannot establish whether a separately supplied ELF belongs to it.
+plus the supplied ROM's lowercase SHA1 as `romSha1` and its CRC32 (IEEE, 8 hex
+digits) as `romCrc32`. These hashes identify the ROM input; they cannot
+establish whether a separately supplied ELF belongs to it. The client checks
+`romCrc32` at startup, because a CRC32 is the only ROM hash mGBA 0.10.5 gives
+scripts (see [client/README.md](client/README.md)).
 
 The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
 `gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr`, `gMain`,

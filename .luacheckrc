@@ -7,3 +7,6 @@ max_line_length = 120
 files["client/spike"] = {
   read_globals = { "callbacks", "console", "emu", "socket" },
 }
+files["client/bridge.lua"] = {
+  read_globals = { "callbacks", "console", "emu", "socket" },
+}

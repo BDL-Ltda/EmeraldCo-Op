@@ -7,4 +7,4 @@ Shared server and tool packages belong here, inside the root Go module
 | Package | Purpose |
 | --- | --- |
 | `protocol` | Wire messages, the JSON line codec and validation. Contract in [docs/protocol.md](../docs/protocol.md). |
-| `room` | Single-room TCP connection lifecycle: authenticated hello, welcome snapshots, joins, leaves and duplicate-ID replacement. See [docs/server.md](../docs/server.md). |
+| `room` | Authenticated single-room presence relay, welcome snapshots, lifecycle, ping/timeout, per-client send queues and message-rate limits. See [docs/server.md](../docs/server.md). |
