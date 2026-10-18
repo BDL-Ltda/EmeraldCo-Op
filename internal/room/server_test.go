@@ -148,17 +148,16 @@ func wantError(t *testing.T, p *testPeer, code string) {
 }
 
 func TestLifecycle(t *testing.T) {
-	s, addr, _ := testServer(t, 5, nil)
+	_, addr, _ := testServer(t, 5, nil)
 	a, w := enter(t, addr, "a")
 	if len(w.Players) != 0 {
 		t.Fatalf("first welcome: %#v", w)
 	}
-	// #14 will populate this through presence messages. Verify that the
-	// lifecycle snapshot preserves an existing last presence without relaying.
+	// A pong is a barrier: the earlier presence must be stored before B joins.
 	presence := protocol.PresenceState{MapGroup: 0, MapNum: 9, X: 5, Y: 3, Facing: 1, Visible: true}
-	s.mu.Lock()
-	s.players["a"].player.Presence = &presence
-	s.mu.Unlock()
+	a.send(t, protocol.Presence{PlayerID: "a", PresenceState: presence})
+	a.send(t, protocol.Ping{T: 1})
+	want(t, a, protocol.Pong{T: 1})
 	b, w := enter(t, addr, "b")
 	expected := []protocol.Player{{PlayerID: "a", TrainerID: 12345, Gender: 0, Presence: &presence}}
 	if !reflect.DeepEqual(w.Players, expected) {
@@ -271,6 +270,7 @@ func TestUnknownTypesAreIgnored(t *testing.T) {
 	a.send(t, hello("a"))
 	want(t, a, protocol.Welcome{Players: []protocol.Player{}})
 	a.send(t, protocol.Ping{T: 1})
+	want(t, a, protocol.Pong{T: 1})
 	a.send(t, protocol.Presence{PlayerID: "a", PresenceState: protocol.PresenceState{Facing: 1}})
 	a.raw(t, `{"v":1,"type":"future","payload":"ignored"}`+"\n")
 	_, _ = enter(t, addr, "b")

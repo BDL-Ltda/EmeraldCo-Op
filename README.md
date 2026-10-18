@@ -4,10 +4,10 @@ A co-op mod for Pokémon Emerald, with a Go presence server and an mGBA Lua
 client. The first release aims to let up to five players see each other in the
 overworld. Saves, battles and items stay local in v1.
 
-The ROM build, ELF symbol generator and server connection lifecycle are
-available. The server accepts authenticated players and announces joins and
-leaves; presence relay and liveness are still pending (#14). The fake client
-remains a placeholder, and there is no working Lua client yet. Follow progress
+The ROM build, ELF symbol generator and single-room presence server are
+available. The server authenticates players, relays presence, answers pings
+and removes inactive, flooding or slow connections. The fake client remains
+a placeholder, and there is no working Lua client yet. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -16,7 +16,7 @@ in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 EmeraldCo-Op/
 ├── go.mod                    # one Go module for the server and tools
 ├── cmd/
-│   ├── server/               # presence relay entry point (placeholder)
+│   ├── server/               # authenticated single-room presence relay
 │   ├── fakeclient/           # simulated player entry point (placeholder)
 │   ├── echoserver/           # line echo server for client socket tests
 │   └── symgen/               # ELF symbol generator and symbol allowlist

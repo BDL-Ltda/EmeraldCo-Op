@@ -1,8 +1,9 @@
 # Server development
 
 `cmd/server` implements the connection lifecycle from
-[#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13). It uses the Go standard
-library and the existing [protocol](protocol.md). There is one global room.
+[#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13) and presence/liveness
+from [#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14). It uses the Go
+standard library and the existing [protocol](protocol.md). There is one room.
 
 ## Configuration
 
@@ -50,12 +51,19 @@ changes `trainerId`. The trainer ID is self-reported metadata, not proof that
 a client owns a player ID. Requiring matching trainer IDs would change that
 contract and needs a separate identity-policy decision.
 
-The room uses a mutex to serialize membership and notification order. Each
-connection also serializes writes so errors and broadcasts cannot interleave
-JSON lines. Writes have a five-second deadline. A failed write closes that
-peer; its reader performs removal. Writes currently hold the room mutex, so a
-slow reader can delay lifecycle events. Buffered queues and slow-client isolation
-belong to #14; this is not yet a complete public relay.
+The room uses a mutex to serialize membership, snapshots and notification order.
+Each authenticated client has a FIFO queue of **64 encoded lines** and its own
+writer goroutine. Enqueuing never waits for a socket or queue space. Welcome is
+queued before admission and later messages, so it remains the newcomer's first
+message. No socket writes run under the room mutex.
+
+If a queue is full, the server logs `drop` with `send_queue_full`, removes that
+client, closes its socket and announces `leave(disconnect)`. Other players keep
+receiving messages. Writes also have a five-second deadline; failed writes close
+that socket and its reader removes the connection. Terminal protocol errors
+detach the player, stop queued output and attempt to send one error before
+closing. Only that client's handler can wait on its writer deadline; other
+clients continue. Cancellation closes sockets and waits for readers and writers.
 
 Temporary listener accept failures retry after 5 ms, doubling up to one second,
 without removing existing players. A successful accept resets the delay;
@@ -75,23 +83,36 @@ A reset or closed socket during hello is a transport failure, not a
 `bad_message` rejection; no error response is attempted. The five-second hello
 timeout still produces `bad_hello`. Unknown messages are ignored in both phases,
 with only the first one logged per connection. This bounds unknown-message logs,
-not incoming message rates (#14) or the number of unauthenticated sockets
-([#50](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/50)). Those overload
-limits remain follow-up work.
+not the number of unauthenticated sockets; a pending-handshake cap is still
+tracked by [#50](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/50).
 
 Logs include the event, remote address, player ID when validated, and rejection
 or leave reason. Raw messages, unknown type names and decoder errors are not
 logged: these could contain secrets. The join key is never logged.
 
-## Current boundary
+## Presence, liveness and limits
 
-Presence relay, presence updates, ping/pong, rate limits and the 15-second
-inactivity timeout are implemented by
-[#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14), not this lifecycle.
-Valid presence and ping messages are currently decoded but have no effect.
-New connections therefore have no last presence; welcome supports copying it
-once #14 populates it. A client that remains connected after hello is not yet
-evicted for silence. Client networking and fakeclient are separate issues.
+- A valid `presence` has its `playerId` overwritten with the authenticated
+  connection's ID before it is stored and queued to every other room member.
+  It is never echoed to the sender. Welcome includes each existing player's
+  last presence, if available. A replaced reader cannot update its successor.
+- `ping` replies with `pong`, preserving the exact integer `t`. Clients should
+  send one every five seconds, including when they have not moved.
+- After hello, **15 seconds without a complete message** closes that connection
+  and broadcasts `leave(timeout)`. Receiving a partial line does not extend the
+  deadline. Complete unknown messages count as activity but still share the
+  message-rate limit; the pre-hello five-second deadline remains fixed.
+- Each connection can send **50 complete messages in any rolling one-second
+  window**. Hello, ping, presence and unknown types all count, before and after
+  authentication. The 51st message sends `error bad_message` and closes; known
+  malformed messages already reject immediately. This is per connection, not a
+  room-wide cap.
+- Protocol line-size and configured room-capacity limits still apply. The send
+  queue and timeouts are server constants; only address, key and capacity have
+  CLI configuration. Pending-handshake admission control remains #50.
+
+Client networking (#17), fakeclient (#15), hosting (#18), interpolation and ROM
+rendering remain separate work. The relay does not synchronize saves or battles.
 
 ## Verify with two TCP sessions
 
@@ -117,3 +138,23 @@ B receives a welcome containing A. A receives B's join. Close B: A receives
 the old A socket closes. With a third observer connected, it sees
 `leave(replaced)` before the new `join`. A PowerShell `System.Net.Sockets.TcpClient`
 can perform the same line exchanges when `nc` is unavailable on Windows.
+
+While both clients are connected, send a ping from A:
+
+```json
+{"v":1,"type":"ping","t":1712345678901}
+```
+
+A receives a pong with the same `t`. Then send presence from B (using A's ID
+deliberately tests that the server overrides it):
+
+```json
+{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":9,"x":5,"y":3,"facing":1,"visible":true}
+```
+
+A receives that presence with `playerId` set to `b`; B gets no echo. A new client
+gets this state in welcome. To test timeout, keep A pinging every five seconds
+and let B stop sending: A sees `leave(timeout)` after about 15 seconds. Automated
+tests cover flooding and deterministic socket backpressure. The issue's
+fakeclient-based smoke scenario can be repeated when #15 is implemented; until
+then, TCP sessions exercise the same protocol without an emulator.
