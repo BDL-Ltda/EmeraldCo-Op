@@ -27,8 +27,9 @@ if not probe then
 end
 probe:close()
 
-package.path = DIR .. "lib/?.lua;" .. package.path
+package.path = DIR .. "lib/?.lua;" .. DIR .. "?.lua;" .. package.path
 local romcheck = require("romcheck")
+local memory = require("memory")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -61,20 +62,57 @@ if not addresses then
 	return
 end
 
+-- Reads the player state once per game loop, but only while the loaded ROM is
+-- the verified build: on any other ROM the addresses mean nothing.
+local reader = nil
+local lastLine, lastIdentity = nil, nil
+
+local function readState()
+	if not reader then
+		return
+	end
+	local state = reader.getPlayerState()
+	local line = memory.format(state)
+	if line ~= lastLine then
+		console:log(line)
+		lastLine = line
+	end
+	-- Logged again for each new game session.
+	local identity = nil
+	if state.trainerId then
+		identity = string.format("[state] trainerId %d  gender %d", state.trainerId, state.gender)
+		if identity ~= lastIdentity then
+			console:log(identity)
+		end
+	end
+	lastIdentity = identity
+end
+
 -- Runs once a game is loaded, and again whenever another game is started, so
--- switching ROMs with the script still loaded is caught too. Later issues (#11
--- onward) start their work here, and only when the ROM is verified.
+-- switching ROMs with the script still loaded is caught too. Game memory is
+-- only read after the ROM is verified.
 local function verifyRom()
+	reader, lastLine, lastIdentity = nil, nil, nil
 	local ok, msg = romcheck.verify(addresses.romCrc32, emu:checksum())
-	if ok then
-		console:log("[bridge] " .. msg)
-	else
+	if not ok then
 		fail(msg)
+		return
+	end
+	console:log("[bridge] " .. msg)
+	local rerr
+	reader, rerr = memory.new(emu, addresses.symbols)
+	if not reader then
+		fail(rerr)
 	end
 end
 
 console:log("[bridge] Emerald Co-Op bridge started")
 callbacks:add("start", verifyRom)
+-- Not "frame": a heavy game loop (map loads, route-edge crossings, save block
+-- moves) can run past the end of a frame, so a frame callback can see memory
+-- half updated. The game reads the keypad only at the top of its main loop,
+-- when the previous iteration is complete (see docs/memory-map.md).
+callbacks:add("keysRead", readState)
 if emu then
 	verifyRom()
 end

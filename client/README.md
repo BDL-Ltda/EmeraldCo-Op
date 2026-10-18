@@ -31,6 +31,29 @@ on the first problem. The game itself keeps running.
 On success it logs `ROM verified (<crc32>)`. The check runs again whenever
 another game is loaded with the script still running.
 
+## Player state
+
+Once the ROM is verified, `bridge.lua` reads the local player state once per game
+loop (in mGBA's `keysRead` callback, see the
+[memory map](../docs/memory-map.md#when-to-read-the-keysread-callback))
+with `memory.lua` and logs it **only when it changes**:
+
+```text
+[state] no position  hidden
+[state] trainerId 12345  gender 0
+[state] map 0:9  pos 5,3  facing SOUTH  visible
+```
+
+`getPlayerState()` returns `mapGroup`, `mapNum`, `x`, `y` (map coordinates),
+`facing` (the game's `DIR_*` value), `visible`, `gender` and `trainerId`.
+`visible` is true for the whole game session and false before a game starts
+(title screen, main menu, new-game intro). During map loads, battles and
+full-screen menus the position keeps the last snapshot read in the field. On a
+soft reset the last snapshot is reported once as `hidden` and then dropped;
+position fields stay `nil` until the new session has a fresh snapshot. The
+rules and every offset are in
+[memory map: player state](../docs/memory-map.md#player-state).
+
 ## Local configuration
 
 `config.example.lua` lists every setting: `SERVER_HOST`, `SERVER_PORT`,
@@ -52,12 +75,15 @@ the command, required build inputs, allowlist, validation and regeneration rules
 ## Layout and tests
 
 - `bridge.lua`: entry point loaded in mGBA.
+- `memory.lua`: reads the player state through the bus it is given (`emu` in
+  mGBA). The only place with struct offsets, in one table at the top.
 - `lib/`: pure modules (no `emu`, `socket` or `callbacks`), testable outside
   mGBA. `romcheck.lua` compares the ROM hash; `json.lua` and `framing.lua`
   provide the transport primitives described below.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
   folder, sorts suites and test names, prints pass/fail and exits non-zero on
-  failure. It also checks every JSON example in `docs/protocol.md`.
+  failure. It includes ROM checks, fake-memory player-state checks and every
+  JSON example in `docs/protocol.md`.
 - `spike/`: the throwaway scripting spike from
   [issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8).
 
