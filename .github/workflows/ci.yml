@@ -35,12 +35,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends lua5.4 lua-check
       - run: luacheck client/
       - name: Lua tests
-        run: |
-          if [ -f client/tests/run.lua ]; then
-            lua5.4 client/tests/run.lua
-          else
-            echo "client/tests/run.lua does not exist yet (#16); skipping."
-          fi
+        run: lua5.4 client/tests/run.lua
 
   rom:
     name: ROM

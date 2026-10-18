@@ -130,6 +130,11 @@ A message with an unknown `type` (and the right `v`) is not an error: the receiv
 
 In Go, `protocol.Decoder` reports these cases as errors matching `ErrVersionMismatch`, `ErrLineTooLong`, `ErrMalformed` and `ErrInvalid` (a `*ValidationError` naming the field), and returns a `protocol.Unknown` value for unknown types. Choosing the error code is the server's job.
 
+Lua's pure [JSON and framing modules](../client/README.md#pure-json-codec) decode
+the representation and split complete lines; they do not validate message
+fields. The shared Lua test runner round-trips every JSON example above and
+feeds them through arbitrary chunk splits. Lua network integration remains #17.
+
 ## Connection sequences
 
 The server rules (timeouts, relaying, rate limits) are implemented in [#13](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/13) and [#14](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/14).
