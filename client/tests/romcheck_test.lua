@@ -1,15 +1,11 @@
--- Tests for client/lib/romcheck.lua. Run from the repository root:
---   lua5.4 client/tests/romcheck_test.lua
--- Standalone until the shared test runner from #16 exists.
+-- Tests for client/lib/romcheck.lua, discovered by client/tests/run.lua.
 
 package.path = "client/lib/?.lua;" .. package.path
 local romcheck = require("romcheck")
 
-local failures = 0
+local tests = {}
 local function test(name, fn)
-	local ok, err = pcall(fn)
-	print((ok and "ok   " or "FAIL ") .. name .. (ok and "" or ": " .. tostring(err)))
-	if not ok then failures = failures + 1 end
+	tests[name] = fn
 end
 local function eq(got, want)
 	if got ~= want then error(string.format("got %q, want %q", tostring(got), tostring(want)), 2) end
@@ -54,8 +50,4 @@ test("no checksum from mGBA is rejected", function()
 	eq((romcheck.verify("453202b6", "\x45\x32")), false)
 end)
 
-if failures > 0 then
-	print(failures .. " test(s) failed")
-	os.exit(1)
-end
-print("all romcheck tests passed")
+return tests
