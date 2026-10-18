@@ -188,7 +188,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="meta">
     <span>closes <b>#15</b></span>
     <span>branch <b>feat/15-fakeclient</b></span>
-    <span>diff <b>9 files · +1046 / −11</b></span>
+    <span>diff <b>10 files · +1049 / −16</b></span>
     <span>milestone <b>0.2 Networking</b></span>
   </div>
   <ul class="toc">
@@ -301,11 +301,11 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="prose">
     <span class="eyebrow">How it was tested</span>
     <h2>Unit contracts and real processes</h2>
-    <p>Native Windows tests use official Go 1.27.2. Scripted TCP peers check the protocol independently. Real process tests cover the master lifecycle and the approved relay revision from PR #52, isolated without merging its code. Local Docker could not start; race, Lua and ROM CI results are recorded on the PR.</p>
+    <p>Native Windows tests use official Go 1.27.2. Scripted TCP peers check the protocol independently. After syncing this branch with master, real process tests were repeated against its merged relay from PR #52. Local race checking requires an unavailable C compiler; race, Lua and ROM CI results are recorded on the PR.</p>
   </div>
   <div class="term" data-anim>
     <div style="--i:0"><span class="p">$</span> go test -cover ./cmd/fakeclient</div>
-    <div style="--i:1" class="ok">ok  github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient  5.875s  coverage: 86.8% of statements</div>
+    <div style="--i:1" class="ok">ok  github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient  (cached)  coverage: 86.8% of statements</div>
     <div style="--i:2"><span class="p">$</span> node bin/test-fakeclients.cjs relay</div>
     <div style="--i:3" class="ok">PASS: mutual presence, correct facing, warp 0:9 -&gt; 1:0 -&gt; 0:9, no self-echo</div>
     <div style="--i:4">[presence] bot2 1:0 5,7 WEST visible=true</div>
@@ -314,7 +314,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div style="--i:7" class="ok">PASS: idle sends one presence and remains connected for &gt;15 seconds with heartbeat</div>
     <div style="--i:8" class="ok">PASS: no test join key in client or server output</div>
   </div>
-  <p class="small">The integration harness and portable toolchain are ignored local test artifacts, not part of the PR. Public source tests live under <code>cmd/fakeclient/*_test.go</code>. Server revision tested: <code>9da291afdbbe94f0651e0e653cf8342eb8586ef0</code>.</p>
+  <p class="small">The integration harness and portable toolchain are ignored local test artifacts, not part of the PR. Public source tests live under <code>cmd/fakeclient/*_test.go</code>. The server was rebuilt from this checkout after merging master at <code>1c267af</code>; its runtime code is unchanged from that revision.</p>
 </section>
 
 <section id="review">
@@ -330,7 +330,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <label class="check"><input type="checkbox" id="c4"><span>Can help, malformed messages or remote text disclose the key?</span></label>
   </div>
   <div class="limits">
-    <div class="limit"><b>#14 · Server relay</b><span>The current #13-only server supports joins and leaves but ignores presence and ping. Full multiplayer behavior needs #14; that code is not added by this PR.</span></div>
+    <div class="limit"><b>#14 · Merged relay</b><span>PR #52 is now in master. The updated branch uses its presence relay and heartbeat as-is; this PR adds no server runtime changes.</span></div>
     <div class="limit"><b>#17 · Real client</b><span>No mGBA integration, rendering, real save identity or automatic reconnect. The fake client tests the wire behavior only.</span></div>
   </div>
 </section>
