@@ -184,7 +184,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#55</span>
   <h1>Test the wire.<br>Without the emulator.</h1>
   <p class="lede">Pure Lua primitives turn byte chunks into JSON values. A tiny runner exercises the same code locally and in CI, before networking is connected in #17.</p>
-  <div class="meta"><span>closes <b>#16</b></span><span>branch <b>feat/16-lua-pure-modules</b></span><span>diff <b>11 files · +637 / −22</b></span><span>milestone <b>0.2 Networking</b></span></div>
+  <div class="meta"><span>closes <b>#16</b></span><span>branch <b>feat/16-lua-pure-modules</b></span><span>diff <b>11 files · +638 / −23</b></span><span>milestone <b>0.2 Networking</b></span></div>
   <ul class="toc"><li><a href="#big-picture">Big picture</a></li><li><a href="#detail">JSON shapes</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#tested">Testing</a></li><li><a href="#review">Review</a></li></ul>
 </header>
 <section id="big-picture">
@@ -222,11 +222,11 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <section id="tested">
   <div class="prose"><span class="eyebrow">How it was tested</span><h2>Real examples, byte-sized chunks</h2><p>Native Windows: Lua 5.4.8 and luacheck 1.2.0, portable in ignored bin/. All 16 JSON examples are read directly from docs/protocol.md and tested with chunk sizes down to one byte. CI now invokes the runner unconditionally.</p></div>
   <div class="term" data-anim>
-    <div style="--i:0"><span class="p">$</span> lua54.exe client/tests/run.lua</div><div style="--i:1" class="ok">87 passed, 0 failed (4 suites)</div>
-    <div style="--i:2"><span class="p">$</span> luacheck.exe client</div><div style="--i:3" class="ok">Total: 0 warnings / 0 errors in 13 files</div>
+    <div style="--i:0"><span class="p">$</span> lua54.exe client/tests/run.lua</div><div style="--i:1" class="ok">88 passed, 0 failed (5 suites)</div>
+    <div style="--i:2"><span class="p">$</span> luacheck.exe client</div><div style="--i:3" class="ok">Total: 0 warnings / 0 errors in 15 files</div>
     <div style="--i:4"><span class="p">$</span> node bin/check-lua-codec.cjs</div><div style="--i:5" class="ok">PASS: 1000 deterministic generated JSON values round-trip through Lua and Node JSON</div>
   </div>
-  <p class="small">Temporary assertion and suite-load failures both returned exit code 1; the deliberate fixtures were removed. Go vet and native tests passed. Linux CI supplies the race check unavailable on this Windows host. Current CI results are linked in the PR.</p>
+  <p class="small">After merging master at 67ea37c, the unchanged standalone memory suite from PR #54 also runs: all 15 internal tests passed, counted as one suite-level check in the summary above. Temporary assertion and suite-load failures both returned exit code 1 during the initial implementation; those deliberate fixtures were removed. Go vet and native tests passed. Linux CI supplies the race check unavailable on this Windows host. Current CI results are linked in the PR.</p>
 </section>
 <section id="review">
   <div class="prose"><span class="eyebrow">For the reviewer</span><h2>Where to look</h2><p>Read the codec and framer, then their tests and run.lua. Existing ROM-check tests are migrated without dropping checks. Older standalone suites remain compatible during migration.</p></div>
@@ -237,7 +237,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   </div>
   <div class="limits"><div class="limit"><b>#17 · Network client</b><span>No sockets or emulator changes here. Message validation, connection lifecycle, outbound length limits and LF insertion remain the integration caller's job.</span></div></div>
 </section>
-<footer>Generated for BDL-Ltda/EmeraldCo-Op#55 by Codex with the pr-walkthrough skill. Based on issue #16, commit 3131ae9 and commands run for this PR.</footer>
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#55 by Codex with the pr-walkthrough skill. Based on issue #16, commit 76c1072 and commands run for this PR.</footer>
 </main>
 
 <script>
