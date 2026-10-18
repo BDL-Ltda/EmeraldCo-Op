@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Pure Lua transport primitives · Emerald Co-Op</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Emerald Co-Op PR walkthrough using the shared template tokens and classes.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#55</span>
+  <h1>Test the wire.<br>Without the emulator.</h1>
+  <p class="lede">Pure Lua primitives turn byte chunks into JSON values. A tiny runner exercises the same code locally and in CI, before networking is connected in #17.</p>
+  <div class="meta"><span>closes <b>#16</b></span><span>branch <b>feat/16-lua-pure-modules</b></span><span>diff <b>11 files · +637 / −22</b></span><span>milestone <b>0.2 Networking</b></span></div>
+  <ul class="toc"><li><a href="#big-picture">Big picture</a></li><li><a href="#detail">JSON shapes</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#tested">Testing</a></li><li><a href="#review">Review</a></li></ul>
+</header>
+<section id="big-picture">
+  <div class="prose"><span class="eyebrow">Big picture · How it works</span><h2>A complete line is not yet a valid message</h2><p>Issue #16 separates pure modules from thin emulator glue. The framer buffers incomplete byte chunks; the codec parses complete JSON text. Both run in plain Lua 5.4. Neither accesses game memory or creates connections.</p></div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Receive path tested without I/O</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll"><svg viewBox="0 0 1000 300" role="img" aria-label="Arbitrary chunks feed the line framer, complete lines feed JSON decoding, and future network glue validates messages.">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="zone" x="10" y="10" width="980" height="280" rx="10"/><text class="t-zone" x="30" y="38">PURE MODULES · SAME IMPLEMENTATION IN TESTS AND CLIENT</text>
+      <g class="step" style="--i:0"><text x="30" y="141">Byte chunks</text><path class="edge em flow" d="M130 148H180" marker-end="url(#arrow)"/></g>
+      <g class="step" style="--i:1"><rect class="box pub" x="185" y="110" width="220" height="76" rx="6"/><text class="t-mono t-em" x="200" y="137">framing.lua</text><text class="t-sub" x="200" y="159">Complete lines, bounded tail</text><path class="edge em flow" d="M405 148H475" marker-end="url(#arrow)"/></g>
+      <g class="step" style="--i:2"><rect class="box pub" x="480" y="110" width="220" height="76" rx="6"/><text class="t-mono t-em" x="495" y="137">json.lua</text><text class="t-sub" x="495" y="159">Exact integers + UTF-8 values</text><path class="edge ret" d="M700 148H760" marker-end="url(#arrow)"/></g>
+      <g class="step" style="--i:3"><rect class="box dim" x="765" y="110" width="200" height="76" rx="6"/><text class="t-mono" x="780" y="137">#17 glue</text><text class="t-sub" x="780" y="159">Field checks + networking</text></g>
+      <text class="t-sub" x="185" y="228">Oversized line or partial EOF → error, discard tail, reject that stream.</text>
+      <text class="t-sub" x="185" y="251">JSON encode returns text only; future glue adds LF and checks outbound length.</text>
+    </svg></div>
+    <div class="legend"><span><i></i>added by this PR</span><span><i class="m"></i>outside this PR</span><span><i class="flow"></i>tested data path</span></div>
+  </figure>
+</section>
+<section id="detail">
+  <div class="prose"><span class="eyebrow">Under the hood</span><h2>Three values Lua must not collapse</h2><p>A welcome with no players needs an array, not an object. Null must retain its slot instead of disappearing as Lua nil. Choose a shape to inspect the representation.</p></div>
+  <div class="plate" style="display:grid;gap:14px"><div class="bytes">
+    <button class="seg wide" type="button" data-selected data-title="Empty array" data-value="json.array() → []" data-text="Decoded arrays retain their shape even when empty. Dense non-empty Lua sequences also encode as arrays."><small>Empty array</small>[]</button>
+    <button class="seg wide" type="button" data-title="Empty object" data-value="json.object() or {} → {}" data-text="Object keys must be strings. Decoding retains object shape; encoding sorts keys with v and type first."><small>Empty object</small>{}</button>
+    <button class="seg wide" type="button" data-title="Explicit null" data-value="json.null → null" data-text="A sentinel preserves null fields and array indices. Sparse tables fail rather than silently changing the data."><small>Null sentinel</small>null</button>
+  </div><div class="detail" aria-live="polite"></div></div>
+</section>
+<section id="decisions">
+  <div class="prose"><span class="eyebrow">Decisions</span><h2>Small, explicit contracts</h2></div>
+  <div class="decisions">
+    <div class="decision"><h3>Integer-only JSON</h3><div class="term"><div>math.type(value) == "integer"</div><div>nil, error on unsupported data</div></div><div class="why"><b>Why</b><p>The issue asks for the protocol subset. Lua 5.4 integers preserve trainer IDs and timestamps exactly, including values beyond floating-point precision. Fractions and exponents are rejected, not rounded. Nesting is capped at 64 containers.</p></div></div>
+    <div class="decision"><h3>Bound the unfinished line</h3><div class="term"><div>framing.new() -- 4096 bytes</div><div>framer:feed(bytes)</div><div>framer:finish() -- check EOF</div></div><div class="why"><b>Why</b><p>A large chunk is checked before its unfinished line is copied. Oversize input rejects the current batch and permanently fails the framer. A caller cannot accidentally resume a rejected stream.</p></div></div>
+  </div>
+</section>
+<section id="tested">
+  <div class="prose"><span class="eyebrow">How it was tested</span><h2>Real examples, byte-sized chunks</h2><p>Native Windows: Lua 5.4.8 and luacheck 1.2.0, portable in ignored bin/. All 16 JSON examples are read directly from docs/protocol.md and tested with chunk sizes down to one byte. CI now invokes the runner unconditionally.</p></div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> lua54.exe client/tests/run.lua</div><div style="--i:1" class="ok">87 passed, 0 failed (4 suites)</div>
+    <div style="--i:2"><span class="p">$</span> luacheck.exe client</div><div style="--i:3" class="ok">Total: 0 warnings / 0 errors in 13 files</div>
+    <div style="--i:4"><span class="p">$</span> node bin/check-lua-codec.cjs</div><div style="--i:5" class="ok">PASS: 1000 deterministic generated JSON values round-trip through Lua and Node JSON</div>
+  </div>
+  <p class="small">Temporary assertion and suite-load failures both returned exit code 1; the deliberate fixtures were removed. Go vet and native tests passed. Linux CI supplies the race check unavailable on this Windows host. Current CI results are linked in the PR.</p>
+</section>
+<section id="review">
+  <div class="prose"><span class="eyebrow">For the reviewer</span><h2>Where to look</h2><p>Read the codec and framer, then their tests and run.lua. Existing ROM-check tests are migrated without dropping checks. Older standalone suites remain compatible during migration.</p></div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Are null, empty arrays, integers and Unicode preserved without coercion?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Do oversize lines and partial EOF reject the stream without unbounded buffering?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Does CI discover every suite, run each returned function and fail on errors?</span></label>
+  </div>
+  <div class="limits"><div class="limit"><b>#17 · Network client</b><span>No sockets or emulator changes here. Message validation, connection lifecycle, outbound length limits and LF insertion remain the integration caller's job.</span></div></div>
+</section>
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#55 by Codex with the pr-walkthrough skill. Based on issue #16, commit 3131ae9 and commands run for this PR.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
