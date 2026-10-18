@@ -33,7 +33,9 @@ another game is loaded with the script still running.
 
 ## Player state
 
-Once the ROM is verified, `bridge.lua` reads the local player state every frame
+Once the ROM is verified, `bridge.lua` reads the local player state once per game
+loop (in mGBA's `keysRead` callback, see the
+[memory map](../docs/memory-map.md#when-to-read-the-keysread-callback))
 with `memory.lua` and logs it **only when it changes**:
 
 ```text

@@ -62,12 +62,12 @@ if not addresses then
 	return
 end
 
--- Reads the player state every frame, but only while the loaded ROM is the
--- verified build: on any other ROM the addresses mean nothing.
+-- Reads the player state once per game loop, but only while the loaded ROM is
+-- the verified build: on any other ROM the addresses mean nothing.
 local reader = nil
 local lastLine, lastIdentity = nil, nil
 
-local function onFrame()
+local function readState()
 	if not reader then
 		return
 	end
@@ -108,7 +108,11 @@ end
 
 console:log("[bridge] Emerald Co-Op bridge started")
 callbacks:add("start", verifyRom)
-callbacks:add("frame", onFrame)
+-- Not "frame": a heavy game loop (map loads, route-edge crossings, save block
+-- moves) can run past the end of a frame, so a frame callback can see memory
+-- half updated. The game reads the keypad only at the top of its main loop,
+-- when the previous iteration is complete (see docs/memory-map.md).
+callbacks:add("keysRead", readState)
 if emu then
 	verifyRom()
 end

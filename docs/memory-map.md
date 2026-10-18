@@ -54,8 +54,27 @@ battle ([battle_main.c][battle_main-590]), and when a game is loaded.
 
 So read `gSaveBlock1Ptr` / `gSaveBlock2Ptr` **again on every read** and add the
 field offset to the value you just read. Never cache the pointer or a derived
-address across frames. The move happens inside a single frame, so a read done
-from a frame callback always sees a consistent pointer and block.
+address across frames.
+
+### When to read: the `keysRead` callback
+
+Read the player state from mGBA's **`keysRead`** callback, not from `frame`.
+A `frame` callback fires at the end of every video frame, wherever the game's
+code happens to be. A heavy game loop iteration (a map load, a save block move,
+a route-edge crossing) runs past the frame boundary, so a `frame` callback can
+see memory half updated. This was observed in mGBA 0.10.5: crossing from
+Littleroot Town (`0:9`) to Route 101 (`0:16`), one `frame` read returned map
+`0:16` with the Littleroot coordinates `11,-1`, because
+[`CameraUpdate`][camera-414] had run `CameraMove` (which loads the new map ID)
+but not yet `UpdateObjectEventsForCameraUpdate` (which shifts the
+coordinates).
+
+The game reads the keypad (`REG_KEYINPUT`) only in [`ReadKeys`][main-252], the
+first call of each [`AgbMain`][main-89] loop iteration, when the previous
+iteration has finished. `keysRead` fires on that read, so every read made there
+sees a consistent state. (The e-Reader code also reads the keypad, but it never
+runs in normal play.) If the game lags, `keysRead` fires less than once per
+frame, which is fine for presence.
 
 ### Fields
 
@@ -169,10 +188,10 @@ coordinates.
 #### Cached position across sessions
 
 The client keeps one **position snapshot**: `mapGroup`, `mapNum`, `x`, `y` and
-`facing`, read together in the same frame while `positionValid` is true. It
+`facing`, read together in the same `keysRead` callback while `positionValid` is true. It
 replaces the whole snapshot at once and never updates single fields while
 `positionValid` is false, so a new map ID is never paired with the old map's
-coordinates. Each frame:
+coordinates. Each read:
 
 1. **`visible` is false and was never true** (boot, title, intro): there is no
    snapshot and nothing to publish.
@@ -261,6 +280,9 @@ Never by eye. On the pinned commit, inside the ROM build image
 [play_time-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L4-L11
 [play_time-31]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L31-L34
 [main-437]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L428-L438
+[main-89]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L89-L169
+[main-252]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L250-L253
+[camera-414]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_camera.c#L360-L420
 [new_game-165]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/new_game.c#L165
 [overworld-1539]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1532-L1540
 [overworld-1735]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1705-L1736
