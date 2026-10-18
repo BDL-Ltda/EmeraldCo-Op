@@ -25,9 +25,9 @@ as needed, for example when `gCoopMailbox` is introduced.
 See [Generating client addresses](../README.md#generating-client-addresses) for
 the command, required build inputs, validation, map verification and regeneration
 rules. Never hand-write or guess global addresses, or edit the generated module.
-Update this document if the memory layout changes. Client runtime integration is
-still planned in
-[issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
+Update this document if the memory layout changes. The client reads the fields
+below in [`client/memory.lua`](../client/memory.lua), whose offset table must
+match this document.
 
 ## Player state
 
