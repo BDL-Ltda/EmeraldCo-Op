@@ -60,6 +60,10 @@ type Server struct {
 	idleTimeout   time.Duration
 	rateLimit     int
 	sendQueueSize int
+	// pending is a semaphore of unauthenticated connections; its capacity is
+	// the cap. A slot is held from accept until the join key matches or the
+	// handshake ends any other way.
+	pending chan struct{}
 
 	// The mutex serializes membership changes and their notifications, so an
 	// observer always sees leave(replaced) before join for a replacement.
@@ -68,6 +72,12 @@ type Server struct {
 	mu      sync.Mutex
 	players map[string]*client
 }
+
+// maxPendingHandshakes bounds connections that have not yet sent a hello with
+// the correct join key. It is about three times the room capacity, so a whole
+// room can reconnect at once while an idle-connection flood holds at most this
+// many descriptors, each for at most the hello timeout.
+const maxPendingHandshakes = 16
 
 func New(cfg Config, logger *log.Logger) (*Server, error) {
 	if err := cfg.Validate(); err != nil {
@@ -78,7 +88,8 @@ func New(cfg Config, logger *log.Logger) (*Server, error) {
 	}
 	return &Server{cfg: cfg, logger: logger, helloTimeout: 5 * time.Second,
 		writeTimeout: 5 * time.Second, idleTimeout: 15 * time.Second,
-		rateLimit: 50, sendQueueSize: 64, players: make(map[string]*client)}, nil
+		rateLimit: 50, sendQueueSize: 64, pending: make(chan struct{}, maxPendingHandshakes),
+		players: make(map[string]*client)}, nil
 }
 
 // Serve owns listener and all accepted connections. Cancellation closes even
@@ -102,6 +113,7 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 		handlers.Wait()
 	}()
 	var retryDelay time.Duration
+	pendingFullLogged := false
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -131,10 +143,27 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 			return err
 		}
 		retryDelay = 0
+		select {
+		case s.pending <- struct{}{}:
+			pendingFullLogged = false
+		default:
+			// Over the cap: close at once, without reading or replying, so a
+			// flood costs no handler and no descriptor beyond this moment.
+			// Log once per overload episode to keep the flood out of the log.
+			if !pendingFullLogged {
+				s.logger.Printf("event=pending_full remote=%q", conn.RemoteAddr())
+				pendingFullLogged = true
+			}
+			conn.Close()
+			continue
+		}
+		var releaseOnce sync.Once
+		release := func() { releaseOnce.Do(func() { <-s.pending }) }
 		activeMu.Lock()
 		if ctx.Err() != nil {
 			activeMu.Unlock()
 			conn.Close()
+			release()
 			return nil
 		}
 		active[conn] = struct{}{}
@@ -142,12 +171,13 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 		handlers.Add(1)
 		go func() {
 			defer handlers.Done()
+			defer release()
 			defer func() {
 				activeMu.Lock()
 				delete(active, conn)
 				activeMu.Unlock()
 			}()
-			s.handle(conn)
+			s.handle(conn, release)
 		}()
 	}
 }
@@ -279,7 +309,9 @@ func decodeCode(err error, handshake bool) string {
 	return protocol.CodeBadMessage
 }
 
-func (s *Server) handle(conn net.Conn) {
+// handle calls authenticated once the join key matches, freeing the pending
+// handshake slot; Serve frees it on every other exit.
+func (s *Server) handle(conn net.Conn, authenticated func()) {
 	c := &client{conn: conn, outbox: make(chan []byte, s.sendQueueSize), stop: make(chan struct{})}
 	defer func() {
 		c.close()
@@ -321,6 +353,7 @@ func (s *Server) handle(conn net.Conn) {
 			s.reject(c, protocol.CodeBadKey)
 			return
 		}
+		authenticated()
 		if conn.SetReadDeadline(time.Time{}) != nil {
 			return
 		}
