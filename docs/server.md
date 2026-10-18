@@ -111,8 +111,9 @@ logged: these could contain secrets. The join key is never logged.
   queue and timeouts are server constants; only address, key and capacity have
   CLI configuration. Pending-handshake admission control remains #50.
 
-Client networking (#17), fakeclient (#15), hosting (#18), interpolation and ROM
-rendering remain separate work. The relay does not synchronize saves or battles.
+Use the [fake client](fakeclient.md) to exercise the relay without an emulator.
+Client networking (#17), hosting (#18), interpolation and ROM rendering remain
+separate work. The relay does not synchronize saves or battles.
 
 ## Verify with two TCP sessions
 
@@ -155,6 +156,5 @@ deliberately tests that the server overrides it):
 A receives that presence with `playerId` set to `b`; B gets no echo. A new client
 gets this state in welcome. To test timeout, keep A pinging every five seconds
 and let B stop sending: A sees `leave(timeout)` after about 15 seconds. Automated
-tests cover flooding and deterministic socket backpressure. The issue's
-fakeclient-based smoke scenario can be repeated when #15 is implemented; until
-then, TCP sessions exercise the same protocol without an emulator.
+tests cover flooding and deterministic socket backpressure. For the same smoke
+scenario with simulated walking players, follow the [fake client guide](fakeclient.md#verify-two-clients-locally).
