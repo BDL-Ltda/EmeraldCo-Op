@@ -251,7 +251,7 @@ See the [client README](client/README.md) for the planned configuration.
 - [Fake client](docs/fakeclient.md): simulated walking, warp and idle players for terminal tests.
 - [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
 - [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.
-- [Playing online](docs/playing-online.md): stub for hosting and joining (#18).
+- [Playing online](docs/playing-online.md): IPv4 hosting, TCP forwarding and external validation (#18).
 - [Installing](docs/installing.md): patch your ROM and load the client (players).
 - [Releasing](docs/releasing.md): build, create the `.bps` patch and publish a release.
 

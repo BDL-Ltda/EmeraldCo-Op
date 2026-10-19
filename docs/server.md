@@ -26,8 +26,10 @@ $env:SERVER_JOIN_KEY = Read-Host "Local test join key"
 go run ./cmd/server -addr localhost:8765
 ```
 
-The default address binds all interfaces; actual online hosting and port
-forwarding remain in [#18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18).
+The default address binds all interfaces. For IPv4 hosting, TCP-only port
+forwarding, a scoped Windows firewall rule and an external fakeclient test,
+follow [Playing online](playing-online.md). The real-network validation status
+is tracked in [#18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18).
 Keep keys and public addresses private. Ctrl+C (or SIGTERM on a service host)
 closes the listener, accepted players and connections still waiting for hello,
 and waits for handlers to exit.
