@@ -308,7 +308,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   </div>
   <div class="plate" style="display:grid;gap:14px">
     <div class="bytes">
-      <button class="seg" type="button" data-title="connect fails" data-value="retry in 5 s" data-text="env.connect returns nil and an error. net.lua logs '[net] connect failed: …; retrying in 5 s' and sets nextAttempt = now + 5000. mGBA's connect blocks, so each attempt can freeze the game briefly (see the reviewer question)."><small>transport</small>connect fails</button>
+      <button class="seg" type="button" data-title="connect fails" data-value="retry in 5 s" data-text="env.connect returns nil and an error. net.lua logs '[net] connect failed: …; retrying in 5 s' and sets nextAttempt = now + 5000. mGBA's connect blocks, so on Windows each refused attempt freezes the game for about 2 s. The retry stays at a fixed 5 s, as #17 specifies, with no backoff."><small>transport</small>connect fails</button>
       <button class="seg" type="button" data-title="server closes / receive error" data-value="retry in 5 s" data-text="receive() returns an error, or the first read after select() would block, which on Windows means the peer closed. disconnect() clears the socket, the framer and the outbox, and schedules a retry."><small>transport</small>connection lost</button>
       <button class="seg" type="button" data-title="room_full, bad_message" data-value="retry in 5 s" data-text="An error message whose code is not in FATAL_ERRORS. The client logs it and reconnects after 5 s, because the same config can succeed later."><small>server error</small>room_full</button>
       <button class="seg crc" type="button" data-selected data-title="bad_key, version_mismatch, bad_hello" data-value="stopped = true" data-text="Retrying with the same config cannot succeed. The client logs a readable hint (for bad_key: 'Check JOIN_KEY in client/config.lua, then reload the script.') and stops. A protocol version mismatch found while decoding stops it the same way. The join key itself is never logged."><small>server error</small>bad_key</button>
@@ -383,7 +383,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <p>Start with <code>client/net.lua</code>, then the wiring in <code>client/bridge.lua</code>, then <code>client/lib/protocol.lua</code>. Your ticks are saved in this browser only.</p>
   </div>
   <div class="checks">
-    <label class="check"><input type="checkbox" id="c1"><span>Fixed 5 s retry (as the issue says) or back off 5 s → 60 s as <code>docs/mgba-scripting.md</code> suggests? Each refused connect freezes the game for about 2 s on Windows.</span></label>
+    <label class="check"><input type="checkbox" id="c1"><span>Retry policy follows the issue: a fixed 5 s retry, no backoff. Is the 2 s hitch every 5 s on Windows while the server is down acceptable for 0.2?</span></label>
     <label class="check"><input type="checkbox" id="c2"><span>Is the 30 ms presence throttle and the 64 KiB outbox cap acceptable, or should they be config values?</span></label>
     <label class="check"><input type="checkbox" id="c3"><span>Run the issue's manual mGBA steps with two devs and add the log to the PR.</span></label>
   </div>
