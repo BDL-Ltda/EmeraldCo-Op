@@ -104,7 +104,21 @@ The protocol is plain TCP, **not encrypted**; the key is an access check, not
 transport encryption. Use this MVP only with trusted friends, not as a public
 service. See the server's [limits](server.md#presence-liveness-and-limits).
 
-Use a normal (non-administrator) PowerShell for the server. Enter the key at
+On Windows, double-click [`start-server.bat`](../start-server.bat) at the
+repository root. It opens a visible PowerShell window, asks for the key at a
+masked prompt and runs `bin/hosting/server.exe` in the foreground. Keep that
+window open to see the logs; **Ctrl+C** stops the server, and the window stays
+open so errors remain visible. Close it when finished. Run it as a normal user,
+not as administrator. Build the executable in step 2 first; the launcher does
+not build/download tools, configure the router or change firewall rules.
+
+The launcher passes the key through the child environment, removes it when
+the server stops, and never saves it to a file. Its execution-policy override
+applies only to the new PowerShell process; it does not change machine policy.
+Managed policy can still prevent scripts from running; ask your administrator
+instead of changing that policy.
+
+Alternatively, use a normal (non-administrator) PowerShell. Enter the key at
 the masked prompt so it is not a literal command-line argument or history entry:
 
 ```powershell
