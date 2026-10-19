@@ -140,8 +140,8 @@ logged: these could contain secrets. The join key is never logged.
   have CLI configuration.
 
 Use the [fake client](fakeclient.md) to exercise the relay without an emulator.
-Client networking (#17), hosting (#18), interpolation and ROM rendering remain
-separate work. The relay does not synchronize saves or battles.
+The mGBA client connects with [`client/net.lua`](../client/README.md#networking).
+Interpolation and ROM rendering remain separate work. The relay does not synchronize saves or battles.
 
 ## Verify with two TCP sessions
 

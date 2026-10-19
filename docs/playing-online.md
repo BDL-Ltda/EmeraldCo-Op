@@ -3,8 +3,9 @@
 The MVP host is **leomayca's Windows PC**, using IPv4 port forwarding and a
 private shared join key. There is one room with at most five players. The
 [server](server.md) and [fakeclient](fakeclient.md) can test this path without
-a ROM or emulator. The mGBA networking integration is separate work in #17;
-hosting a relay does not yet make remote players appear in the game.
+a ROM or emulator. The mGBA client connects too and logs the other players in
+its scripting console ([client README](../client/README.md#networking)); remote
+players do not appear in the game itself until milestone 0.4.
 
 **Validation status:** no CGNAT, confirmed by host **leomayca**. On 2026-10-19,
 leomayca reported a successful external fakeclient connection by
@@ -198,9 +199,10 @@ The installed Lua scripts and patched ROM must match; see
 - `DEBUG`: normally `false`; sanitize any logs before sharing.
 
 The host's own client can use `127.0.0.1`; peers on another network cannot.
-Configuration loading and memory reads are implemented, but this checkout's
-bridge does **not yet connect to the relay** (#17). Use fakeclient for #18's
-network acceptance test; changing Lua settings alone is not that test.
+Once a game is running, the bridge connects with these settings and logs
+`[net] joined as <PLAYER_ID>`, then one `[remote]` line per move of each other
+player. See [the client README](../client/README.md#networking) for every log
+line and error.
 
 ## Dynamic addresses and troubleshooting
 
@@ -220,7 +222,7 @@ If friends' addresses are allowlisted, update those restrictions when needed.
 | `bad_key` | Share the same key privately and restart the server/clients after rotation. |
 | `room_full` or a peer is replaced | At most five connections; use distinct player IDs. |
 | `version_mismatch` | Both developers should use compatible code from the same revision. |
-| Fakeclient works but no remote avatar in mGBA | Network bridge/rendering milestones are not completed by this hosting guide. |
+| Fakeclient works but no remote avatar in mGBA | Expected until milestone 0.4: remote players only appear as `[remote]` lines in the scripting console. |
 
 ## Stop hosting and clean up
 

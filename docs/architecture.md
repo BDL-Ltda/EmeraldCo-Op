@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay and terminal fake client are available. Lua client networking and ROM co-op behavior described here remain planned. See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay, terminal fake client and Lua client networking (logging remote players in the mGBA console) are available. ROM co-op behavior described here remains planned. See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
