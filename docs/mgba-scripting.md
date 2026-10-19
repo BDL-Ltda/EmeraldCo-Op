@@ -94,8 +94,9 @@ variables; real addresses come from `client/addresses.lua`.
     the OS connect timeout.
 
   There is no non-blocking connect in 0.10.5. Every failed attempt is a visible
-  hitch, so reconnects must back off: the spike waits ~5 s, then doubles up to
-  ~60 s. A resolve failure returns the raw native error code, so its message can
+  hitch. The spike backs off (~5 s, doubling up to ~60 s); `client/net.lua`
+  retries every 5 s as #17 specifies, so it hitches every 5 s while the server
+  is down. A resolve failure returns the raw native error code, so its message can
   be `error#N`.
 - **Each connect adds a frame callback that is never compacted.** A connected
   socket registers a **frame** callback. Removing it clears the slot but never
