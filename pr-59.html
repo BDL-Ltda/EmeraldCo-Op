@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Lua network client</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#59</span>
+  <h1>Each mGBA instance now joins the relay and sees the other players</h1>
+  <p class="lede">The new <code>client/net.lua</code> sends this player's state to the server and logs everyone else's. It joins the 0.1 state reader to the 0.2 server, and it does that without blocking the frame.</p>
+  <div class="meta">
+    <span>closes <b>#17</b></span>
+    <span>branch <b>feat/17-net-client</b></span>
+    <span>files <b>11</b></span>
+    <span>lines <b>+1130 / −18</b></span>
+    <span>milestone <b>0.2 Networking</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>The missing link between the game and the server</h2>
+    <p>Milestone 0.1 reads the player state from memory (<code>memory.lua</code>, #11). The server relays presence between players (#14), and the pure framing module splits the byte stream into lines (#16). Issue #17 joins the three: <code>bridge.lua</code> passes each state to <code>net.lua</code>, which talks to the server over mGBA's socket API.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where net.lua sits</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="bridge.lua reads state with memory.lua, hands it to net.lua, which uses lib/protocol.lua and lib/framing.lua and talks to cmd/server over TCP; config.lua stays local.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="700" height="310" rx="10"/>
+      <text class="t-zone" x="30" y="38">MGBA (EACH PLAYER)</text>
+      <rect class="zone" x="730" y="10" width="260" height="310" rx="10"/>
+      <text class="t-zone" x="750" y="38">HOST</text>
+      <g class="step" style="--i:0">
+        <rect class="box dim" x="40" y="60" width="200" height="56" rx="6"/>
+        <text class="t-mono" x="56" y="84">memory.lua</text>
+        <text class="t-sub" x="56" y="104">getPlayerState() (#11)</text>
+        <rect class="box priv" x="40" y="240" width="200" height="56" rx="6"/>
+        <text class="t-mono" x="56" y="264">config.lua</text>
+        <text class="t-sub" x="56" y="284">host, port, key, PLAYER_ID</text>
+      </g>
+      <g class="step" style="--i:1">
+        <rect class="box pub" x="40" y="150" width="200" height="56" rx="6"/>
+        <text class="t-mono t-em" x="56" y="174">bridge.lua</text>
+        <text class="t-sub" x="56" y="194">wires net into the frame</text>
+        <path class="edge" d="M140 116V146" marker-end="url(#m-a)"/>
+        <path class="edge" d="M140 240V210" marker-end="url(#m-a)"/>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em flow" d="M240 178H316" marker-end="url(#m-ae)"/>
+        <rect class="box pub" x="320" y="150" width="200" height="56" rx="6"/>
+        <text class="t-mono t-em" x="336" y="174">net.lua</text>
+        <text class="t-sub" x="336" y="194">connect, send, log</text>
+      </g>
+      <g class="step" style="--i:3">
+        <rect class="box pub" x="540" y="60" width="150" height="56" rx="6"/>
+        <text class="t-mono t-em" x="554" y="84">lib/protocol</text>
+        <text class="t-sub" x="554" y="104">build + validate</text>
+        <rect class="box dim" x="540" y="240" width="150" height="56" rx="6"/>
+        <text class="t-mono" x="554" y="264">lib/framing</text>
+        <text class="t-sub" x="554" y="284">lines (#16)</text>
+        <path class="edge" d="M470 150L560 118" marker-end="url(#m-a)"/>
+        <path class="edge" d="M470 206L560 238" marker-end="url(#m-a)"/>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="edge em flow" d="M520 178H776" marker-end="url(#m-ae)"/>
+        <text class="t-sub" x="600" y="170">TCP, JSON lines</text>
+        <rect class="box dim" x="780" y="150" width="190" height="56" rx="6"/>
+        <text class="t-mono" x="796" y="174">cmd/server</text>
+        <text class="t-sub" x="796" y="194">relay (#13, #14)</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added or changed by this PR</span><span><i class="d"></i>private, stays local</span><span><i class="m"></i>already there</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>One connection, driven once per frame</h2>
+    <p><code>bridge.lua</code> calls <code>client:update(ms)</code> every frame with a clock built from the frame count. The client connects once a verified game is running and it knows the save's trainer ID and gender. After <code>welcome</code> it sends <code>presence</code> only when the tile, map, facing or visibility changes, and a <code>ping</code> every 5 s. Replies arrive through the socket's <code>received</code> event, which mGBA polls each frame, so nothing waits.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Session sequence</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 440" role="img" aria-label="net.lua sends hello, gets welcome, sends presence on change and ping every 5 s, and receives join, presence, pong and leave from the server.">
+      <defs>
+        <marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="s-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="box pub" x="120" y="16" width="200" height="44" rx="6"/><text class="t-mono t-em" x="180" y="44">net.lua</text>
+      <rect class="box" x="680" y="16" width="200" height="44" rx="6"/><text class="t-mono" x="730" y="44">cmd/server</text>
+      <path class="life" d="M220 60V430"/><path class="life" d="M780 60V430"/>
+      <g class="step" style="--i:0"><circle class="badge" cx="190" cy="92" r="12"/><text class="badge-t" x="186" y="97">1</text>
+        <path class="edge em" d="M220 92H776" marker-end="url(#s-ae)"/><text class="t-mono" x="250" y="84">hello {playerId, joinKey, trainerId, gender, clientVersion}</text></g>
+      <g class="step" style="--i:1"><circle class="badge" cx="190" cy="140" r="12"/><text class="badge-t" x="186" y="145">2</text>
+        <path class="edge ret" d="M780 140H224" marker-end="url(#s-a)"/><text class="t-mono" x="250" y="132">welcome {players[]}  →  "[net] joined as …"</text></g>
+      <g class="step" style="--i:2"><circle class="badge" cx="190" cy="188" r="12"/><text class="badge-t" x="186" y="193">3</text>
+        <path class="edge em flow" d="M220 188H776" marker-end="url(#s-ae)"/><text class="t-mono" x="250" y="180">presence  (only on change, ≥ 30 ms apart)</text></g>
+      <g class="step" style="--i:3"><circle class="badge" cx="190" cy="236" r="12"/><text class="badge-t" x="186" y="241">4</text>
+        <path class="edge em" d="M220 236H776" marker-end="url(#s-ae)"/><text class="t-mono" x="250" y="228">ping {t}  every 5 s</text></g>
+      <g class="step" style="--i:4"><circle class="badge" cx="190" cy="284" r="12"/><text class="badge-t" x="186" y="289">5</text>
+        <path class="edge ret" d="M780 284H224" marker-end="url(#s-a)"/><text class="t-mono" x="250" y="276">pong {t}  →  "[net] latency N ms"</text></g>
+      <g class="step" style="--i:5">
+        <path class="edge ret" d="M780 332H224" marker-end="url(#s-a)"/><text class="t-mono" x="250" y="324">join / presence / leave  →  "[remote] joao 0:9 7,3 WEST visible"</text></g>
+      <g class="step" style="--i:6">
+        <path class="edge bad" d="M780 392H224" marker-end="url(#s-a)"/><text class="t-mono t-bad" x="250" y="384">error {code}  →  retry in 5 s, or stop on bad_key / version_mismatch / bad_hello</text></g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>What happens when the connection goes wrong</h2>
+    <p>Every failure ends in one of two places: retry in <code>RETRY_INTERVAL_MS</code> (5000), or stop until the script is reloaded. Pick a case to see what <code>net.lua</code> does. The values come from <code>client/net.lua</code>.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-title="connect fails" data-value="retry in 5 s" data-text="env.connect returns nil and an error. net.lua logs '[net] connect failed: …; retrying in 5 s' and sets nextAttempt = now + 5000. mGBA's connect blocks, so each attempt can freeze the game briefly (see the reviewer question)."><small>transport</small>connect fails</button>
+      <button class="seg" type="button" data-title="server closes / receive error" data-value="retry in 5 s" data-text="receive() returns an error, or the first read after select() would block, which on Windows means the peer closed. disconnect() clears the socket, the framer and the outbox, and schedules a retry."><small>transport</small>connection lost</button>
+      <button class="seg" type="button" data-title="room_full, bad_message" data-value="retry in 5 s" data-text="An error message whose code is not in FATAL_ERRORS. The client logs it and reconnects after 5 s, because the same config can succeed later."><small>server error</small>room_full</button>
+      <button class="seg crc" type="button" data-selected data-title="bad_key, version_mismatch, bad_hello" data-value="stopped = true" data-text="Retrying with the same config cannot succeed. The client logs a readable hint (for bad_key: 'Check JOIN_KEY in client/config.lua, then reload the script.') and stops. A protocol version mismatch found while decoding stops it the same way. The join key itself is never logged."><small>server error</small>bad_key</button>
+      <button class="seg" type="button" data-title="send buffer full" data-value="MAX_OUTBOX = 64 KiB" data-text="If the server stops reading, queued bytes would grow without bound. Past 64 KiB the client disconnects and retries instead."><small>backpressure</small>outbox full</button>
+      <button class="seg" type="button" data-title="another save loaded" data-value="reconnect now (retry 0)" data-text="hello carries the trainer ID and gender. When the game session's identity changes, the client disconnects with retry 0 and sends a fresh hello; the server replaces the old connection."><small>identity</small>save changed</button>
+      <button class="seg" type="button" data-title="invalid config" data-value="network disabled" data-text="net.new() checks SERVER_HOST, SERVER_PORT (1–65535), PLAYER_ID and JOIN_KEY first. On a bad value it returns an error naming the field but never its value; bridge.lua logs it and keeps reading player state."><small>startup</small>bad config</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Three choices beyond the issue's list</h2>
+    <p>The issue sets the behavior (presence on change, ping every 5 s, retry every 5 s). These are the extras the PR adds, open to pushback.</p>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Throttle presence to one per 2 frames</h3>
+      <div class="term">
+        <div>MIN_PRESENCE_INTERVAL_MS = 30,</div>
+        <div><span class="c">-- one frame is about 16.7 ms → ~30/s</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>The server closes a connection that sends more than 50 messages in one second (#14). Fast state changes could cross that; at most one presence every 30 ms stays well below it.</p></div>
+    </div>
+    <div class="decision">
+      <h3>A pure client, driven by a fake socket</h3>
+      <div class="term">
+        <div>net.new(config, { connect, again,</div>
+        <div>                  log, logError })</div>
+      </div>
+      <div class="why"><b>Why</b><p>AGENTS.md wants testable modules free of <code>emu</code>, <code>socket</code> and <code>callbacks</code>. <code>net.lua</code> gets the socket and the clock from <code>bridge.lua</code>, so <code>net_test.lua</code> can cover partial sends, chunked receives and retries in CI.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Clock from the frame count</h3>
+      <div class="term">
+        <div>frames * 280896 * 1000 // 16777216</div>
+        <div><span class="c">-- ms at ~59.73 fps; stops while paused</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>Socket events are polled once per frame, so a finer clock would not measure latency better. It also never goes back, which the ping and retry timers need.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Unit tests, CI and a run against the real server</h2>
+    <p>The PR's author session ran the Lua suites and luacheck, then drove <code>net.lua</code> through a LuaSocket harness against <code>cmd/server</code> on localhost with one <code>fakeclient</code>. The output below is copied from the PR description. CI (Go, Lua, ROM) passed on the same code.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> lua5.4 client/tests/run.lua</div>
+    <div style="--i:1" class="ok">116 passed, 0 failed (7 suites)</div>
+    <div style="--i:2"><span class="p">$</span> luacheck client/</div>
+    <div style="--i:3" class="ok">0 warnings / 0 errors in 19 files</div>
+    <div style="--i:4"><span class="c"># harness against cmd/server + fakeclient -pattern square</span></div>
+    <div style="--i:5">alice  [net] joined as alice; 0 other player(s) online</div>
+    <div style="--i:6">alice  [remote] bot1 0:9 5,3 EAST visible</div>
+    <div style="--i:7">alice  [remote] bob left (disconnect)</div>
+    <div style="--i:8">bob    [net] joined as bob; 2 other player(s) online</div>
+    <div style="--i:9" class="bad">eve    ERR [net] the server rejected this client: bad_key (bad_key)</div>
+    <div style="--i:10" class="bad">eve    ERR [net] stopped. Check JOIN_KEY in client/config.lua, then reload the script.</div>
+  </div>
+  <p class="small">Not done yet: the manual mGBA steps from the issue (two instances, walking, a map change, closing one, a wrong key, watching for stutter). The issue is <code>needs:multiplayer-test</code>, so two devs must run them before merging.</p>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with <code>client/net.lua</code>, then the wiring in <code>client/bridge.lua</code>, then <code>client/lib/protocol.lua</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Fixed 5 s retry (as the issue says) or back off 5 s → 60 s as <code>docs/mgba-scripting.md</code> suggests? Each refused connect freezes the game for about 2 s on Windows.</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is the 30 ms presence throttle and the 64 KiB outbox cap acceptable, or should they be config values?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Run the issue's manual mGBA steps with two devs and add the log to the PR.</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>0.3</b><span>Showing remote players on screen. This PR only logs them.</span></div>
+    <div class="limit"><b>#17 manual test</b><span>Emulator run with two instances is still open; the author session had no mGBA.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#59 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #17 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
