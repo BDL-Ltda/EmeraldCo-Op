@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Pending Handshake Cap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#56</span>
+  <h1>An idle-connection flood can no longer starve the server</h1>
+  <p class="lede">The relay now holds at most 16 connections that have not proved the join key yet. Extra connections are closed at accept, and players already in the room keep playing.</p>
+  <div class="meta">
+    <span>closes <b>#50</b></span>
+    <span>branch <b>feat/50-pending-handshake-cap</b></span>
+    <span>files <b>4</b></span>
+    <span>lines <b>+223 / −10</b></span>
+    <span>milestone <b>0.2 Networking</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>A gate between accept and the handler</h2>
+    <p>The review of #49 found that room capacity bounds authenticated players, but nothing bounded sockets still waiting for <code>hello</code>. Each one owned a descriptor and a handler goroutine for up to five seconds. Opening idle connections in a loop could exhaust descriptors.</p>
+    <p>This PR adds a semaphore to <code>room.Server.Serve</code>, between <code>listener.Accept</code> and the per-connection handler. Room capacity, message rates and the protocol are unchanged.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Accept path in internal/room/server.go</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="The listener accepts a connection; a pending-slot gate either hands it to the handler or closes it at once; the handler frees the slot when the join key matches or the handshake ends.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah bad" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="980" height="310" rx="10"/>
+      <text class="t-zone" x="30" y="38">CMD/SERVER · ROOM.SERVER</text>
+      <g class="step" style="--i:0">
+        <rect class="box" x="40" y="110" width="190" height="56" rx="6"/>
+        <text class="t-mono" x="56" y="134">listener.Accept</text>
+        <text class="t-sub" x="56" y="154">TCP, unchanged</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em flow" d="M230 138H306" marker-end="url(#m-ae)"/>
+        <polygon class="gate" points="390,78 470,138 390,198 310,138"/>
+        <text class="t-mono t-em" x="390" y="134" text-anchor="middle">slot</text>
+        <text class="t-sub" x="390" y="152" text-anchor="middle">free?</text>
+        <text class="t-sub" x="390" y="222" text-anchor="middle">s.pending (cap 16)</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em flow" d="M470 138H566" marker-end="url(#m-ae)"/>
+        <text class="t-sub t-em" x="490" y="128">yes</text>
+        <rect class="box pub" x="570" y="110" width="200" height="56" rx="6"/>
+        <text class="t-mono t-em" x="586" y="134">handle(conn, release)</text>
+        <text class="t-sub" x="586" y="154">reads hello, checks key</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge bad" d="M390 198V262H566" marker-end="url(#m-ab)"/>
+        <text class="t-sub t-bad" x="400" y="252">no</text>
+        <rect class="box bad" x="570" y="236" width="200" height="56" rx="6"/>
+        <text class="t-mono t-bad" x="586" y="260">conn.Close()</text>
+        <text class="t-sub" x="586" y="280">no read, no reply</text>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="edge em" d="M770 138H836" marker-end="url(#m-ae)"/>
+        <rect class="box dim" x="840" y="110" width="130" height="56" rx="6"/>
+        <text class="t-mono" x="856" y="134">join room</text>
+        <text class="t-sub" x="856" y="154">max-players</text>
+        <path class="edge ret" d="M670 110V60H390V74" marker-end="url(#m-a)"/>
+        <text class="t-sub" x="440" y="54">key matched or handshake ended: free the slot</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added or changed by this PR</span><span><i class="m"></i>unchanged</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>One slot per unauthenticated socket</h2>
+    <p><code>s.pending</code> is a buffered channel of capacity 16. After each accept, <code>Serve</code> tries a non-blocking send. If it succeeds, the connection gets a handler and a <code>release</code> function wrapped in <code>sync.Once</code>. If the channel is full, the socket is closed on the spot.</p>
+    <p>The handler calls <code>release</code> as soon as the join key matches. The goroutine also defers <code>release</code>, so every other exit (rejection, read error, hello timeout, shutdown) frees the slot too. Calling it twice is harmless.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Slot lifecycle of one connection</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 250" role="img" aria-label="A connection takes a slot at accept, holds it while waiting for hello, and releases it on key match, rejection, transport failure, timeout or shutdown.">
+      <defs>
+        <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-be" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="60" cy="110" r="13"/><text class="badge-t" x="60" y="115" text-anchor="middle">1</text>
+        <rect class="box pub" x="85" y="82" width="190" height="56" rx="6"/>
+        <text class="t-mono t-em" x="101" y="106">take slot</text>
+        <text class="t-sub" x="101" y="126">s.pending &lt;- struct{}{}</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em flow" d="M275 110H341" marker-end="url(#m-be)"/>
+        <circle class="badge" cx="370" cy="110" r="13"/><text class="badge-t" x="370" y="115" text-anchor="middle">2</text>
+        <rect class="box" x="395" y="82" width="190" height="56" rx="6"/>
+        <text class="t-mono" x="411" y="106">wait for hello</text>
+        <text class="t-sub" x="411" y="126">≤ 5 s hello deadline</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em flow" d="M585 110H651" marker-end="url(#m-be)"/>
+        <circle class="badge" cx="680" cy="110" r="13"/><text class="badge-t" x="680" y="115" text-anchor="middle">3</text>
+        <rect class="box pub" x="705" y="82" width="250" height="56" rx="6"/>
+        <text class="t-mono t-em" x="721" y="106">release()</text>
+        <text class="t-sub" x="721" y="126">&lt;-s.pending, at most once</text>
+      </g>
+      <g class="step" style="--i:3">
+        <text class="t-sub" x="705" y="170">key matched → authenticated()</text>
+        <text class="t-sub" x="705" y="190">bad_key / bad_hello / bad_message / version_mismatch</text>
+        <text class="t-sub" x="705" y="210">socket closed or reset · hello timeout</text>
+        <text class="t-sub" x="705" y="230">shutdown → deferred release in Serve</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>Three limits, three jobs</h2>
+    <p>Issue #50 asked for the boundary between limits to be documented. Pick one to see what it bounds. The values come from <code>internal/room/server.go</code> and <code>docs/server.md</code>.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg crc" type="button" data-selected data-title="Pending-handshake cap (new)" data-value="16 connections · constant maxPendingHandshakes" data-text="Bounds sockets that have not sent a hello with the correct join key. Each holds a slot for at most the 5-second hello timeout. Over the cap, the connection is closed at accept, and one event=pending_full line is logged per overload episode."><small>new</small>pending cap</button>
+      <button class="seg" type="button" data-title="Room capacity" data-value="-max-players 1–5 (default 5)" data-text="Bounds authenticated players. It is checked only after the key matches, so a key-matched hello that gets room_full has already freed its pending slot."><small>existing</small>room capacity</button>
+      <button class="seg" type="button" data-title="Per-connection message rate" data-value="50 complete messages per rolling second" data-text="Applies to each socket before and after authentication. The 51st message gets error bad_message and the connection closes. The protocol line-size limit also applies in both phases."><small>existing</small>message rate</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>What was chosen, and why</h2>
+    <p>Issue #50 left the cap value and the overload behavior open, to be chosen and documented. These are the choices.</p>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Close over-cap sockets without an <code>error</code></h3>
+      <div class="term">
+        <div>default:</div>
+        <div>    <span class="c">// Over the cap: close at once, without</span></div>
+        <div>    <span class="c">// reading or replying ...</span></div>
+        <div>    conn.Close()</div>
+        <div>    continue</div>
+      </div>
+      <div class="why"><b>Why</b><p>Protocol v1 has no "busy" code, and adding one would be a protocol change outside #50. Writing a reply would also spend a write deadline per flood connection. The client sees a plain disconnect and retries.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Free the slot at key match, not at join</h3>
+      <div class="term">
+        <div>    s.reject(c, protocol.CodeBadKey)</div>
+        <div>    return</div>
+        <div>}</div>
+        <div class="ok">authenticated()</div>
+      </div>
+      <div class="why"><b>Why</b><p>Once the key matches, the room-capacity check takes over. The cap stays purely about unauthenticated sockets, which is what the issue asked to bound.</p></div>
+    </div>
+    <div class="decision">
+      <h3>A constant of 16, no CLI flag</h3>
+      <div class="term">
+        <div>const maxPendingHandshakes = 16</div>
+      </div>
+      <div class="why"><b>Why</b><p>That is about three times the room capacity, so a whole room can reconnect at once. The send queue and timeouts are already constants. Only address, key and capacity have flags, and a new flag needs a reason first.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Unit tests with the race detector, plus a real TCP run</h2>
+    <p>Race tests ran in a <code>golang:1.27.2</code> container because the dev machine has no cgo toolchain. The smoke test ran the real server binary in the same container on 127.0.0.1 with a synthetic key, using bash <code>/dev/tcp</code>: one player, then 20 idle sockets, then a second player after closing them.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> go vet ./... &amp;&amp; go test -race -count=3 ./internal/room/ &amp;&amp; go test -race ./...</div>
+    <div style="--i:1" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	10.628s</div>
+    <div style="--i:2" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/echoserver	1.026s</div>
+    <div style="--i:3" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	6.244s</div>
+    <div style="--i:4" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	2.041s</div>
+    <div style="--i:5" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	1.048s</div>
+    <div style="--i:6" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	1.052s</div>
+    <div style="--i:7" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	4.211s</div>
+    <div style="--i:8"><span class="c"># TCP smoke test against the real binary</span></div>
+    <div style="--i:9">player a: {"v":1,"type":"welcome","players":[]}</div>
+    <div style="--i:10" class="ok">idle sockets: held open=16, closed by server=4</div>
+    <div style="--i:11">player a ping during flood: {"v":1,"type":"pong","t":7}</div>
+    <div style="--i:12">player b after closing idle sockets: {"v":1,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0}]}</div>
+    <div style="--i:13">player a sees: {"v":1,"type":"join","playerId":"b","trainerId":2,"gender":1}</div>
+    <div style="--i:14" class="ok">server log: connects=18 pending_full=1</div>
+  </div>
+  <div class="prose">
+    <p>The new tests are in <code>internal/room/pending_test.go</code>:</p>
+    <ul>
+      <li>20 concurrent dials against a cap of 4: exactly 4 sockets are held.</li>
+      <li>A flood is closed while an authenticated player keeps getting pongs.</li>
+      <li>Success, <code>bad_key</code>, socket close, hello timeout and shutdown each free a slot, and freed slots can be reused.</li>
+      <li>The log gets one <code>pending_full</code> line per overload episode.</li>
+      <li>The default cap is 16.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with <code>Serve</code> and <code>handle</code> in <code>internal/room/server.go</code>, then the <em>Pending handshakes</em> section of <code>docs/server.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Is 16 the right cap for the hosting setup in #18, or should it be a flag?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is closing without an <code>error</code> acceptable for the Lua client in #17, given that it will retry on disconnect?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Does every exit of <code>handle</code> before key match reach the deferred <code>release</code>?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>Known limit</b><span>An attacker holding all 16 slots can delay new joins by up to the hello timeout. Established players are unaffected.</span></div>
+    <div class="limit"><b>#17</b><span>The client should treat an immediate disconnect as "try again later".</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#56 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #50 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
