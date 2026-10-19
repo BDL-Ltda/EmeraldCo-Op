@@ -6,12 +6,16 @@ private shared join key. There is one room with at most five players. The
 a ROM or emulator. The mGBA networking integration is separate work in #17;
 hosting a relay does not yet make remote players appear in the game.
 
-**Validation status:** the host confirmed no CGNAT in
+**Validation status:** no CGNAT, confirmed by host **leomayca**. On 2026-10-19,
+leomayca reported a successful external fakeclient connection by
+**DaviAlencastro**, who was on a different network and received recurring
+`pong` messages. The result is recorded in
 [issue #18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18#issuecomment-6256865347).
-Router forwarding, the host firewall and a successful fakeclient welcome from
-another developer on a different network still need to be verified. Local
-checks alone do not complete #18. Never record real IPs, hostnames, keys or raw
-server logs in the repository, issues or PRs.
+The tested server and fakeclient binaries embed build revision `94c4e2c`;
+this records the manual test, not a claim that later revisions were externally
+retested. CI, human approval and merge remain separate delivery requirements.
+Never record real IPs, hostnames, keys or raw server logs in the repository,
+issues or PRs.
 
 ## 1. Check the connection before opening a port
 
@@ -178,7 +182,8 @@ Record the tested Git revision, tester's name, confirmation that they used a
 different network, and a sanitized welcome/pong result in #18 and the PR.
 Do not paste the address, key, full command history or raw server logs: server
 logs contain remote addresses, and transport errors can contain host addresses.
-Until this test succeeds, external reachability remains **unverified**.
+Repeat this different-network test after changing the ISP, router or hosting
+configuration; a past success is not a guarantee of future reachability.
 
 ## Player settings for the mGBA client
 
