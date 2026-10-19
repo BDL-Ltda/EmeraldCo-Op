@@ -128,7 +128,7 @@ func TestHandshakeTransportErrorsAreNotRejections(t *testing.T) {
 			server, peer := net.Pipe()
 			defer peer.Close()
 			conn := &failingReadConn{Conn: server, err: readErr}
-			s.handle(conn)
+			s.handle(conn, func() { t.Error("failed transport authenticated") })
 			if conn.writes != 0 {
 				t.Fatal("wrote an error response to a failed transport")
 			}

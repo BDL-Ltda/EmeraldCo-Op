@@ -82,9 +82,34 @@ only the leave notification.
 A reset or closed socket during hello is a transport failure, not a
 `bad_message` rejection; no error response is attempted. The five-second hello
 timeout still produces `bad_hello`. Unknown messages are ignored in both phases,
-with only the first one logged per connection. This bounds unknown-message logs,
-not the number of unauthenticated sockets; a pending-handshake cap is still
-tracked by [#50](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/50).
+with only the first one logged per connection. This bounds unknown-message logs;
+the pending-handshake cap below bounds the sockets themselves.
+
+## Pending handshakes
+
+At most **16 connections** can be waiting for a hello with the correct join key
+at the same time ([#50](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/50)).
+That is about three times the room capacity, so a whole room can reconnect at
+once. The cap is a server constant, like the send queue and timeouts.
+
+- A connection holds a slot from accept until its join key matches. A
+  rejection (`bad_key`, `bad_hello`, `bad_message`, `version_mismatch`), a
+  closed or reset socket, the five-second hello timeout, and shutdown also free
+  it. A key-matched hello that then gets `room_full` has already freed its slot.
+- When all 16 slots are in use, the server accepts each new connection and
+  closes it at once: no read, no `error` reply (the protocol has no code for
+  it) and no handler goroutine. A client sees a plain disconnect and should
+  retry later. The log gets one `event=pending_full` line per overload episode;
+  the next connection that gets a slot ends the episode.
+- Authenticated players are not counted. An idle-connection flood can delay new
+  joins by up to the hello timeout, but established players keep relaying,
+  pinging and timing out normally.
+
+These limits stack. The pending-handshake cap bounds unauthenticated
+descriptors and handlers. The configured room capacity (`-max-players`) bounds
+authenticated players and is checked only after the key matches. The
+per-connection message rate (50 per rolling second) and line-size limits apply
+to each socket in both phases.
 
 Logs include the event, remote address, player ID when validated, and rejection
 or leave reason. Raw messages, unknown type names and decoder errors are not
@@ -107,9 +132,10 @@ logged: these could contain secrets. The join key is never logged.
   authentication. The 51st message sends `error bad_message` and closes; known
   malformed messages already reject immediately. This is per connection, not a
   room-wide cap.
-- Protocol line-size and configured room-capacity limits still apply. The send
-  queue and timeouts are server constants; only address, key and capacity have
-  CLI configuration. Pending-handshake admission control remains #50.
+- Protocol line-size, configured room-capacity and
+  [pending-handshake](#pending-handshakes) limits still apply. The send queue,
+  timeouts and pending cap are server constants; only address, key and capacity
+  have CLI configuration.
 
 Use the [fake client](fakeclient.md) to exercise the relay without an emulator.
 Client networking (#17), hosting (#18), interpolation and ROM rendering remain
