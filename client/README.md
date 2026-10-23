@@ -36,7 +36,7 @@ another game is loaded with the script still running.
 Once the ROM is verified, `bridge.lua` reads the local player state once per game
 loop (in mGBA's `keysRead` callback, see the
 [memory map](../docs/memory-map.md#when-to-read-the-keysread-callback))
-with `memory.lua` and logs it **only when it changes**:
+with `memory.lua`. With `DEBUG=true`, it logs that state **only when it changes**:
 
 ```text
 [state] no position  hidden
@@ -63,7 +63,8 @@ game session is running, because `hello` carries the save's `trainerId` and
 
 1. connects and sends `hello`;
 2. after `welcome`, sends `presence` whenever the tile, map, facing or
-   `visible` changes (at most once every 2 frames), and a `ping` every 5
+   `visible` changes (at most once every 2 frames), renews unchanged presence
+   every 10 seconds, and sends a `ping` every 5
    seconds. It sends at most 20 messages per second, so even fast-forward
    stays below the server's limit of 50. A change that has to wait is sent
    once there is room, so the latest state (including `hidden`) always goes
@@ -138,9 +139,14 @@ map number to match the local player's map; before a position exists it says
 Leave removes the row. Losing the connection clears all remote rows and the
 latency; reconnecting replaces them from the new welcome. As required by #20,
 a row also expires after **30 seconds without a welcome/join/presence update**
-while connected. Pongs do not refresh it. An idle player who sends only heartbeat
-can therefore disappear from this debug view until their next presence or a new
-welcome. This is a local display timeout, not a server disconnect.
+while connected. Pongs do not refresh it. The client renews its last valid
+presence every **10 seconds**, including an unchanged position in menus or
+dialogue, so connected idle players remain listed. A hidden state is renewed as
+hidden even after the memory reader drops its position on reset. Refreshes use
+the same send budget and partial-write handling as changes; a blocked socket
+does not accumulate a backlog of renewal messages. Clients without this renewal
+(including the current idle fakeclient) can still expire from this debug view.
+Expiry is a local display timeout, not a server disconnect.
 
 The panel redraws only when text changes, at most every **250 ms** (four times
 per second). Stop/shutdown clears it immediately. `lib/debugview.lua` owns the
@@ -153,8 +159,10 @@ For a manual check, run a local server, one mGBA and a second client with
 `fakeclient -pattern warp` (see [fakeclient.md](../docs/fakeclient.md)). Walk or
 turn in the game and watch the Me row. The remote row's coordinates/facing
 should change and alternate between `same map` and `different map` as the bot
-warps. Close the bot and confirm its row disappears. Repeat with two mGBAs and
-record the developers involved for the multiplayer acceptance check.
+warps. Close the bot and confirm its row disappears. Repeat with two mGBAs,
+including standing still or reading a menu/dialogue for at least 45 seconds:
+both players must remain listed without moving. Record the developers involved
+for the multiplayer acceptance check. Both mGBAs must use this updated client.
 
 Restart mGBA, or use **File > Reset** in its Scripting window, before loading
 `bridge.lua` again; loading it twice starts two sets of callbacks/connections.

@@ -1,5 +1,5 @@
 -- Network client for milestone 0.2 (#17): connects to the relay server, sends
--- hello, presence when the local state changes and a ping every 5 s, and logs
+-- hello, presence on change or every 10 s and a ping every 5 s, and logs
 -- the other players. Protocol: docs/protocol.md.
 --
 -- Pure apart from what it is given: no emu, socket or callbacks globals, so
@@ -12,6 +12,8 @@ local protocol = require("protocol")
 local M = {
 	CLIENT_VERSION = "0.2.0",
 	PING_INTERVAL_MS = 5000,
+	-- Renew unchanged state before other panels' 30-second stale timeout.
+	PRESENCE_REFRESH_MS = 10000,
 	RETRY_INTERVAL_MS = 5000,
 	-- The server closes a connection that sends more than 50 messages in one
 	-- second. Presence goes out at most once per 2 frames (one frame is about
@@ -322,15 +324,21 @@ function M.new(config, env)
 				lastPingAt = now
 				send(protocol.ping(now))
 			end
-			if state and state.mapGroup ~= nil and not samePresence(state, lastSent)
+			-- After reset, memory.lua drops its position after reporting hidden
+			-- once. Renew that last transmitted hidden tuple until a fresh state
+			-- exists; never turn it visible or resurrect it across reconnects.
+			local presenceState = state and state.mapGroup ~= nil and state or lastSent
+			local refreshDue = lastPresenceAt and now - lastPresenceAt >= M.PRESENCE_REFRESH_MS
+				and not protocol.checkPresenceState(presenceState)
+			if presenceState and (not samePresence(presenceState, lastSent) or refreshDue)
 				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) and readyToSend() then
-				local reason = protocol.checkPresenceState(state)
+				local reason = protocol.checkPresenceState(presenceState)
 				if reason then
 					-- Remembered as sent so it is skipped (and logged) once, not every frame.
-					lastSent = state
+					lastSent = presenceState
 					if verbose then log("[net] not sending presence: " .. reason) end
 				else
-					local message = protocol.presence(config.PLAYER_ID, state)
+					local message = protocol.presence(config.PLAYER_ID, presenceState)
 					lastSent, lastPresenceAt = message, now
 					if verbose then log("[net] sent presence " .. formatPresence(message)) end
 					send(message)

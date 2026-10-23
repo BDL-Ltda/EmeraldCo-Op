@@ -160,7 +160,7 @@ If the check fails, the server replies with `error` (`version_mismatch`, `bad_ke
 
 ### Normal play
 
-Clients send `presence` when it changes. The server replaces `playerId` with the sender's own ID (it never trusts the client's value), keeps it as that player's last presence, and relays it to everyone else, never back to the sender. Clients send `ping` every 5 seconds, and the server answers with `pong` carrying the same `t`.
+Clients send `presence` when it changes and renew unchanged valid presence every 10 seconds, so an idle player stays in the debug view's 30-second freshness window. Renewal uses the existing message and send budget; hidden states stay hidden. The server replaces `playerId` with the sender's own ID (it never trusts the client's value), keeps it as that player's last presence, and relays it to everyone else, never back to the sender. Clients send `ping` every 5 seconds, and the server answers with `pong` carrying the same `t`.
 
 ```mermaid
 sequenceDiagram
