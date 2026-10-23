@@ -36,8 +36,9 @@ git clone --recurse-submodules https://github.com/BDL-Ltda/EmeraldCo-Op.git
 cd EmeraldCo-Op
 ```
 
-For an existing checkout, run `git submodule update --init --recursive` after
-pulling changes. `rom/` tracks our fork at
+For an existing checkout, run `git submodule sync --recursive` and then
+`git submodule update --init --recursive` after pulling changes (`sync` picks up
+submodule URL changes, such as the fork's move to `BDL-Ltda`). `rom/` tracks our fork at
 [BDL-Ltda/pokeemerald](https://github.com/BDL-Ltda/pokeemerald) as a
 Git submodule.
 
