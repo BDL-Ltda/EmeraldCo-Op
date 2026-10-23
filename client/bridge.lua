@@ -32,6 +32,7 @@ package.path = DIR .. "lib/?.lua;" .. DIR .. "?.lua;" .. package.path
 local romcheck = require("romcheck")
 local memory = require("memory")
 local net = require("net")
+local netclock = require("netclock")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -135,14 +136,15 @@ local function verifyRom()
 	end
 end
 
--- The network clock: frames run at the GBA's 16777216 / 280896 Hz (about
--- 59.73 fps). Socket events are only polled once per frame, so a finer clock
--- would not measure latency any better. It stops while the game is paused.
-local frames = 0
+-- The network clock advances one frame (about 16.7 ms) per frame but never
+-- runs ahead of the wall clock, so fast-forward can't break the server's
+-- per-second limit (lib/netclock.lua). Socket events are only polled once per
+-- frame, so a finer clock would not measure latency any better.
+local clock = netclock.new()
 local function updateNet()
-	frames = frames + 1
+	local now = clock:tick(os.time())
 	if client and reader then
-		client:update(frames * 280896 * 1000 // 16777216)
+		client:update(now)
 	end
 end
 

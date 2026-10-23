@@ -17,6 +17,11 @@ local M = {
 	-- second. Presence goes out at most once per 2 frames (one frame is about
 	-- 16.7 ms), so about 30 per second.
 	MIN_PRESENCE_INTERVAL_MS = 30,
+	-- Messages sent per clock second (now // 1000). bridge.lua's clock keeps
+	-- that second within one wall-clock second (lib/netclock.lua), so any real
+	-- second spans at most two of them: 40 messages, below the server's 50,
+	-- even when fast-forward runs many frames per real second.
+	MAX_MESSAGES_PER_SECOND = 20,
 	-- Bytes received per receive() call.
 	RECEIVE_CHUNK = 4096,
 	-- A server that stops reading must not grow the send buffer without bound.
@@ -90,6 +95,7 @@ function M.new(config, env)
 	local lastPingAt = nil
 	local pongs = 0
 	local waitingLogged = false
+	local budgetSecond, sentThisSecond = nil, 0
 
 	local client = {}
 
@@ -125,7 +131,16 @@ function M.new(config, env)
 		outbox = outbox:sub(sent + 1)
 	end
 
+	local function canSend()
+		if budgetSecond ~= now // 1000 then
+			budgetSecond, sentThisSecond = now // 1000, 0
+		end
+		return sentThisSecond < M.MAX_MESSAGES_PER_SECOND
+	end
+
 	local function send(message)
+		canSend() -- starts a new second's count if needed
+		sentThisSecond = sentThisSecond + 1
 		local line, err = protocol.encode(message)
 		if not line then
 			logError("[net] could not encode " .. tostring(message.type) .. ": " .. err)
@@ -244,7 +259,12 @@ function M.new(config, env)
 
 	-- Called once per game loop with memory.lua's getPlayerState().
 	function client.setPlayerState(_, s)
-		state = s
+		-- A sample without a position must not replace one that is still waiting
+		-- for the throttle or the budget: after a soft reset memory.lua reports
+		-- the last position as hidden only once, then no position at all.
+		if s.mapGroup ~= nil or not state or state.mapGroup == nil or samePresence(state, lastSent) then
+			state = s
+		end
 		if s.trainerId ~= nil and s.gender ~= nil then
 			if not identity or identity.trainerId ~= s.trainerId or identity.gender ~= s.gender then
 				identity = { trainerId = s.trainerId, gender = s.gender }
@@ -274,12 +294,12 @@ function M.new(config, env)
 			return
 		end
 		if joined then
-			if not lastPingAt or now - lastPingAt >= M.PING_INTERVAL_MS then
+			if (not lastPingAt or now - lastPingAt >= M.PING_INTERVAL_MS) and canSend() then
 				lastPingAt = now
 				send(protocol.ping(now))
 			end
 			if sock and state and state.mapGroup ~= nil and not samePresence(state, lastSent)
-				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) then
+				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) and canSend() then
 				local reason = protocol.checkPresenceState(state)
 				if reason then
 					-- Remembered as sent so it is skipped (and logged) once, not every frame.

@@ -362,4 +362,77 @@ tests["net.lua does not use mGBA globals"] = function()
 	end
 end
 
+tests["a throttled hidden presence after a soft reset is still sent"] = function()
+	-- joined() sent the first presence at 16 ms. memory.lua reports the hidden
+	-- tuple once, inside the throttle window, then no position at all.
+	local w = joined()
+	w.step(16, state(5, 3, 1, { visible = false }))
+	for _ = 1, 1000 do w.step(16, { visible = false }) end
+	local hidden = 0
+	for _, m in ipairs(w.sock().take()) do
+		if m.type == "presence" then
+			h.eq(m.visible, false)
+			hidden = hidden + 1
+		end
+	end
+	h.eq(hidden, 1)
+	assert(w.client:isConnected())
+end
+
+tests["a new position replaces a presence still waiting to be sent"] = function()
+	local w = joined()
+	-- Both samples arrive inside the throttle window after the 16 ms presence.
+	w.step(8, state(5, 3, 1, { visible = false }))
+	w.step(8, state(9, 9))
+	w.step(16)
+	local sent = w.sock().take()
+	h.eq(#sent, 1)
+	h.eq(sent[1].x, 9)
+	h.eq(sent[1].visible, true)
+end
+
+tests["no more than the budget is sent in one clock second"] = function()
+	local w = joined()
+	w.sock().take()
+	local count = 0
+	-- 1000..1999 ms: one clock second with a new tile every 33 ms.
+	w.step(1000 - w.now)
+	for i = 1, 30 do w.step(33, state(10 + i)) end
+	for _, m in ipairs(w.sock().take()) do
+		if m.type == "presence" or m.type == "ping" then count = count + 1 end
+	end
+	h.eq(count, net.MAX_MESSAGES_PER_SECOND)
+	-- The latest state goes out once the next second starts.
+	w.step(2000 - w.now, state(10 + 30))
+	local sent = w.sock().take()
+	h.eq(sent[#sent].x, 40)
+end
+
+tests["fast-forward stays below the server's rate limit"] = function()
+	-- 8x speed: 477 frames per real second, a new tile every 8 frames, with
+	-- bridge.lua's clock. The server allows 50 messages per rolling second.
+	local netclock = require("netclock")
+	local w = setup()
+	local clock = netclock.new()
+	local perSecond = {}
+	local frame = 0
+	for second = 0, 5 do
+		local count = 0
+		for _ = 1, 477 do
+			frame = frame + 1
+			w.client:setPlayerState(state(frame // 8 % 200))
+			w.client:update(clock:tick(1000 + second))
+			if frame == 1 then w.sock().deliver('{"v":1,"type":"welcome","players":[]}\n') end
+			count = count + #w.sock().take()
+		end
+		perSecond[#perSecond + 1] = count
+	end
+	assert(w.client:isConnected())
+	for i, count in ipairs(perSecond) do
+		assert(count <= net.MAX_MESSAGES_PER_SECOND, "second " .. i .. " sent " .. count)
+		if i > 1 then assert(count + perSecond[i - 1] < 50, "two seconds sent " .. count + perSecond[i - 1]) end
+	end
+	assert(perSecond[3] > 0, "nothing was sent")
+end
+
 return tests

@@ -63,8 +63,11 @@ game session is running, because `hello` carries the save's `trainerId` and
 
 1. connects and sends `hello`;
 2. after `welcome`, sends `presence` whenever the tile, map, facing or
-   `visible` changes (at most once every 2 frames, below the server's rate
-   limit), and a `ping` every 5 seconds;
+   `visible` changes (at most once every 2 frames), and a `ping` every 5
+   seconds. It sends at most 20 messages per second, so even fast-forward
+   stays below the server's limit of 50. A change that has to wait is sent
+   once there is room, so the latest state (including `hidden`) always goes
+   out;
 3. logs the other players and the round-trip latency:
 
 ```text
@@ -80,9 +83,11 @@ game session is running, because `hello` carries the save's `trainerId` and
 ```
 
 Latency is logged on the first pong and then about once a minute (every pong
-with `DEBUG = true`). It is measured in frames (about 16.7 ms each), because
-mGBA only polls sockets once per frame; the clock stops while the game is
-paused.
+with `DEBUG = true`). The network clock (`lib/netclock.lua`) advances one
+frame (about 16.7 ms) per frame, because mGBA only polls sockets once per
+frame, but never runs ahead of the wall clock. Under fast-forward it holds at
+the end of each real second, so pings, retries and the message budget keep
+real-time pace, and latency reads lower than it is.
 
 Socket reads and sends never wait. **Connecting does**: mGBA's `connect`
 blocks the game until it succeeds or fails, which on Windows takes about 2 s
@@ -134,7 +139,8 @@ the command, required build inputs, allowlist, validation and regeneration rules
 - `net.lua`: the network client. It gets mGBA's socket, the console and a
   clock from `bridge.lua`, so tests drive it with fakes.
 - `lib/`: pure modules (no `emu`, `socket` or `callbacks`), testable outside
-  mGBA. `romcheck.lua` compares the ROM hash; `json.lua` and `framing.lua`
+  mGBA. `romcheck.lua` compares the ROM hash; `netclock.lua` is the network
+  clock; `json.lua` and `framing.lua`
   provide the transport primitives described below; `protocol.lua` builds the
   client's messages and validates the server's.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
