@@ -201,7 +201,7 @@ scripts (see [client/README.md](client/README.md)).
 
 The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
 `gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr`, `gMain`,
-`CB1_Overworld`, `CB2_Overworld` and `sPlayTimeCounterState` (see
+`CB1_Overworld`, `CB2_Overworld`, `sPlayTimeCounterState` and `gCoopMailbox` (see
 the [memory map](docs/memory-map.md) for what each is used for).
 The file is embedded when the tool is compiled. `go run` picks up edits
 automatically; rebuild any existing `symgen` binary after changing the list.

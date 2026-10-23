@@ -14,3 +14,4 @@ gMain
 CB1_Overworld
 CB2_Overworld
 sPlayTimeCounterState
+gCoopMailbox
