@@ -38,8 +38,26 @@ cd EmeraldCo-Op
 
 For an existing checkout, run `git submodule update --init --recursive` after
 pulling changes. `rom/` tracks our fork at
-[DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald) as a
+[BDL-Ltda/pokeemerald](https://github.com/BDL-Ltda/pokeemerald) as a
 Git submodule.
+
+### Changing the ROM
+
+ROM work happens on a feature branch of the fork with the same name as the
+parent branch (for example `feat/24-local-presence`), and the parent PR pins a
+commit from that branch. When the parent PR merges, fast-forward the fork's
+`master` to the pinned commit so it stays reachable after the feature branch is
+deleted:
+
+```sh
+git -C rom fetch origin
+git -C rom merge-base --is-ancestor origin/master <pinned-sha>   # must succeed
+git -C rom push origin <pinned-sha>:refs/heads/master             # fast-forward only
+```
+
+Never force-push the fork's `master`. If the pinned commit does not descend
+from it, rebase the ROM branch onto the fork's `master` and re-pin before
+merging the parent PR.
 
 ## Go development
 
