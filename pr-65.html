@@ -321,7 +321,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
         <text class="t-sub" x="832" y="286">same tile → turn</text>
         <text class="t-sub" x="832" y="306">1 tile → walk</text>
         <text class="t-sub" x="832" y="326">further → teleport</text>
-        <text class="t-sub" x="832" y="346">out of view → remove</text>
+        <text class="t-sub" x="832" y="346">ends out of view → remove</text>
       </g>
       <g class="step" style="--i:6">
         <text class="t-sub" x="20" y="400">A slot whose object has the wrong graphics (new player in the slot, or an object restored by Continue) is removed and respawned the next frame.</text>
@@ -371,9 +371,10 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
       <h3>Forget every slot when Lua disconnects</h3>
       <div class="term">
         <div><span class="c">// CoopRemote_DespawnAll</span></div>
+        <div>while (CoopMailbox_Pop(&amp;msg)) ; <span class="c">// bounded</span></div>
         <div>memset(sRemotes, 0, sizeof(sRemotes));</div>
       </div>
-      <div class="why"><b>Why</b><p>A reconnect is a new session. Keeping old slots would draw players who may have left. Lua has to resend presence after reconnecting, which is documented in <code>memory-map.md</code>.</p></div>
+      <div class="why"><b>Why</b><p>A reconnect is a new session. Keeping old slots, or messages still queued in the ring, would draw players who may have left. The ROM pops and drops queued messages (moving only its own tail), so Lua must set <code>lua_connected</code> before its first push and resend every presence. This came from review and is documented in <code>memory-map.md</code>.</p></div>
     </div>
     <div class="decision">
       <h3>Create <code>coop/overworld.c</code> here</h3>
@@ -407,11 +408,13 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
     <div style="--i:9" class="ok">PASS catches up to (10,12) after the lock ends            locked=false obj#4 (10,12) prev (10,12) f1</div>
     <div style="--i:10" class="ok">PASS four remotes spawned, reserve kept                   spawned 4, free object slots 8</div>
     <div style="--i:11" class="ok">PASS everything despawns when lua_connected drops         0 left</div>
-    <div style="--i:12" class="c">done at frame 1122, 0 failure(s)   # 27 checks in total</div>
+    <div style="--i:12" class="ok">PASS disconnect drains the inbound ring                   head 12 tail 12</div>
+    <div style="--i:13" class="ok">PASS walked out of view: object slot released             player (12,12) remote none</div>
+    <div style="--i:14" class="c">done at frame 1186, 0 failure(s)   # 35 checks in total, incl. the review regressions</div>
   </div>
   <div class="term">
     <div><span class="p">$</span> docker compose run --build --rm rom</div>
-    <div class="ok">668d4e0c3c2fe6ad0b37ac8e046619618d80b000  pokeemerald_modern.gba</div>
+    <div class="ok">0acc6a0158192bb9390a3b3cabec132431c67ce8  pokeemerald_modern.gba</div>
     <div><span class="p">$</span> lua client/tests/run.lua</div>
     <div class="ok">170 passed, 0 failed (11 suites)</div>
     <div><span class="p">$</span> luacheck client/</div>
