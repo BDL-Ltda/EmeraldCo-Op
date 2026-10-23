@@ -33,6 +33,7 @@ local romcheck = require("romcheck")
 local memory = require("memory")
 local net = require("net")
 local netclock = require("netclock")
+local debugview = require("debugview")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -65,6 +66,25 @@ if not addresses then
 	return
 end
 
+local view = debugview.new(config.SERVER_HOST, config.PLAYER_ID)
+local panel = console:createBuffer("Emerald Co-Op")
+local verbose = config.DEBUG == true
+
+local function drawPanel(text)
+	local lines, columns = {}, 80
+	for line in text:gmatch("([^\n]*)\n") do
+		lines[#lines + 1] = line
+		columns = math.max(columns, #line + 1)
+	end
+	panel:setSize(columns, #lines + 1)
+	panel:clear()
+	-- Explicit row positions avoid the native buffer's stream wrapping rules.
+	for row, line in ipairs(lines) do
+		panel:moveCursor(0, row - 1)
+		panel:print(line)
+	end
+end
+
 -- The network client, or nil when config.lua's network settings are invalid:
 -- the player state is still read and logged.
 local client, nerr = net.new(config, {
@@ -81,9 +101,11 @@ local client, nerr = net.new(config, {
 	again = socket.ERRORS.AGAIN,
 	log = function(line) console:log(line) end,
 	logError = function(line) console:error(line) end,
+	onEvent = function(kind, data, now) view:onEvent(kind, data, now) end,
 })
 if not client then
 	fail(nerr)
+	view:onEvent("status", "Network disabled", 0)
 end
 
 -- Reads the player state once per game loop, but only while the loaded ROM is
@@ -96,11 +118,12 @@ local function readState()
 		return
 	end
 	local state = reader.getPlayerState()
+	view:setPlayerState(state)
 	if client then
 		client:setPlayerState(state)
 	end
 	local line = memory.format(state)
-	if line ~= lastLine then
+	if verbose and line ~= lastLine then
 		console:log(line)
 		lastLine = line
 	end
@@ -108,7 +131,7 @@ local function readState()
 	local identity = nil
 	if state.trainerId then
 		identity = string.format("[state] trainerId %d  gender %d", state.trainerId, state.gender)
-		if identity ~= lastIdentity then
+		if verbose and identity ~= lastIdentity then
 			console:log(identity)
 		end
 	end
@@ -120,12 +143,14 @@ end
 -- only read after the ROM is verified.
 local function verifyRom()
 	reader, lastLine, lastIdentity = nil, nil, nil
+	view:setPlayerState(nil)
 	if client then
 		client:close("a game was loaded")
 	end
 	local ok, msg = romcheck.verify(addresses.romCrc32, emu:checksum())
 	if not ok then
 		fail(msg)
+		view:onEvent("status", "ROM not verified", 0)
 		return
 	end
 	console:log("[bridge] " .. msg)
@@ -133,6 +158,7 @@ local function verifyRom()
 	reader, rerr = memory.new(emu, addresses.symbols)
 	if not reader then
 		fail(rerr)
+		view:onEvent("status", "Memory reader unavailable", 0)
 	end
 end
 
@@ -141,17 +167,25 @@ end
 -- per-second limit (lib/netclock.lua). Socket events are only polled once per
 -- frame, so a finer clock would not measure latency any better.
 local clock = netclock.new()
+local networkNow = 0
 local function updateNet()
 	local now = clock:tick(os.time())
+	networkNow = now
 	if client and reader then
 		client:update(now)
 	end
+	local text = view:update(now)
+	if text then drawPanel(text) end
 end
 
 local function stopNet()
 	if client then
 		client:close("emulation stopped")
 	end
+	view:setPlayerState(nil)
+	-- No frame follows stop/shutdown, so publish the cleared state immediately.
+	local text = view:update(networkNow, true)
+	if text then drawPanel(text) end
 end
 
 console:log("[bridge] Emerald Co-Op bridge started")

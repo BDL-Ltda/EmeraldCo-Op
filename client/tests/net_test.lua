@@ -4,7 +4,7 @@ local tests = {}
 
 local AGAIN = "again"
 local KEY = "secret-key-123"
-local CONFIG = { SERVER_HOST = "127.0.0.1", SERVER_PORT = 8765, PLAYER_ID = "bernardo", JOIN_KEY = KEY }
+local CONFIG = { SERVER_HOST = "127.0.0.1", SERVER_PORT = 8765, PLAYER_ID = "bernardo", JOIN_KEY = KEY, DEBUG = true }
 
 -- A socket shaped like mGBA's: the test plays the server through it.
 local function newSocket()
@@ -41,7 +41,7 @@ end
 
 -- A client plus its world: sockets it opened, logs and a clock.
 local function setup(config)
-	local world = { sockets = {}, logs = {}, errors = {}, refuse = nil }
+	local world = { sockets = {}, logs = {}, errors = {}, events = {}, refuse = nil }
 	local cfg = {}
 	for k, v in pairs(CONFIG) do cfg[k] = v end
 	for k, v in pairs(config or {}) do cfg[k] = v end
@@ -60,6 +60,9 @@ local function setup(config)
 		again = AGAIN,
 		log = function(text) world.logs[#world.logs + 1] = text end,
 		logError = function(text) world.errors[#world.errors + 1] = text end,
+		onEvent = function(kind, data, now)
+			world.events[#world.events + 1] = { kind = kind, data = data, now = now }
+		end,
 	}))
 	world.now = 0
 	function world.step(ms, state)
@@ -474,6 +477,29 @@ tests["fast-forward stays below the server's rate limit"] = function()
 		if i > 1 then assert(count + perSecond[i - 1] < 50, "two seconds sent " .. count + perSecond[i - 1]) end
 	end
 	assert(perSecond[3] > 0, "nothing was sent")
+end
+
+tests["quiet mode still publishes validated panel events"] = function()
+	local w = joined({ DEBUG = false })
+	w.step(42)
+	w.sock().deliver('{"v":1,"type":"join","playerId":"davi","trainerId":7,"gender":0}\n'
+		.. '{"v":1,"type":"presence","playerId":"davi","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
+		.. '{"v":1,"type":"pong","t":16}\n'
+		.. '{"v":1,"type":"leave","playerId":"davi","reason":"disconnect"}\n')
+	assert(not w.logged("[remote]"))
+	local types = {}
+	for _, event in ipairs(w.events) do
+		if event.kind == "message" then types[#types + 1] = event.data.type end
+		assert(not assert(json.encode(event)):find(KEY, 1, true), "event leaks the join key")
+	end
+	h.eq(table.concat(types, ","), "welcome,join,presence,pong,leave")
+	h.eq(w.events[#w.events].now, w.now)
+	local count = #w.events
+	w.sock().deliver('{"v":1,"type":"presence","playerId":"invalid"}\n'
+		.. '{"v":1,"type":"future"}\n')
+	h.eq(#w.events, count)
+	w.sock().deliver({ err = "disconnected" })
+	h.eq(w.events[#w.events].data, "Retrying")
 end
 
 return tests

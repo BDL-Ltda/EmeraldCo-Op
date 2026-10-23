@@ -5,5 +5,5 @@ return {
 	SERVER_PORT = 8765, -- server TCP port
 	PLAYER_ID = "your-player-id", -- unique per player: 1-16 of a-z, A-Z, 0-9, _ and -
 	JOIN_KEY = "", -- shared join key from the server host
-	DEBUG = false, -- true logs extra detail in the scripting console
+	DEBUG = false, -- true logs state/presence detail; the debug panel stays visible either way
 }
