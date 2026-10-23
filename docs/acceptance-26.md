@@ -1,8 +1,10 @@
 # Issue #26 validation record
 
 Branch: `feat/26-mailbox-socket-bridge`. Automated checks performed on
-2026-10-23. **Manual emulator acceptance is pending.** This record is not a
-claim that the issue is done; CI, human approval and merge are also pending.
+2026-10-23. On the same date, **leomayca confirmed the manual cases below
+passed with DaviAlencastro and bernardosevero**. This is the testers' report,
+not an independent agent observation. Screenshot/log evidence is still being
+collected; CI, human approval and merge are also pending.
 
 ## Automated checks
 
@@ -24,21 +26,31 @@ slot/identity lifecycle, latest-state retries, debug-panel data, server loss,
 idle reconnect and old-queue cleanup. They do not demonstrate rendering or
 socket behavior inside mGBA; those need the test below.
 
-## Manual result to supply before opening the PR
+## Reported manual result
 
-Follow [the two-instance procedure](mailbox-bridge.md#manual-acceptance-two-mgba-instances).
-Record the tested client commit and testers here or in the PR, plus sanitized
-logs/screenshots. Use separate saves and local configs; never publish keys,
-public IPs, trainer IDs, saves or ROM files.
+Testers: **leomayca, DaviAlencastro and bernardosevero**. The test handoff was
+client commit `c72a31c`, using the matching ROM identified above. No source
+code has changed since that handoff. In response to the requested checklist,
+leomayca reported: "All of that worked" (translated from Portuguese).
 
-- [ ] Both players see each other move and turn on the same map; map changes work.
-- [ ] Panel coordinates, identity and connection state follow both sessions.
-- [ ] At least 45 seconds idle/in a menu preserves peer presence.
-- [ ] Stopping the server clears avatars and rows; restart restores both without movement.
+- [x] Both players see each other move and turn on the same map; map changes work.
+- [x] Panel positions and connection state follow both sessions.
+- [x] At least 45 seconds idle/in a menu preserves peer presence.
+- [x] Stopping the server clears avatars and rows; restart restores both without movement.
+- [x] Leaving/rejoining produces one avatar, without duplication.
+
+Evidence: tester attestation received in the implementation chat on
+2026-10-23. A sanitized emulator screenshot or connection/reconnect log has
+been requested for the PR; it has not yet been supplied.
+
+### Additional robustness checks not yet reported
+
+These are recommended by the longer [procedure](mailbox-bridge.md#manual-acceptance-two-mgba-instances),
+not additional ticket acceptance criteria. Do not infer them from the report
+above: they were not in the shorter checklist the tester confirmed.
+
 - [ ] Restart during a menu does not resurrect departed peers when returning to the field.
-- [ ] Leaving/rejoining produces one avatar; soft reset/continue rejoins safely.
-
-Testers: pending. Client commit: pending. Evidence: pending.
+- [ ] Soft reset/continue rejoins safely.
 
 The ticket has no `needs:multiplayer-test` label. Its two-instance manual
 test is still required; if two developers participate, record their names.
