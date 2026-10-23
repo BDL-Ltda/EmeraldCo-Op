@@ -49,7 +49,8 @@ Once you pick an issue:
 
 - the commit message format: **Conventional Commits + gitmoji**, e.g. `feat(server): ✨ relay presence to other players`;
 - the checks that must pass locally before a PR is opened (tests, lint, ROM build, forbidden files);
-- the branch name and PR body format.
+- the branch name and PR body format;
+- the closing-link review after opening and before merging a partial-scope PR.
 
 Right after opening a `feat` or `fix` PR, use the **`pr-walkthrough` skill** (`.claude/skills/pr-walkthrough/SKILL.md`): it creates an HTML page with diagrams explaining what changed and why, publishes it on the `walkthroughs` branch and links it in a PR comment, so reviewers can learn the change quickly.
 

@@ -80,10 +80,14 @@ Then do the issue's **How to test** steps (manual emulator steps included) and k
 - Branch: `<type>/<issue>-<short-name>`, e.g. `feat/14-presence-relay`.
 - Rebase on the latest `master` before opening the PR.
 - PR title: same format as a commit message.
+- Use `Refs #<issue>` for partial work. Use `Closes #<issue>` only when the PR
+  completes the whole issue, including its acceptance requirements. A docs or
+  packaging PR leaves a release acceptance tracker open while human testing
+  remains pending. Check GitHub's actual closing links in step 4.
 - PR body:
 
 ```markdown
-Closes #<issue>
+Refs #<issue>
 
 ## What
 <1–3 sentences>
@@ -104,3 +108,21 @@ Closes #<issue>
 - If the PR is a `feat` or `fix`, then use the `pr-walkthrough` skill (`.claude/skills/pr-walkthrough/SKILL.md`) to create the PR's walkthrough page and post it as a PR comment (it is not part of the PR's code). Skip it for every other type.
 - One human approval is required before merging. Never approve or merge your own PR.
 - If the PR moves the `rom` submodule pointer: the pinned commit must descend from the fork's `master` (`BDL-Ltda/pokeemerald`). After the PR merges, fast-forward the fork's `master` to it (see "Changing the ROM" in the README). Never force-push the fork.
+
+## 4. Check issue closing links
+
+After opening a PR and again before merge, inspect the **Development** sidebar
+or run:
+
+```bash
+gh pr view <PR> --repo BDL-Ltda/EmeraldCo-Op --json closingIssuesReferences \
+  --jq '.closingIssuesReferences[] | {number, url}'
+```
+
+Review each returned issue against the scope this PR actually completes.
+A partial preparation PR must have **no closing reference to its incomplete
+acceptance tracker**, even if its description only says `Refs #N`. Remove an
+incorrect closing link in GitHub and rerun the check before merging. Record
+the output in the PR; no output means no closing references. Repeat after
+edits to issue links or the PR description. A reviewer confirms this check
+alongside human approval; green CI alone does not establish issue completion.

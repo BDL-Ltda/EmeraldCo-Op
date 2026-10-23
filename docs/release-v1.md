@@ -1,21 +1,29 @@
-# v1.0 release preparation (#27)
+# v1.0 release and acceptance (#74)
 
-This checklist tracks [issue #27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
+Outstanding acceptance is tracked in
+[issue #74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74). Preparation and
+publication originated in [#27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
+PR #71's closing linkage auto-closed #27 before release acceptance; it was later
+reopened. Record remaining session and retrospective results in #74.
 v1 synchronizes overworld presence for up to five players. Battles, trades,
 items and saves remain local. Follow [Releasing](releasing.md) for commands.
 
 ## Preparation and publication
 
-- [ ] Merge the preparation PR with human approval; select the resulting
+- [x] Merge the preparation PR with human approval; select the resulting
   `master` commit and verify Go, Lua and ROM CI are green at that commit.
-- [ ] Build its pinned ROM in Docker, regenerate addresses and confirm no diff.
-- [ ] Verify the privately supplied retail base ROM's SHA1, create the BPS with
+- [x] Build its pinned ROM in Docker, regenerate addresses and confirm no diff.
+- [x] Verify the matching base ROM's SHA1, create the BPS with
   Flips, apply it to a fresh output and compare with the built ROM.
-- [ ] Archive the committed client, inspect the ZIP for runtime files and the
+- [x] Archive the committed client, inspect the ZIP for runtime files and the
   absence of private settings, and extract it to a clean ASCII-only path.
-- [ ] Fill the notes below with the exact commit, ROM pin and measured SHA1.
-- [ ] Create and inspect the draft, then publish `v1.0` with both assets.
-- [ ] Download the published assets and verify installation and patched SHA1.
+- [x] Fill the release notes with the exact commit, ROM pin and measured SHA1.
+- [x] Create and inspect the draft, then publish `v1.0` with both assets.
+- [x] Download the published assets, extract the client into a clean folder,
+  apply the downloaded patch and verify the patched SHA1.
+
+These checks cover packaging and patch installation. An emulator playthrough
+and the three-developer acceptance session remain pending.
 
 Do not check these boxes from earlier builds. The ROM hash in generated
 `client/addresses.lua` identifies the expected ROM; measure the release build
@@ -27,7 +35,31 @@ installation and online play. Protocol v1 and mailbox layout v1 are unchanged.
 The protocol examples remain covered by Go and Lua tests; C size/offset
 assertions and Lua mailbox tests cover the documented binary contract.
 
-## Preparation evidence (2026-10-23)
+## Published release evidence (2026-10-23)
+
+[v1.0](https://github.com/BDL-Ltda/EmeraldCo-Op/releases/tag/v1.0) is published
+with `emerald-coop-v1.0.bps` and `emerald-coop-v1.0-client.zip`.
+The [publication record](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27#issuecomment-6368366388)
+records the fresh Docker build, unchanged regenerated addresses, client archive
+inspection and download/patch checks. The annotated tag points to reviewed,
+merged commit `ad827e11b748028d95da54efc72d5660e368f11c`; its ROM pin is
+`662300386fae6899c8f4fea4504f2d9d4303c94c`.
+
+| ROM | SHA1 |
+| --- | --- |
+| Matching base (Pokémon Emerald USA) | `f3ae088181bf583e55daf962a92bb46f4f1d07b7` |
+| Fresh mod build and downloaded-patch output | `ab60e843b809acf58943b8e90b156a3554deaade` |
+
+The base was reproduced locally from clean upstream `pret/pokeemerald`
+`731ad5bfd6e6f265508d0efcca0ba42f9dcf5881` using `pret/agbcc`
+`da598c1d918402c42c0c0d7128ba14567f3175e9`; `make compare` verified the retail
+checksum. Flips v198 created the BPS. Applying the published patch to that base
+produced byte-identical output to the fresh mod build. No ROM was uploaded.
+[Go, Lua and ROM CI](https://github.com/BDL-Ltda/EmeraldCo-Op/actions/runs/39976041089)
+passed at the release commit. These results do not establish multiplayer
+acceptance; that evidence belongs in #74.
+
+### Earlier preparation evidence
 
 The client archive preflight used merged `master` commit
 `265eaab904d07e1c4f583a498117094898b9dbd9` and ROM pin
@@ -48,9 +80,9 @@ Docker build or a patch round-trip.
 - [CI on the base commit](https://github.com/BDL-Ltda/EmeraldCo-Op/actions/runs/39966359462)
   passed Go, Lua and ROM. This records that commit, not a future release build.
 
-Publication still requires the selected merged release commit, a fresh Docker
-build, the privately supplied retail base ROM and a verified Flips round-trip.
-The release-only session, retrospective and planning date remain pending.
+That preflight was superseded by the fresh build and published-asset checks
+above. The release-only session, retrospective and planning date remain pending
+in #74.
 
 ## Release notes template
 
@@ -88,7 +120,8 @@ The host shares the server address and join key privately.
 ## Validation and known limits
 
 - Automated checks: <links to green Go, Lua and ROM CI at the release commit>.
-- Release-only three-developer session: pending; tracked in issue #27.
+- Release-only three-developer session: pending;
+  [acceptance tracker #74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74).
 - Only presence is shared. Avatars appear on the same map and in view when
   object/sprite slots are available. Menus/battles keep the last peer position;
   local menus can delay mailbox handoff until the overworld resumes.
@@ -128,17 +161,19 @@ Keep a short video or screenshots plus sanitized observations. Redact the
 panel's host, join keys, real trainer IDs and desktop content. Never upload
 ROMs, saves or raw server logs. Open an issue for each bug with the release
 tag, reproduction, expected/actual result and sanitized evidence; link it
-from #27. Leave untested cases pending.
+from #74. Leave untested cases pending.
 
 ## Retrospective and v1.5 planning
 
-Complete in #27 after the release session; do not infer outcomes in advance:
+Complete in #74 after the release session; do not infer outcomes in advance:
 
 - Session evidence and remaining bugs: <links>.
 - What worked: <observed results>.
 - What to change before v1.5: <actions, owners and linked issues>.
 - v1.5 re-planning: <agreed date, time, timezone and participants>.
 
-Keep #27 open until publication, the released-artifact session, retrospective
-and scheduling are complete. A preparation PR only references #27; it must
-not auto-close it.
+Keep #74 open until the released-artifact session, retrospective and scheduling
+are complete. Partial preparation PRs reference #74 and pass the
+[closing-link review](../.claude/skills/pre-commit/SKILL.md#4-check-issue-closing-links)
+after opening and before merge. The review checks GitHub's actual closing
+linkage; `Refs #74` in the description alone does not guarantee it stays open.
