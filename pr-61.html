@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Coop Mailbox Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#61</span>
+  <h1>The ROM and Lua now share a mailbox</h1>
+  <p class="lede">The game can't do networking, but Lua can read and write its RAM. This PR adds <code>gCoopMailbox</code>, a fixed 1034-byte struct in EWRAM with two one-way rings, plus a small C API, so the next 0.4 issues can move presence through it.</p>
+  <div class="meta">
+    <span>closes <b>#22</b></span>
+    <span>branch <b>feat/22-coop-mailbox</b></span>
+    <span>files <b>10</b> (6 repo + 4 rom)</span>
+    <span>lines <b>+295 / −14</b></span>
+    <span>milestone <b>0.4 In-game presence</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#next">What's next</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>A struct in RAM is the only channel between the game and the network</h2>
+    <p>From milestone 0.4 the ROM owns co-op behavior and Lua is a dumb pipe between the mailbox and the socket (<code>docs/architecture.md</code>). This PR builds the mailbox and the ROM's side of it. The Lua side, publishing and rendering come in later issues.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where gCoopMailbox sits</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="ROM co-op code writes the outbound ring and reads the inbound ring of gCoopMailbox; mGBA Lua does the opposite and talks JSON lines to the Go relay.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="620" height="310" rx="10"/>
+      <text class="t-zone" x="30" y="38">GBA (ROM + EWRAM)</text>
+      <g class="step" style="--i:0">
+        <rect class="box pub" x="40" y="130" width="200" height="66" rx="6"/>
+        <text class="t-mono t-em" x="56" y="156">src/coop/mailbox.c</text>
+        <text class="t-sub" x="56" y="178">Init · Push · Pop · IsLuaConnected</text>
+      </g>
+      <g class="step" style="--i:1">
+        <rect class="box pub" x="330" y="60" width="270" height="230" rx="6"/>
+        <text class="t-mono t-em" x="346" y="86">gCoopMailbox (0x40A bytes)</text>
+        <rect class="box" x="346" y="100" width="238" height="40" rx="4"/>
+        <text class="t-mono" x="358" y="125">header: "COOP" · v1 · flags</text>
+        <rect class="box" x="346" y="152" width="238" height="56" rx="4"/>
+        <text class="t-mono" x="358" y="175">outbound ring</text>
+        <text class="t-sub" x="358" y="195">16 × 32 B · ROM → Lua</text>
+        <rect class="box" x="346" y="220" width="238" height="56" rx="4"/>
+        <text class="t-mono" x="358" y="243">inbound ring</text>
+        <text class="t-sub" x="358" y="263">16 × 32 B · Lua → ROM</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em flow" d="M240 150C290 150 300 180 342 180" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M342 248C300 248 290 178 244 178" marker-end="url(#m-ae)"/>
+      </g>
+      <g class="step" style="--i:3">
+        <rect class="box dim" x="680" y="130" width="140" height="66" rx="6"/>
+        <text class="t-mono" x="696" y="156">mGBA Lua</text>
+        <text class="t-sub" x="696" y="178">#23, not here</text>
+        <path class="edge" d="M600 180H676" marker-end="url(#m-a)"/>
+        <path class="edge" d="M676 200C640 200 640 248 604 248" marker-end="url(#m-a)"/>
+        <rect class="box dim" x="850" y="130" width="130" height="66" rx="6"/>
+        <text class="t-mono" x="866" y="156">Go relay</text>
+        <text class="t-sub" x="866" y="178">JSON lines/TCP</text>
+        <path class="edge ret" d="M820 163H846" marker-end="url(#m-a)"/>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added by this PR</span><span><i class="m"></i>later issues</span><span><i class="flow"></i>ROM side of the mailbox</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>One writer, one reader, slot first and index last</h2>
+    <p>Each ring has one writer and one reader, so it needs no locks. The ROM writes only <code>outbound.head</code> and <code>inbound.tail</code>, and Lua writes only the other two indices. The writer fills <code>slots[head]</code> and then advances <code>head</code>. The reader copies <code>slots[tail]</code> and then advances <code>tail</code>. When <code>(head + 1) % 16 == tail</code> the ring is full and the message is dropped, so each ring holds at most 15 messages.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">CoopMailbox_Push (outbound)</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 250" role="img" aria-label="Push checks the length, checks for a full ring, writes the slot, then advances head; Lua later reads the slot and advances tail.">
+      <defs>
+        <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-be" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-bb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah bad" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <polygon class="gate" points="110,60 180,100 110,140 40,100"/>
+        <text class="t-mono" x="80" y="105">len≤30?</text>
+        <path class="edge bad" d="M110 140V196" marker-end="url(#m-bb)"/>
+        <text class="t-sub t-bad" x="120" y="190">FALSE</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em" d="M180 100H236" marker-end="url(#m-be)"/>
+        <polygon class="gate" points="320,60 400,100 320,140 240,100"/>
+        <text class="t-mono" x="290" y="105">not full?</text>
+        <path class="edge bad" d="M320 140V196" marker-end="url(#m-bb)"/>
+        <text class="t-sub t-bad" x="330" y="190">FALSE (dropped)</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em" d="M400 100H456" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="460" y="72" width="180" height="56" rx="6"/>
+        <text class="t-mono t-em" x="476" y="96">write slots[head]</text>
+        <text class="t-sub" x="476" y="116">type, length, payload, zero rest</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge em" d="M640 100H676" marker-end="url(#m-be)"/>
+        <rect class="box" x="680" y="80" width="80" height="40" rx="6"/>
+        <text class="t-mono" x="690" y="105">barrier</text>
+        <path class="edge em" d="M760 100H796" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="800" y="72" width="170" height="56" rx="6"/>
+        <text class="t-mono t-em" x="816" y="96">head = next</text>
+        <text class="t-sub" x="816" y="116">now Lua may read it</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>The byte layout, field by field</h2>
+    <p>Offsets are from <code>gCoopMailbox</code> (address in <code>client/addresses.lua</code>). <code>STATIC_ASSERT</code>s in <code>mailbox.c</code> lock each one, and <code>docs/memory-map.md</code> has the same table. Click a field.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-selected data-title="magic" data-value="0x000 · 4 bytes · 43 4F 4F 50" data-text="ASCII COOP with no terminator. CoopMailbox_Init writes it last, so a valid magic means the header is complete."><small>0x000 magic</small>43 4F 4F 50</button>
+      <button class="seg" type="button" data-title="layoutVersion" data-value="0x004 · 1 byte · 01" data-text="Version 1. Any layout change bumps it, and Lua must refuse a version it does not know."><small>0x004 ver</small>01</button>
+      <button class="seg crc" type="button" data-title="flags" data-value="0x005 · 1 byte · 02 after boot" data-text="Bit 0 lua_connected is owned by Lua. Bit 1 rom_ready is set by the ROM at boot. Lua must read-modify-write the byte to keep rom_ready."><small>0x005 flags</small>02</button>
+      <button class="seg" type="button" data-title="outbound.head / tail" data-value="0x006 / 0x007 · 1 byte each" data-text="The ROM writes head and Lua writes tail. Both are 0 after boot (empty ring)."><small>0x006 out h/t</small>00 00</button>
+      <button class="seg wide" type="button" data-title="outbound.slots[16]" data-value="0x008 · 512 bytes" data-text="Slot i is at 0x008 + i * 0x20. Each slot is type (1), length (1), payload (30). The ROM zero-fills payload bytes after length."><small>0x008 outbound slots</small>16 × 32 B</button>
+      <button class="seg" type="button" data-title="inbound.head / tail" data-value="0x208 / 0x209 · 1 byte each" data-text="Lua writes head and the ROM writes tail."><small>0x208 in h/t</small>00 00</button>
+      <button class="seg wide" type="button" data-title="inbound.slots[16]" data-value="0x20A · 512 bytes" data-text="Slot i is at 0x20A + i * 0x20. Pop clamps a length above 30 to 30, so a bad slot from Lua can't make a caller read past the payload."><small>0x20A inbound slots</small>16 × 32 B</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>The layout came from the issue. These details did not.</h2>
+    <p>Issue #22 fixed the header, the slot size and the ring rules. These choices came up while implementing them.</p>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Packed structs</h3>
+      <div class="term">
+        <div><span class="bad">src/coop/mailbox.c:10:14: error: size of array 'CoopMailboxRingSize' is negative</span></div>
+        <div>struct __attribute__((packed)) CoopMailboxRing</div>
+      </div>
+      <div class="why"><b>Why</b><p>The modern build uses <code>-mabi=apcs-gnu</code>, which aligns every struct to 4 bytes. That put <code>slots</code> at offset 4 instead of 2. The static asserts failed the first build, which is their job. Packing all three structs restores the agreed layout. Copies use <code>memcpy</code> because packed structs have 1-byte alignment.</p></div>
+    </div>
+    <div class="decision">
+      <h3>A compiler barrier, but no lock</h3>
+      <div class="term">
+        <div>#define COOP_MAILBOX_BARRIER() asm volatile("" ::: "memory")</div>
+      </div>
+      <div class="why"><b>Why</b><p>mGBA's frame callback runs at the frame boundary, which can land in the middle of a ROM call. If GCC moved the <code>head</code> store before the slot stores, Lua could read a half-written slot. The barrier keeps "slot first, index last". It emits no instructions.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Init in AgbMain, every boot</h3>
+      <div class="term">
+        <div>    InitHeap(gHeap, HEAP_SIZE);</div>
+        <div class="ok">    CoopMailbox_Init();</div>
+      </div>
+      <div class="why"><b>Why</b><p>The issue asks for one call at boot. <code>AgbMain</code> also runs after a soft reset, so the mailbox comes back zeroed with <code>lua_connected</code> cleared. The Lua client (#23) should treat a missing magic or a cleared <code>rom_ready</code> as a reset.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Built in Docker, read back through mGBA's GDB stub</h2>
+    <p>mGBA 0.10.5 can't load a script from the command line, so the header was checked through its GDB stub with devkitARM's GDB, stopped at the title screen. Nobody has played past the title screen yet.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> docker compose run --build --rm rom</div>
+    <div style="--i:1" class="ok">ba1da5e9c8a7f60f64b2a69179b764d0395ca745  pokeemerald_modern.gba</div>
+    <div style="--i:2"><span class="p">$</span> grep -n -A2 mailbox.o rom/pokeemerald_modern.map <span class="c"># excerpt</span></div>
+    <div style="--i:3"> ewram_data     0x0203cf6c      0x40a src/coop/mailbox.o</div>
+    <div style="--i:4">                0x0203cf6c                gCoopMailbox</div>
+    <div style="--i:5"><span class="p">$</span> go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua</div>
+    <div style="--i:6" class="ok">+    ["gCoopMailbox"] = { addr = 0x0203CF6C, size = 1034 },</div>
+    <div style="--i:7"><span class="c"># mGBA.exe -g; gdb: break CB2_InitTitleScreen, continue</span></div>
+    <div style="--i:8"><span class="p">(gdb)</span> x/8xb &amp;gCoopMailbox</div>
+    <div style="--i:9" class="ok">0x203cf6c &lt;gCoopMailbox&gt;:	0x43	0x4f	0x4f	0x50	0x01	0x02	0x00	0x00</div>
+    <div style="--i:10"><span class="p">$</span> lua client/tests/run.lua</div>
+    <div style="--i:11" class="ok">127 passed, 0 failed (8 suites)</div>
+  </div>
+</section>
+
+<section id="next">
+  <div class="prose">
+    <span class="eyebrow">What's next</span>
+    <h2>Three issues build on this</h2>
+  </div>
+  <figure class="plate" style="margin:0">
+    <div class="scroll">
+    <svg viewBox="0 0 1000 200" role="img" aria-label="Issue 22 unblocks issues 23, 24 and 25.">
+      <defs><marker id="m-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="box pub" x="40" y="72" width="220" height="56" rx="6"/>
+      <text class="t-mono t-em" x="56" y="96">#22 mailbox</text>
+      <text class="t-sub" x="56" y="116">this PR</text>
+      <path class="edge" d="M260 100C320 100 330 40 396 40" marker-end="url(#m-c)"/>
+      <path class="edge" d="M260 100H396" marker-end="url(#m-c)"/>
+      <path class="edge" d="M260 100C320 100 330 160 396 160" marker-end="url(#m-c)"/>
+      <rect class="box dim" x="400" y="16" width="300" height="48" rx="6"/>
+      <text class="t-mono" x="416" y="45">#23 Lua reads/writes the mailbox</text>
+      <rect class="box dim" x="400" y="76" width="300" height="48" rx="6"/>
+      <text class="t-mono" x="416" y="105">#24 ROM publishes presence</text>
+      <rect class="box dim" x="400" y="136" width="300" height="48" rx="6"/>
+      <text class="t-mono" x="416" y="165">#25 ROM renders remote players</text>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Read <code>rom/include/coop/mailbox.h</code> first, then <code>rom/src/coop/mailbox.c</code>, then the Mailbox section of <code>docs/memory-map.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Does the memory-map table match the struct and the static asserts byte for byte?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Are you OK with the ROM commit living on the fork's <code>feat/22-coop-mailbox</code> branch until it's merged into the fork's <code>master</code>?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>In mGBA, start a new game and leave the truck: does the game play normally, with <code>COOP</code> still at <code>gCoopMailbox</code>?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>Fork branch</b><span>The pinned ROM commit is not on the fork's <code>master</code> yet. Merge that branch so the pin stays reachable.</span></div>
+    <div class="limit"><b>Not played</b><span>The automated check stopped at the title screen. Gameplay past it still needs a human check.</span></div>
+    <div class="limit"><b>#23 #24</b><span>The presence payload format and the Lua side of the mailbox are not defined here.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#61 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #22 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
