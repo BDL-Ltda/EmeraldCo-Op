@@ -380,6 +380,14 @@ Lua to ROM. A reader must reject a payload shorter than 13 bytes and ignore
 bytes it doesn't know past the ones above, so a later field can be appended
 without breaking older readers.
 
+The outbound C definition is `struct CoopPresence` in
+`rom/include/coop/presence.h` (#24), with size and offset assertions in
+`rom/src/coop/presence.c`. [Local publishing](local-presence.md) now implements
+this layout: `visible` is true only in controllable overworld play. A hidden
+transition retains the last complete tuple rather than reading a loading map.
+The old direct-memory reader's session visibility above remains in use by
+`bridge.lua` until the mailbox/socket integration in #26.
+
 ### Remote slots
 
 The ROM keeps a table of **4 remote slots** (`COOP_REMOTE_SLOTS` in

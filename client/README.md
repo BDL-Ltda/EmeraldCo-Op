@@ -8,6 +8,11 @@ built ROM's ELF. From 0.4, the client bridges the ROM mailbox and the TCP socket
 See the [architecture](../docs/architecture.md) and
 [memory map](../docs/memory-map.md).
 
+For the #24 ROM publisher test, load `debug/presence.lua` **instead of**
+`bridge.lua`. It prints outbound mailbox messages without a config or server.
+See [local presence testing](../docs/local-presence.md#manual-mgba-test-no-server-or-second-player).
+The regular bridge still reads game structs until #26 connects it to the mailbox.
+
 ## Running it
 
 1. Put the Emerald Co-Op folder in a path with **only ASCII characters**, e.g.

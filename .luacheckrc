@@ -10,3 +10,6 @@ files["client/spike"] = {
 files["client/bridge.lua"] = {
   read_globals = { "callbacks", "console", "emu", "socket" },
 }
+files["client/debug"] = {
+  read_globals = { "callbacks", "console", "emu" },
+}
