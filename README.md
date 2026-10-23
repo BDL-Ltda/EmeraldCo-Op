@@ -252,6 +252,7 @@ See the [client README](client/README.md) for the planned configuration.
 - [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
 - [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.
 - [Playing online](docs/playing-online.md): IPv4 hosting, TCP forwarding and external validation (#18).
+- [Networking acceptance](docs/acceptance-0.2.md): three-developer milestone 0.2 test results (#19).
 - [Installing](docs/installing.md): patch your ROM and load the client (players).
 - [Releasing](docs/releasing.md): build, create the `.bps` patch and publish a release.
 
