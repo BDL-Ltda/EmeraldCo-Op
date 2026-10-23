@@ -3,8 +3,8 @@
 Branch: `feat/26-mailbox-socket-bridge`. Automated checks performed on
 2026-10-23. On the same date, **leomayca confirmed the manual cases below
 passed with DaviAlencastro and bernardosevero**. This is the testers' report,
-not an independent agent observation. Screenshot/log evidence is still being
-collected; CI, human approval and merge are also pending.
+not an independent agent observation. A cropped emulator screenshot is now
+included below; CI, human approval and merge are still pending.
 
 ## Automated checks
 
@@ -39,9 +39,15 @@ leomayca reported: "All of that worked" (translated from Portuguese).
 - [x] Stopping the server clears avatars and rows; restart restores both without movement.
 - [x] Leaving/rejoining produces one avatar, without duplication.
 
-Evidence: tester attestation received in the implementation chat on
-2026-10-23. A sanitized emulator screenshot or connection/reconnect log has
-been requested for the PR; it has not yet been supplied.
+Evidence: tester attestation and screenshot received in the implementation
+chat on 2026-10-23. The screenshot shows three trainer avatars together in
+mGBA 0.10.5. With the contributor's explicit permission, only the emulator
+window was cropped and published; the room URL, other browser tabs and desktop
+were excluded. The crop is deterministic, with no generative image editing.
+It supports static co-presence; movement, panel behavior and reconnect
+results are the testers' report, not inferred from a still image.
+
+![Three trainer avatars together in the mGBA overworld](images/acceptance-26-overworld.png)
 
 ### Additional robustness checks not yet reported
 
