@@ -397,8 +397,13 @@ be reused. The ROM
 - draws slot `n` as the object event with local ID `228 + n` while the slot is
   used, `visible` is `1`, the slot's map equals the local map and
   `lua_connected` is set; otherwise it removes that object;
-- removes every remote object and **forgets every slot** while `lua_connected`
-  is clear, so after a reconnect Lua must send `PRESENCE` for each player again;
+- removes every remote object, **forgets every slot** and **discards every
+  queued inbound message** (by popping them, so only the ROM's `inbound.tail`
+  moves) on each overworld frame while `lua_connected` is clear. Reconnect
+  handoff for Lua: set `lua_connected` **before** pushing the first message of
+  the new session (in the same frame callback is fine), then send `PRESENCE`
+  for every player again. Anything pushed while the bit is clear may be
+  dropped;
 - drains the inbound ring only while the overworld runs (`CB1_Overworld` with
   `callback2 == CB2_Overworld`). During battles, full-screen menus and map
   loads the ring is not read and can fill up, and Lua's writes are then
@@ -407,7 +412,10 @@ be reused. The ROM
 
 Busy maps: a remote player is spawned only while at least 2 of the 16 object
 event slots stay free afterwards, only when its tile is in view, and never
-while a script, the start menu or battle setup holds the field. When object
+while a script, the start menu or battle setup holds the field. A remote that
+walks out of view is removed by the ROM as soon as its step ends (the game's
+own culling keeps objects whose spawn tile is still in view), and is spawned
+again when its tile is back in view. When object
 event or sprite slots run out it is simply not drawn and is retried every frame:
 nothing crashes, and map NPCs keep priority. Full behavior and the reasons are
 in [remote-player-design.md](remote-player-design.md).
@@ -469,6 +477,6 @@ indices.
 
 [mailbox_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
 [mailbox_c]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
-[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/6c395b88e4cf4cd1cddb1f0ef8b52bc3210baf8e/include/constants/coop.h
-[remote_players_h]: https://github.com/DaviAlencastro/pokeemerald/blob/6c395b88e4cf4cd1cddb1f0ef8b52bc3210baf8e/include/coop/remote_players.h
-[remote_players_c]: https://github.com/DaviAlencastro/pokeemerald/blob/6c395b88e4cf4cd1cddb1f0ef8b52bc3210baf8e/src/coop/remote_players.c
+[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
+[remote_players_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
+[remote_players_c]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c
