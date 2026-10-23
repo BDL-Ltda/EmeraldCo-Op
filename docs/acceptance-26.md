@@ -8,7 +8,8 @@ included below; CI, human approval and merge are still pending.
 
 ## Automated checks
 
-- Lua: **195 passed, 0 failed (13 suites)** with Lua 5.4.8.
+- Lua: **205 passed, 0 failed (14 suites)** with Lua 5.4.8, including the
+  post-review reset regressions described below.
 - luacheck 1.2.0: **0 warnings, 0 errors**.
 - `go vet ./...` and `go test -race ./...`: pass in `golang:1.27.2`
   with `CGO_ENABLED=1`, network disabled, against the branch's Go source.
@@ -30,7 +31,9 @@ socket behavior inside mGBA; those need the test below.
 
 Testers: **leomayca, DaviAlencastro and bernardosevero**. The test handoff was
 client commit `c72a31c`, using the matching ROM identified above. No source
-code has changed since that handoff. In response to the requested checklist,
+code changed between that test handoff and the initial PR head `61539e6`.
+The later reset fix below has automated validation, not a new human playthrough.
+In response to the requested checklist,
 leomayca reported: "All of that worked" (translated from Portuguese).
 
 - [x] Both players see each other move and turn on the same map; map changes work.
@@ -48,6 +51,27 @@ It supports static co-presence; movement, panel behavior and reconnect
 results are the testers' report, not inferred from a still image.
 
 ![Three trainer avatars together in the mGBA overworld](images/acceptance-26-overworld.png)
+
+## Review follow-up: reset during reconnect
+
+The review of `61539e6` found that a completed valid-header reset could go
+unnoticed while the connection bit was already clear. A new real-entrypoint
+adapter suite reproduced the bug before the fix: the retry, awaiting-welcome
+and awaiting-ROM-handoff cases failed. The bridge could retain the old trainer
+and position and rejoin while the game was at title.
+
+The fix watches a local marker in Lua's next unpublished inbound slot, without
+changing the ROM or mailbox layout. Marker loss clears the cached session
+before network retry, independently of socket state. Five entrypoint tests
+now cover those three cases, fresh state arriving in the same observed frame,
+and a reset with every observed ring index already zero. Five mailbox tests
+cover marker ownership, payload preservation, wraps, full-ring capacity,
+invalid indices and read-only detection. All ten additions pass; the original
+tests still pass.
+
+This is automated adapter evidence using the real entrypoint, mailbox, pipe
+and network client, not a newly observed mGBA reset test. The earlier human
+test/screenshot remains attributed to the original handoff revision.
 
 ### Additional robustness checks not yet reported
 

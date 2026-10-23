@@ -456,6 +456,22 @@ including after a soft reset. It zeroes the whole mailbox (both rings empty,
 `lua_connected` cleared) and then writes the header. A Lua client that sees
 `rom_ready` drop or the magic disappear must treat the mailbox as reset.
 
+The main bridge also detects an initialization that finishes entirely between
+frame callbacks, including while disconnected or awaiting reconnect handoff.
+It opts into a Lua-local reset watch: the final four payload bytes of the
+**next unpublished inbound slot** hold `LUA!`. That slot is always free under
+the existing ring rules and belongs to Lua. The marker never advances an
+index, publishes a message or reserves extra capacity; the ROM cannot consume
+it. Before publishing a normal push, Lua writes the actual zero-padded payload
+and moves the marker to the next free slot. Full/invalid pushes do not move it.
+
+`CoopMailbox_Init` zeroes the marker, even if the header and every observed
+index already have their pre-reset values and `lua_connected` was already
+clear. Losing the marker invalidates cached identity/position and the socket;
+the bridge waits for a fresh ROM tuple before rejoining. This uses only
+existing Lua-owned slot storage: no struct/flag/layout/version or ROM change.
+Only one Lua writer/reader may attach to each ring, as before.
+
 ### C API
 
 Declared in [`include/coop/mailbox.h`][mailbox_h]:
@@ -481,8 +497,10 @@ mGBA's `emu` in the emulator and a table in tests), with the base address
 | `:setLuaConnected(bool)` | header | Sets or clears `lua_connected`, keeping the other bits. |
 | `:isLuaConnected()` | header | Reads the Lua-owned bit, allowing the bridge to detect a mailbox reset between frame checks. |
 | `:isInboundEmpty()` | inbound indices, read only | Returns whether the ROM has consumed/discarded the queue; false plus a reason on invalid indices. Used for reconnect handoff, never writes the ROM-owned tail. |
+| `:watchReset()` | next unpublished inbound slot | Arms the local reset marker after a successful header check. Returns true, or false and a reason on invalid indices. Does not publish anything. |
+| `:wasReset()` | watched inbound slot, read only | Returns true if an armed marker was lost, independently of connection state. Returns false before opting in. |
 | `:pop()` | outbound | Returns `{type, payload}` (payload as a byte string) or `nil` when empty, then advances `outbound.tail`. |
-| `:push(type, payload)` | inbound | Fills the slot (zero-padded) and then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
+| `:push(type, payload)` | inbound | Fills the slot (zero-padded), moves an armed local reset marker to the next free slot, then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
 | `encodePresence(t)` / `decodePresence(bytes)` | none | Convert between a [presence payload](#presence-payload) and a table; `slot` is present only in the 14-byte form. Return `nil, error` on bad input. |
 
 Both ring calls read `head` and `tail` from memory every time and return an

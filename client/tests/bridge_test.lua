@@ -21,6 +21,8 @@ local function bridge(validRom)
 		return self.valid, self.valid and "mailbox ready" or "mailbox reset"
 	end
 	function box.isInboundEmpty() return true end
+	function box.watchReset() return true end
+	function box.wasReset() return false end
 	function box:isLuaConnected() return self.connected end
 	function box:setLuaConnected(value)
 		assert(self.valid, "must not write an invalid mailbox")

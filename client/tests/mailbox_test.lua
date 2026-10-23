@@ -65,6 +65,80 @@ local PRESENCE = {
 	mapGroup = 0, mapNum = 9, x = 7, y = -1, facing = 4, visible = true, gender = 1, trainerId = 0xDEADBEEF,
 }
 
+test("reset watch writes only the free slot without publishing a message", function()
+	local mem, box = booted()
+	assert(box:watchReset())
+	eq(#mem.writes, 4)
+	for _, address in ipairs(mem.writes) do
+		assert(address >= BASE + IN_SLOTS + 28 and address < BASE + IN_SLOTS + SLOT_SIZE)
+	end
+	eq(box:isInboundEmpty(), true)
+	eq(box:wasReset(), false)
+	box:setLuaConnected(true)
+	box:setLuaConnected(false)
+	eq(box:wasReset(), false) -- ordinary disconnect is not a reset
+end)
+
+test("reset watch follows head wraps without changing published payloads", function()
+	local mem, box = booted()
+	assert(box:watchReset())
+	for i = 1, 32 do
+		local bytes = string.char(i):rep(30)
+		assert(box:push(mailbox.MSG.PRESENCE, bytes))
+		local kind, payload = romPop(mem)
+		eq(kind, mailbox.MSG.PRESENCE)
+		eq(payload, bytes)
+		eq(box:wasReset(), false)
+	end
+	eq(mem:read8(BASE + IN_HEAD), 0)
+	eq(mem:read8(BASE + IN_TAIL), 0)
+	mem.bytes = {}
+	for i = 1, 4 do mem.bytes[BASE + i - 1] = ("COOP"):byte(i) end
+	mem.bytes[BASE + 4], mem.bytes[BASE + FLAGS] = 1, mailbox.FLAG_ROM_READY
+	eq(box:check(), true)
+	eq(box:wasReset(), true)
+	assert(box:watchReset())
+	eq(box:wasReset(), false)
+end)
+
+test("reset watch preserves fifteen-message capacity and full-ring no-write behavior", function()
+	local mem, box = booted()
+	assert(box:watchReset())
+	for i = 1, 15 do assert(box:push(mailbox.MSG.LEAVE, string.char(i - 1))) end
+	local writes = #mem.writes
+	eq(box:push(mailbox.MSG.LEAVE, "x"), false)
+	eq(#mem.writes, writes)
+	eq(box:wasReset(), false)
+	for i = 1, 15 do
+		local kind, payload = romPop(mem)
+		eq(kind, mailbox.MSG.LEAVE)
+		eq(payload, string.char(i - 1))
+	end
+	eq(box:wasReset(), false)
+end)
+
+test("reset watch rejects invalid indices without writing", function()
+	for _, index in ipairs({ IN_HEAD, IN_TAIL }) do
+		local mem, box = booted()
+		mem.bytes[BASE + index] = 16
+		local ok, err = box:watchReset()
+		eq(ok, false)
+		assert(err:find("indices out of range", 1, true))
+		eq(#mem.writes, 0)
+	end
+end)
+
+test("reset observation is read-only and reports lost markers while disconnected", function()
+	local mem, box = booted()
+	eq(box:wasReset(), false) -- opt-in only
+	assert(box:watchReset())
+	mem.writes = {}
+	eq(box:wasReset(), false)
+	mem.bytes[BASE + IN_SLOTS + 28] = 0
+	eq(box:wasReset(), true)
+	eq(#mem.writes, 0)
+end)
+
 test("inbound emptiness observes ROM tail without writing it", function()
 	local mem, box = booted()
 	eq(box:isInboundEmpty(), true)

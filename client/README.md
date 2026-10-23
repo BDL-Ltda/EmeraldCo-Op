@@ -37,6 +37,10 @@ on the first problem. The game itself keeps running.
 On success it logs `ROM verified (<crc32>)` and `mailbox ready (layout v1)`.
 The checks run again whenever another game is loaded with the script still
 running; the mailbox header is also checked each frame to catch soft resets.
+A reset marker in Lua's next unpublished inbound slot additionally detects a
+reset that finishes between frames while the connection bit is already clear.
+The bridge then discards the old identity/position and waits for fresh ROM
+state before reconnecting; see [reset tracking](../docs/memory-map.md#ring-rules).
 
 ## Player state
 

@@ -114,6 +114,15 @@ end
 local box, ready = nil, false
 local lastMailboxError
 
+local function checkMailbox()
+	local ok, reason = box:check()
+	if ok and not ready then
+		local watching, err = box:watchReset()
+		if not watching then return false, err end
+	end
+	return ok, reason
+end
+
 -- Runs once a game is loaded, and again whenever another game is started, so
 -- switching ROMs with the script still loaded is caught too. Game memory is
 -- only read after the ROM is verified.
@@ -140,7 +149,7 @@ local function verifyRom()
 	end
 	box = mailbox.new(emu, symbol.addr)
 	-- A loaded ROM may still be booting. Check now and retry each frame.
-	local mailboxOk, reason = box:check()
+	local mailboxOk, reason = checkMailbox()
 	if mailboxOk then
 		ready = true
 		box:setLuaConnected(false)
@@ -163,7 +172,7 @@ local function updateNet()
 	local now = clock:tick(os.time())
 	networkNow = now
 	if box then
-		local ok, reason = box:check()
+		local ok, reason = checkMailbox()
 		if not ok then
 			if ready then
 				ready = false
@@ -179,10 +188,13 @@ local function updateNet()
 			ready, lastMailboxError = true, nil
 			box:setLuaConnected(false)
 			console:log("[bridge] " .. reason)
-		elseif pipe and pipe.isConnected() and not box:isLuaConnected() then
-			-- A soft reset can replace a valid header between two frame checks.
+		elseif box:wasReset() or (pipe and pipe.isConnected() and not box:isLuaConnected()) then
+			-- Detect completed resets even while retrying, awaiting welcome or
+			-- waiting for the ROM handoff, when lua_connected is already clear.
+			ready = false
 			pipe.reset()
-			client:close("mailbox reset")
+			if client then client:close("mailbox reset") end
+			box:setLuaConnected(false) -- header was checked; no old session survives
 			view:setPlayerState(nil)
 		end
 	end

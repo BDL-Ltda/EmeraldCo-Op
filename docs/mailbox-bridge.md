@@ -31,10 +31,15 @@ The ROM, its pin and the mailbox layout are unchanged.
 - On disconnect or stop, clear the flag and pending peer state. The ROM removes
   remote objects on its next overworld update. Socket connection and the debug
   panel may already be restored while a menu delays the ROM handoff.
-- Invalid headers stop mailbox I/O and close the session. A cleared Lua bit
-  while active also detects a soft reset that completed between callbacks.
-  A stopped script cannot reconnect from later frame callbacks. Late events
-  from an old socket cannot affect its replacement.
+- Invalid headers stop mailbox I/O and close the session. After a valid header,
+  the bridge arms a [Lua-local reset marker](memory-map.md#ring-rules) in the
+  unused inbound slot. Its loss detects a completed soft reset even while
+  retrying, awaiting welcome or waiting for ROM handoff with the Lua bit
+  already clear. Cached identity/position and socket are invalidated before
+  any retry; only a fresh post-reset ROM tuple permits rejoining. Index wraps
+  and ordinary disconnects do not invalidate the marker. A stopped script
+  cannot reconnect from later frame callbacks. Late events from an old socket
+  cannot affect its replacement.
 
 The pure `client/lib/mailboxbridge.lua` owns conversion and slot bookkeeping.
 `bridge.lua` alone binds emulator, socket and panel APIs. The panel's 30-second
@@ -49,6 +54,9 @@ relay. It checks both directions, identity/facing/coordinates, no pre-session
 connection, full-ring coalescing, leave, server restart while idle and stale
 queues during a menu. Other suites cover header/version rejection, ROM change,
 reset, stop, slot replacement, bounded draining and compatible payload extensions.
+The real-entrypoint reset suite also drives the real network client and pipe
+through completed valid-header resets during retry, welcome and ROM handoff,
+including a reset with all ring indices already zero and fresh-state recovery.
 These tests do **not** run mGBA or the actual object-event renderer. The manual
 test below is still required; do not mark it done from simulated tests.
 
