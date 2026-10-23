@@ -193,13 +193,14 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="meta">
     <span>closes <b>#26</b></span>
     <span>branch <b>feat/26-mailbox-socket-bridge</b></span>
-    <span>files <b>23</b></span>
-    <span>lines <b>+1091 / −604</b></span>
+    <span>files <b>24</b></span>
+    <span>lines <b>+1463 / −602</b></span>
     <span>milestone <b>0.4 In-game presence</b></span>
   </div>
   <ul class="toc">
     <li><a href="#big-picture">Big picture</a></li>
     <li><a href="#how">How it works</a></li>
+    <li><a href="#reset">Offline reset fix</a></li>
     <li><a href="#detail">Under the hood</a></li>
     <li><a href="#decisions">Decisions</a></li>
     <li><a href="#tested">Testing</a></li>
@@ -264,6 +265,24 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
 <text class="t-sub" x="30" y="195">Menus can delay handoff; the network and panel can already be connected.</text></svg></div></figure>
 </section>
 
+<section id="reset">
+  <div class="prose">
+    <span class="eyebrow">Review follow-up · ba35395</span>
+    <h2>A reset must invalidate the session even while offline</h2>
+    <p>The review found that the connection bit was already clear during retry or ROM handoff. A reset finishing between frames could leave the old trainer and position cached. Merely checking that bit, or comparing wrapping ring indices, cannot distinguish every reset.</p>
+    <p>The bridge now watches four bytes in Lua's next unpublished inbound slot. The ROM never consumes that free slot; initialization clears it. Normal pushes move the marker to the next free slot before publishing the actual payload. No flag, layout, message type or capacity changes.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Independent of retry, welcome and handoff state</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll"><svg viewBox="0 0 1000 210" role="img" aria-label="ROM initialization clears the unpublished-slot marker; the next frame detects the loss, drops the cached session and waits for fresh ROM presence">
+      <g class="step" style="--i:0"><rect class="box priv" x="15" y="50" width="220" height="95" rx="6"/><text x="30" y="80">ROM reset completes</text><text class="t-sub" x="30" y="105">Header valid again</text><text class="t-sub" x="30" y="125">Local marker zeroed</text></g>
+      <g class="step" style="--i:1"><path class="edge em flow" d="M235 95H265"/><rect class="box pub" x="270" y="50" width="220" height="95" rx="6"/><text x="285" y="80">Next frame checks marker</text><text class="t-sub" x="285" y="105">Even if flags/indices match</text><text class="t-sub" x="285" y="125">No socket-state dependency</text></g>
+      <g class="step" style="--i:2"><path class="edge bad" d="M490 95H520"/><rect class="box bad" x="525" y="50" width="220" height="95" rx="6"/><text x="540" y="80">Invalidate the session</text><text class="t-sub" x="540" y="105">Close socket, clear identity</text><text class="t-sub" x="540" y="125">Forget cached position</text></g>
+      <g class="step" style="--i:3"><path class="edge em flow" d="M745 95H775"/><rect class="box pub" x="780" y="50" width="205" height="95" rx="6"/><text x="795" y="80">Wait for fresh ROM state</text><text class="t-sub" x="795" y="105">Then send a new hello</text><text class="t-sub" x="795" y="125">Never rejoin from old cache</text></g>
+    </svg></div>
+  </figure>
+</section>
+
 <!-- UNDER THE HOOD: one interactive explorer for the trickiest detail (message fields, struct offsets,
      a byte layout, states). Each .seg carries its own explanation. Use real values only. -->
 <section id="detail">
@@ -301,11 +320,11 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="prose">
     <span class="eyebrow">How it was tested</span>
     <h2>Automated checks and human evidence</h2>
-    <p>Actual local runner/lint output is below. All six Go packages passed vet and race tests in Go 1.27.2. Existing ROM host tests passed seven ASan/UBSan groups; symgen matches the unchanged build. CI run 39902460716 passed Go, Lua and ROM at head 61539e6.</p>
+    <p>Actual local runner/lint output is below. The review fix adds five real-entrypoint reset cases and five mailbox-marker cases. Three new entrypoint cases failed before the fix; all now pass. Native Go vet/test passed; the new head's CI Go job also passed its race tests in run 39965258729. ROM source/pin and generated addresses remain unchanged.</p>
   </div>
   <div class="term" data-anim>
     <div style="--i:0"><span class="p">$</span> lua5.4 client/tests/run.lua</div>
-    <div style="--i:1" class="ok">195 passed, 0 failed (13 suites)<br><br>Total: 0 warnings / 0 errors in 29 files</div>
+    <div style="--i:1" class="ok">205 passed, 0 failed (14 suites)<br><br>Total: 0 warnings / 0 errors in 30 files</div>
   </div>
 </section>
 
@@ -319,6 +338,8 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   </div>
   <div class="checks">
     <label class="check"><input type="checkbox" id="c1"><span>Do queue cleanup, pending leaves and slot reuse prevent stale peers from crossing into a new connection?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Does marker loss invalidate identity/position during retry, welcome and handoff, even when all indices are already zero?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Does the local marker stay unpublished, preserve all 30 payload bytes and keep the fifteen-message capacity?</span></label>
   </div>
   <div class="limits">
     <div class="limit"><b>#26</b><span>Human approval and merge remain. Additional manual soft-reset and menu-restart cases are not claimed; automated regressions cover them.</span></div>
