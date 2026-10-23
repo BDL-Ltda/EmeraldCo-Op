@@ -58,13 +58,13 @@ jobs:
           load: true
           cache-from: type=gha,scope=rom-image
           cache-to: type=gha,mode=max,scope=rom-image
-      # Mirrors the `rom` service in docker-compose.yml.
       - name: Test ROM co-op publishing
         run: >
           docker run --rm --platform linux/amd64 --network none
           --mount type=bind,source="$PWD/rom",target=/source,readonly
           --entrypoint sh emerald-coop-rom:ci
           -c 'cd /source && sh tests/coop/run.sh'
+      # Mirrors the `rom` service in docker-compose.yml.
       - name: Build the ROM
         run: >
           docker run --rm --platform linux/amd64 --network none
