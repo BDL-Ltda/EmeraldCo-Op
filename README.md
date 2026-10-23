@@ -14,8 +14,8 @@ in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 Players should follow [Installing](docs/installing.md) and use the patch and
 client from the same release. The [v1 release checklist](docs/release-v1.md)
-records published v1.0 packaging and the pending release-only, three-developer
-acceptance session in [#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74);
+records published v1.0 packaging and the pending release-only, two-developer
+acceptance session in [#27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27);
 earlier development playtests do not complete that session.
 
 ## Repository layout

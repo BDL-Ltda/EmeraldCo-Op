@@ -34,7 +34,7 @@ Release versions follow the milestones: `vX.Y`, for example `v0.1`.
 The first presence release is **`v1.0`**; use the
 [v1 checklist and notes template](release-v1.md). v1.0 is already published;
 remaining release-only acceptance and retrospective work is tracked in
-[#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74).
+[#27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
 
 ## 1. Build the ROM at the release commit
 
@@ -174,12 +174,13 @@ Download both files from the release page (not your local copies), follow
 [installing.md](installing.md), and confirm the SHA1 matches the release notes.
 For a milestone release, ask another developer to do this too.
 
-For **v1.0**, all three developers must install only the downloaded release
-patch and client, then play together over the internet for **20+ minutes**.
+For **v1.0**, two developers (bernardosevero and leomayca) must install only
+the downloaded release patch and client, then play together over the internet
+for **20+ minutes**.
 Use the [session checklist](release-v1.md#release-only-acceptance-session).
 Publishing the assets can happen before that session; the session,
 retrospective and v1.5 scheduling keep
-[#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74) open until completed.
+[#27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27) open until completed.
 For preparation-only PRs, reviewers use the
 [closing-link check](../.claude/skills/pre-commit/SKILL.md#4-check-issue-closing-links)
 to confirm GitHub will leave that tracker open.
