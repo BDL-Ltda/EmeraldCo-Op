@@ -352,7 +352,32 @@ client mirrors these values; never renumber one.
 | Value | Constant | Direction | Payload |
 | --- | --- | --- | --- |
 | `0` | `COOP_MSG_NONE` | none | Reserved: never sent. |
-| `1` | `COOP_MSG_PRESENCE` | both | Defined by the presence issues ([#23](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/23), [#24](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/24)). |
+| `1` | `COOP_MSG_PRESENCE` | both | See [Presence payload](#presence-payload). |
+
+### Presence payload
+
+`COOP_MSG_PRESENCE` carries one player's presence. Unlike the header, the
+payload has multi-byte integers: they are **little-endian** and may be
+unaligned inside the slot, so the ROM must copy them byte by byte (or with
+`memcpy`), never through a `u16`/`u32` pointer. Offsets are from the start of
+`payload` (slot offset `0x02`).
+
+| Offset | Size, type | Field | Meaning |
+| --- | --- | --- | --- |
+| `0x00` | 1, `u8` | `mapGroup` | Same value as [`mapGroup`](#fields). |
+| `0x01` | 1, `u8` | `mapNum` | Same value as [`mapNum`](#fields). |
+| `0x02` | 2, `s16` | `x` | Map coordinate, `currentCoords.x − MAP_OFFSET`. |
+| `0x04` | 2, `s16` | `y` | Map coordinate, `currentCoords.y − MAP_OFFSET`. |
+| `0x06` | 1, `u8` | `facing` | `DIR_*`: `1` south, `2` north, `3` west, `4` east. |
+| `0x07` | 1, `u8` | `visible` | `1` visible, `0` hidden. |
+| `0x08` | 1, `u8` | `gender` | `0` `MALE`, `1` `FEMALE`. |
+| `0x09` | 4, `u32` | `trainerId` | 32-bit trainer ID, as [`trainerId`](#fields). |
+| `0x0D` | 1, `u8` | `slot` | **Inbound only.** Remote player slot `0`–`3`; Lua maps each `playerId` to a slot ([#25](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/25)). |
+
+`length` is **13** (`0x0D`) outbound, ROM to Lua, and **14** (`0x0E`) inbound,
+Lua to ROM. A reader must reject a payload shorter than 13 bytes and ignore
+bytes it doesn't know past the ones above, so a later field can be appended
+without breaking older readers.
 
 ### Ring rules
 
@@ -388,6 +413,26 @@ Declared in [`include/coop/mailbox.h`][mailbox_h]:
 | `bool8 CoopMailbox_Push(u8 type, const void *payload, u8 len)` | outbound | Queues one message. Returns `FALSE` and writes nothing if the ring is full or `len > 30`. |
 | `bool8 CoopMailbox_Pop(struct CoopMailboxSlot *msg)` | inbound | Copies the oldest message to `*msg` and frees its slot. Returns `FALSE` if the ring is empty. |
 | `bool8 CoopMailbox_IsLuaConnected(void)` | header | `TRUE` while `lua_connected` is set. |
+
+### Lua API
+
+[`client/lib/mailbox.lua`](../client/lib/mailbox.lua) is the Lua side. It only
+touches memory through the object it is given (`read8` / `write8`, which is
+mGBA's `emu` in the emulator and a table in tests), with the base address
+`symbols["gCoopMailbox"].addr`.
+
+| Function | Ring | Behavior |
+| --- | --- | --- |
+| `Mailbox.new(mem, baseAddr)` | none | Wraps the mailbox. Reads nothing. |
+| `:check()` | header | Returns `true, message`, or `false, message` if the magic, `layoutVersion` or `rom_ready` is wrong. |
+| `:setLuaConnected(bool)` | header | Sets or clears `lua_connected`, keeping the other bits. |
+| `:pop()` | outbound | Returns `{type, payload}` (payload as a byte string) or `nil` when empty, then advances `outbound.tail`. |
+| `:push(type, payload)` | inbound | Fills the slot (zero-padded) and then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
+| `encodePresence(t)` / `decodePresence(bytes)` | none | Convert between a [presence payload](#presence-payload) and a table; `slot` is present only in the 14-byte form. Return `nil, error` on bad input. |
+
+Both ring calls read `head` and `tail` from memory every time and return an
+error if either is above 15, so a reset mailbox is never read with stale
+indices.
 
 [mailbox_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
 [mailbox_c]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
