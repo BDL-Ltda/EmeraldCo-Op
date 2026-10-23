@@ -408,6 +408,47 @@ tests["no more than the budget is sent in one clock second"] = function()
 	h.eq(sent[#sent].x, 40)
 end
 
+tests["a socket that blocked for seconds does not release a burst"] = function()
+	-- Davi's reproduction: 3.3 s of AGAIN while the player keeps moving, then
+	-- the socket takes everything again. Count what is actually transmitted.
+	local w = joined()
+	local sent = {} -- { at = ms, count = complete messages } per update
+	local function step(ms, s)
+		w.step(ms, s)
+		sent[#sent + 1] = { at = w.now, count = #w.sock().take() }
+	end
+	w.sock().sendError = AGAIN
+	for i = 1, 100 do step(33, state(5 + i)) end
+	w.sock().sendError = nil
+	step(1)
+	assert(sent[#sent].count <= 2, "released " .. sent[#sent].count .. " messages at once")
+	for i = 1, 200 do step(16, state(200 + i % 2)) end
+	assert(w.client:isConnected())
+	for i, first in ipairs(sent) do
+		local total = 0
+		for j = i, #sent do
+			if sent[j].at - first.at >= 1000 then break end
+			total = total + sent[j].count
+		end
+		assert(total < 50, total .. " messages within one second from " .. first.at .. " ms")
+	end
+end
+
+tests["the latest state is sent once a blocked socket drains"] = function()
+	local w = joined()
+	w.sock().sendError = AGAIN
+	for i = 1, 50 do w.step(33, state(5 + i)) end
+	w.step(33, state(5, 3, 1, { visible = false }))
+	w.step(33, { visible = false })
+	w.sock().sendError = nil
+	for _ = 1, 5 do w.step(33) end
+	local sent = w.sock().take()
+	local last = sent[#sent]
+	h.eq(last.type, "presence")
+	h.eq(last.visible, false)
+	assert(#sent <= 4, "sent " .. #sent .. " messages")
+end
+
 tests["fast-forward stays below the server's rate limit"] = function()
 	-- 8x speed: 477 frames per real second, a new tile every 8 frames, with
 	-- bridge.lua's clock. The server allows 50 messages per rolling second.

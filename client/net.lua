@@ -19,8 +19,9 @@ local M = {
 	MIN_PRESENCE_INTERVAL_MS = 30,
 	-- Messages sent per clock second (now // 1000). bridge.lua's clock keeps
 	-- that second within one wall-clock second (lib/netclock.lua), so any real
-	-- second spans at most two of them: 40 messages, below the server's 50,
-	-- even when fast-forward runs many frames per real second.
+	-- second spans at most two of them: 40 messages, plus at most one held
+	-- back by a blocked socket, below the server's 50, even when fast-forward
+	-- runs many frames per real second.
 	MAX_MESSAGES_PER_SECOND = 20,
 	-- Bytes received per receive() call.
 	RECEIVE_CHUNK = 4096,
@@ -136,6 +137,15 @@ function M.new(config, env)
 			budgetSecond, sentThisSecond = now // 1000, 0
 		end
 		return sentThisSecond < M.MAX_MESSAGES_PER_SECOND
+	end
+
+	-- A new ping or presence is only queued once everything before it has gone
+	-- out. Messages are then counted when they are transmitted, so a socket
+	-- that blocked for seconds can't release a backlog above the budget, and
+	-- the latest state waits in `state` instead of the send buffer.
+	local function readyToSend()
+		flush()
+		return sock ~= nil and outbox == "" and canSend()
 	end
 
 	local function send(message)
@@ -294,12 +304,12 @@ function M.new(config, env)
 			return
 		end
 		if joined then
-			if (not lastPingAt or now - lastPingAt >= M.PING_INTERVAL_MS) and canSend() then
+			if (not lastPingAt or now - lastPingAt >= M.PING_INTERVAL_MS) and readyToSend() then
 				lastPingAt = now
 				send(protocol.ping(now))
 			end
-			if sock and state and state.mapGroup ~= nil and not samePresence(state, lastSent)
-				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) and canSend() then
+			if state and state.mapGroup ~= nil and not samePresence(state, lastSent)
+				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) and readyToSend() then
 				local reason = protocol.checkPresenceState(state)
 				if reason then
 					-- Remembered as sent so it is skipped (and logged) once, not every frame.
