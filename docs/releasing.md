@@ -31,6 +31,8 @@ Commands below use a POSIX shell. In PowerShell, use `Get-FileHash -Algorithm
 SHA1 <file>` instead of `sha1sum`.
 
 Release versions follow the milestones: `vX.Y`, for example `v0.1`.
+The first presence release is **`v1.0`**; use the
+[v1 checklist and notes template](release-v1.md) for #27.
 
 ## 1. Build the ROM at the release commit
 
@@ -39,7 +41,8 @@ local changes:
 
 ```sh
 git checkout master
-git pull
+git pull --ff-only
+git submodule sync --recursive
 git submodule update --init --recursive
 git status --short          # must print nothing
 git submodule status        # no leading '+' or '-'
@@ -54,10 +57,17 @@ docker compose run --build --rm rom
 The build prints the SHA1 of `rom/pokeemerald_modern.gba`. Write it down: it
 goes in the release notes.
 
-`client/addresses.lua` must have been generated from this exact build. CI
-checks this once the freshness check from #5 exists. Until then, run the
-`symgen` command from the pre-commit skill and confirm
-`git diff --exit-code client/addresses.lua` passes.
+`client/addresses.lua` must have been generated from this exact build. The ROM
+CI job already rebuilds and checks its freshness. Verify locally too:
+
+```sh
+go run ./cmd/symgen -elf rom/pokeemerald_modern.elf -rom rom/pokeemerald_modern.gba -out client/addresses.lua
+git diff --exit-code -- client/addresses.lua
+```
+
+If it differs, stop: fix and review the generated file through a PR, then
+restart from the merged commit. Do not publish a client archive from a dirty
+checkout or tag an unmerged preparation branch.
 
 ## 2. Create the patch
 
@@ -102,7 +112,8 @@ from this same commit. Always publish the patch and the client together.
 
 ## 4. Publish the GitHub Release
 
-Create a release with tag `vX.Y` on the release commit and attach both files:
+Prepare a **draft** release with tag `vX.Y` targeting the exact, reviewed
+release commit and attach both files:
 
 - `emerald-coop-vX.Y.bps`
 - `emerald-coop-vX.Y-client.zip`
@@ -111,7 +122,7 @@ Use the GitHub web UI (**Releases → Draft a new release**, create the tag on
 the release commit) or the GitHub CLI:
 
 ```sh
-gh release create vX.Y --target "$(git rev-parse HEAD)" --title "vX.Y" \
+gh release create vX.Y --draft --target "$(git rev-parse HEAD)" --title "vX.Y" \
   --notes-file notes.md emerald-coop-vX.Y.bps emerald-coop-vX.Y-client.zip
 ```
 
@@ -138,8 +149,28 @@ Follow docs/installing.md. You need your own Pokémon Emerald (USA) ROM.
 Never attach a `.gba`, `.elf`, `.map`, save file or anything containing a join
 key or IP address.
 
+Inspect the draft's target commit, notes, ZIP entries and attachments. The ZIP
+must contain `client/bridge.lua`, `client/addresses.lua`, `client/net.lua`,
+`client/config.example.lua` and `client/lib/`, with no private `config.lua`.
+Extract it in a clean ASCII-only directory and compare `addresses.lua` to the
+release commit. When both assets and hashes are verified, publish the draft:
+
+```sh
+gh release edit vX.Y --draft=false
+```
+
+Creating a draft prepares the release; it does not satisfy the published-release
+acceptance criterion. Do not move or replace a published tag to fix a defect;
+record it and release a corrected version.
+
 ## 5. Check the release
 
 Download both files from the release page (not your local copies), follow
 [installing.md](installing.md), and confirm the SHA1 matches the release notes.
 For a milestone release, ask another developer to do this too.
+
+For **v1.0**, all three developers must install only the downloaded release
+patch and client, then play together over the internet for **20+ minutes**.
+Use the [session checklist](release-v1.md#release-only-acceptance-session).
+Publishing the assets can happen before that session; the session,
+retrospective and v1.5 scheduling keep #27 open until completed.
