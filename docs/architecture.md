@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay, terminal fake client, Lua client networking and the ROM side of the Lua/ROM mailbox are available, including a text-panel debug view of remote players in mGBA (see [client/README.md](../client/README.md#debug-panel-03)). The rest of the ROM co-op behavior described here remains planned. See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay, terminal fake client, Lua client networking the ROM side of the Lua/ROM mailbox and the ROM rendering of remote players from the inbound ring ([issue #25](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/25)) are available, including a text-panel debug view of remote players in mGBA (see [client/README.md](../client/README.md#debug-panel-03)). The rest of the ROM co-op behavior described here remains planned. See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
@@ -55,7 +55,7 @@ Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a 
 
 ## Remote players in the overworld (0.4)
 
-The ROM draws each remote player as a normal object event with a reserved local ID, updated every frame from `CB1_Overworld`, with collision and interaction turned off for those objects. [remote-player-design.md](remote-player-design.md) records how, the risks, and the module layout for publishing presence and rendering remote players.
+The ROM draws each remote player as a normal object event with a reserved local ID, updated every frame from `CB1_Overworld`, with collision and interaction turned off for those objects. [remote-player-design.md](remote-player-design.md) records how, the risks, and the module layout for publishing presence and rendering remote players. The rendering side lives in `rom/src/coop/remote_players.c` (issue #25); how Lua addresses remote slots is in [memory-map.md](memory-map.md#remote-slots).
 
 ## Networking, identity and hosting
 
