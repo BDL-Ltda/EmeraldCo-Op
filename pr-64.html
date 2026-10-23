@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Mailbox Lua walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#64</span>
+  <h1>Lua can now read and write the ROM mailbox</h1>
+  <p class="lede">A pure Lua module, <code>client/lib/mailbox.lua</code>, that checks <code>gCoopMailbox</code>, pops ROM messages, pushes messages to the ROM and encodes the <code>PRESENCE</code> payload. It reaches memory only through an injected <code>read8</code>/<code>write8</code>, so CI tests it with a plain Lua table.</p>
+  <div class="meta">
+    <span>closes <b>#23</b></span>
+    <span>branch <b>feat/23-mailbox-lua</b></span>
+    <span>files <b>3</b></span>
+    <span>lines <b>+534 / −1</b></span>
+    <span>milestone <b>0.4 In-game presence</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>The Lua half of the mailbox</h2>
+    <p>From 0.4 the ROM owns co-op behaviour and Lua is a dumb pipe between <code>gCoopMailbox</code> and the socket. #22 added the ROM half: a header and two 16-slot rings in EWRAM. This PR adds the Lua half. Wiring it to the socket is left to #26.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">ROM, mailbox, Lua client, server</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="The ROM writes the outbound ring and reads the inbound ring; mailbox.lua reads outbound and writes inbound through injected memory; bridging to the server is #26.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="560" height="280" rx="10"/>
+      <text class="t-zone" x="30" y="38">MGBA · EMULATED GBA</text>
+      <g class="step" style="--i:0">
+        <rect class="box" x="30" y="110" width="170" height="80" rx="6"/>
+        <text class="t-mono" x="46" y="140">ROM (C)</text>
+        <text class="t-sub" x="46" y="160">CoopMailbox_Push</text>
+        <text class="t-sub" x="46" y="178">CoopMailbox_Pop</text>
+      </g>
+      <g class="step" style="--i:1">
+        <rect class="box" x="250" y="60" width="290" height="60" rx="6"/>
+        <text class="t-mono" x="266" y="86">outbound ring · ROM → Lua</text>
+        <text class="t-sub" x="266" y="106">ROM writes head, Lua writes tail</text>
+        <rect class="box" x="250" y="180" width="290" height="60" rx="6"/>
+        <text class="t-mono" x="266" y="206">inbound ring · Lua → ROM</text>
+        <text class="t-sub" x="266" y="226">Lua writes head, ROM writes tail</text>
+        <text class="t-sub" x="266" y="154">gCoopMailbox · header COOP v1</text>
+        <path class="edge" d="M200 130L246 96" marker-end="url(#m-a)"/>
+        <path class="edge" d="M246 210L200 172" marker-end="url(#m-a)"/>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box pub" x="620" y="110" width="200" height="80" rx="6"/>
+        <text class="t-mono t-em" x="636" y="140">mailbox.lua</text>
+        <text class="t-sub" x="636" y="160">check · pop · push</text>
+        <text class="t-sub" x="636" y="178">encode/decodePresence</text>
+        <path class="edge em flow" d="M540 92L616 128" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M616 172L544 208" marker-end="url(#m-ae)"/>
+      </g>
+      <g class="step" style="--i:3">
+        <rect class="box dim" x="860" y="120" width="120" height="60" rx="6"/>
+        <text class="t-mono" x="876" y="146">socket</text>
+        <text class="t-sub" x="876" y="166">#26</text>
+        <path class="edge ret" d="M820 150H856" marker-end="url(#m-a)"/>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added by this PR</span><span><i class="m"></i>existing or later</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>Slot first, index last</h2>
+    <p>Each ring has one writer and one reader, so there are no locks. Lua's frame callback can fire while the ROM is halfway through a mailbox call. Correctness then rests on ordering: the writer fills the whole slot before it moves <code>head</code>, and the reader copies the slot before it moves <code>tail</code>. <code>push</code> and <code>pop</code> follow the same rules as the C side and read both indices from memory on every call.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">push() into the inbound ring, then the ROM pops it</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 340" role="img" aria-label="Lua reads head and tail, returns false if full, writes 32 slot bytes, then advances head; the ROM later reads the slot and advances tail.">
+      <defs>
+        <marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="s-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="s-ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah bad" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="box pub" x="80" y="20" width="200" height="44" rx="6"/><text class="t-mono t-em" x="96" y="48">mailbox.lua</text>
+      <rect class="box" x="400" y="20" width="200" height="44" rx="6"/><text class="t-mono" x="416" y="48">inbound ring</text>
+      <rect class="box" x="720" y="20" width="200" height="44" rx="6"/><text class="t-mono" x="736" y="48">ROM</text>
+      <path class="life" d="M180 64V330"/><path class="life" d="M500 64V330"/><path class="life" d="M820 64V330"/>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="150" cy="96" r="11"/><text class="badge-t" x="146" y="101">1</text>
+        <path class="edge" d="M180 96H496" marker-end="url(#s-a)"/>
+        <text class="t-sub" x="200" y="88">read head 0x208, tail 0x209</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge bad" d="M180 132H60" marker-end="url(#s-ab)"/>
+        <text class="t-sub t-bad" x="20" y="124">(head+1)%16 == tail</text>
+        <text class="t-sub t-bad" x="20" y="152">→ false, "ring full"</text>
+      </g>
+      <g class="step" style="--i:2">
+        <circle class="badge" cx="150" cy="176" r="11"/><text class="badge-t" x="146" y="181">2</text>
+        <path class="edge em flow" d="M180 176H496" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="200" y="168">write type, length, 30 payload bytes (zero-padded)</text>
+      </g>
+      <g class="step" style="--i:3">
+        <circle class="badge" cx="150" cy="226" r="11"/><text class="badge-t" x="146" y="231">3</text>
+        <path class="edge em" d="M180 226H496" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="200" y="218">then head = (head + 1) % 16</text>
+      </g>
+      <g class="step" style="--i:4">
+        <circle class="badge" cx="850" cy="276" r="11"/><text class="badge-t" x="846" y="281">4</text>
+        <path class="edge ret" d="M820 276H504" marker-end="url(#s-a)"/>
+        <text class="t-sub" x="520" y="268">CoopMailbox_Pop: copy slot, then tail++</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>The PRESENCE payload</h2>
+    <p>No C header defined this payload yet, so this PR sets the layout and records it in <code>docs/memory-map.md#presence-payload</code>. It is little-endian, packed with <code>string.pack("&lt;BBi2i2BBBI4")</code>, and sits at slot offset <code>0x02</code>. The example bytes are the test vector from <code>mailbox_test.lua</code> (map 0:9, x 7, y −1, facing east, visible, female, trainer ID <code>0xDEADBEEF</code>). Click a field.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-title="mapGroup · 0x00" data-value="u8 = 00" data-text="Map group, the same value Lua read from SaveBlock1 in 0.1–0.3."><small>mapGroup</small>00</button>
+      <button class="seg" type="button" data-title="mapNum · 0x01" data-value="u8 = 09" data-text="Map number. 0:9 is Littleroot Town."><small>mapNum</small>09</button>
+      <button class="seg" type="button" data-title="x · 0x02" data-value="s16 LE = 07 00 → 7" data-text="Map coordinate, currentCoords.x − MAP_OFFSET. Signed, because the player can stand at −1 on a map edge."><small>x</small>07 00</button>
+      <button class="seg" type="button" data-title="y · 0x04" data-value="s16 LE = ff ff → −1" data-text="Map coordinate, currentCoords.y − MAP_OFFSET."><small>y</small>ff ff</button>
+      <button class="seg" type="button" data-title="facing · 0x06" data-value="u8 = 04 → east" data-text="DIR_*: 1 south, 2 north, 3 west, 4 east. Encode rejects anything else."><small>facing</small>04</button>
+      <button class="seg" type="button" data-title="visible · 0x07" data-value="u8 = 01 → true" data-text="1 visible, 0 hidden. Lua exposes it as a boolean."><small>visible</small>01</button>
+      <button class="seg" type="button" data-title="gender · 0x08" data-value="u8 = 01 → FEMALE" data-text="Picks the Brendan or May sprite in #25."><small>gender</small>01</button>
+      <button class="seg wide" type="button" data-title="trainerId · 0x09" data-value="u32 LE = ef be ad de → 0xDEADBEEF" data-text="Not aligned to 4 inside the slot, so the ROM must copy it byte by byte or with memcpy, never through a u32 pointer."><small>trainerId</small>ef be ad de</button>
+      <button class="seg crc" type="button" data-selected data-title="slot · 0x0D (inbound only)" data-value="u8, 0–3" data-text="Remote player slot that Lua assigns per playerId (#25). Outbound payloads are 13 bytes and have no slot. Inbound payloads are 14 bytes. Readers ignore bytes they don't know, so fields can be appended later."><small>slot</small>inbound</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Three choices worth checking</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Memory is injected, never global</h3>
+      <div class="term">
+        <div>local box = mailbox.new(emu, addresses</div>
+        <div>  .symbols.gCoopMailbox.addr)</div>
+        <div><span class="c"># tests pass a table with read8/write8</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>Required by the issue and by AGENTS.md (<code>client/lib/</code> stays pure). The same object shape as <code>emu</code> means #26 can pass <code>emu</code> straight in.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Slot index appended, not reserved up front</h3>
+      <div class="term">
+        <div>encodePresence{..., slot = 3}  <span class="c">-- 14 bytes</span></div>
+        <div>encodePresence{...}            <span class="c">-- 13 bytes</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>#25 needs a slot inbound and #24 has none to send. Adding it as the last byte keeps one shared layout and lets #25 use it without a layout change. Please confirm on the PR.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Indices re-read and range-checked on every call</h3>
+      <div class="term">
+        <div>if head &gt;= 16 or tail &gt;= 16 then</div>
+        <div>  return nil, "...out of range..."</div>
+      </div>
+      <div class="why"><b>Why</b><p>A soft reset zeroes the mailbox. Caching <code>tail</code> or <code>head</code> in Lua would then read stale slots. An out-of-range index means the memory isn't a valid mailbox.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Fake memory in CI, real memory once</h2>
+    <p>23 new tests use fake memory and small helpers that do what <code>CoopMailbox_Push</code>/<code>Pop</code> do. They cover empty and full rings, wrap-around past slot 15, write order, magic, version and <code>rom_ready</code> mismatches, and a presence round trip. Then I booted the #22 ROM (whose SHA1 matches <code>addresses.lua</code>) in mGBA with <code>-g</code>, dumped <code>gCoopMailbox</code> with gdb, and ran the module over the dump.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> lua client/tests/run.lua</div>
+    <div style="--i:1" class="ok">150 passed, 0 failed (9 suites)</div>
+    <div style="--i:2"><span class="p">$</span> luacheck client/</div>
+    <div style="--i:3" class="ok">Total: 0 warnings / 0 errors in 23 files</div>
+    <div style="--i:4"><span class="p">$</span> lua check_dump.lua mailbox.bin   <span class="c"># gdb dump of the running ROM</span></div>
+    <div style="--i:5">gCoopMailbox at 0x0203CF6C, 1034 bytes; header 43 4f 4f 50 01 02 00 00</div>
+    <div style="--i:6" class="ok">true	mailbox ready (layout v1)</div>
+    <div style="--i:7">pop on fresh boot:	nil</div>
+    <div style="--i:8">flags after setLuaConnected(true): 0x03</div>
+    <div style="--i:9">push:	true</div>
+  </div>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with <code>client/lib/mailbox.lua</code> (<code>pop</code> and <code>push</code>), then the new <em>Presence payload</em> and <em>Lua API</em> sections of <code>docs/memory-map.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Do <code>pop</code> and <code>push</code> write only Lua-owned indices, and always after the slot?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is the PRESENCE layout (13 bytes out, 14 in with <code>slot</code>) something #24 and #25 can follow?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Are the <code>check()</code> error messages clear enough for a player who loaded the wrong ROM?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#26</b><span>Bridging the mailbox to the socket, and mapping the ROM's <code>visible</code> to the protocol's <code>visible</code>.</span></div>
+    <div class="limit"><b>#24</b><span>The ROM must push PRESENCE in this byte layout.</span></div>
+    <div class="limit"><b>#25</b><span>The ROM reads <code>slot</code> from inbound PRESENCE.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#64 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #23 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
