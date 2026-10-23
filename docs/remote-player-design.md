@@ -301,7 +301,8 @@ Mitigation for #25:
   free afterwards (`GetFirstInactiveObjectEventId` and a count). Remote players
   are the first thing to go.
 - **No spawns while a script runs** (`ArePlayerFieldControlsLocked()`): existing
-  remote objects stay, frozen in place. New ones wait.
+  remote objects stay and get no new steps (a step already in progress finishes,
+  see [Scripted cutscenes](#scripted-cutscenes)). New ones wait.
 - Culling helps: a remote player out of view uses no slot.
 - `CreateSprite` can also fail (`MAX_SPRITES` = 64, shared with field effects).
   The spawn returns `OBJECT_EVENTS_COUNT` and the module retries.
@@ -311,12 +312,35 @@ and nothing crashes.
 
 ### Scripted cutscenes
 
-- `FreezeObjectEvents` (`src/event_object_movement.c`) freezes every object
-  except the player when a script locks the field, including remote players.
-  `ObjectEventSetHeldMovement` calls `UnfreezeObjectEvent`, so moving a remote
-  player would unfreeze it during the scene. Rule: **while
-  `ArePlayerFieldControlsLocked()` is true, don't move remote players**; apply
-  the latest position after the script ends (teleport if needed).
+- `FreezeObjectEvents` (`src/event_object_movement.c`) runs `FreezeObjectEvent`
+  on every object except the player when a script, battle or the start menu
+  locks the field. It does **not** freeze everything:
+  - `FreezeObjectEvent` returns early when `heldMovementActive` is set, without
+    setting `frozen` or pausing the sprite animation. A remote player with a
+    held movement is skipped, and so is one whose step has finished but not
+    been cleared yet (`heldMovementActive` stays set until
+    `ObjectEventClearHeldMovementIfFinished`).
+  - `UpdateObjectEventCurrentMovement` runs the held action **before** it checks
+    `frozen`. So a walk already in progress when the lock starts keeps playing:
+    it finishes its 16 frames and ends on the target tile. (`currentCoords`
+    already holds that tile, since it changes when the step starts.)
+  - Only an idle remote object with no held movement is really frozen.
+  - `ObjectEventSetHeldMovement` calls `UnfreezeObjectEvent`, so starting a step
+    would also unfreeze a frozen remote player during the scene.
+
+  Rule for #25: **while `ArePlayerFieldControlsLocked()` is true, start no new
+  step, turn or teleport, and let a step in progress finish.** Don't cancel it:
+  `ObjectEventClearHeldMovement` stops the sprite between two tiles while
+  `currentCoords` already names the target, and the next teleport would snap
+  it. Call `ObjectEventClearHeldMovementIfFinished` only once the lock ends,
+  then apply the latest position as usual (walk if one tile away, otherwise
+  teleport). Vanilla NPCs behave the same way: an NPC caught mid-step when a
+  script starts also finishes its step. At most 15 frames of remote movement
+  play after the lock, which is accepted for v1.
+- Validation cases for #25: the lock starts **mid-step** (talk to an NPC, open
+  the start menu, and trigger a trainer battle, each while a remote player is
+  walking). The step must finish on its target tile, the remote player must not
+  move again until the lock ends, and must then catch up to its latest position.
 - Scripted movement of the player (`applymovement`) doesn't check collision, so
   remote players never block a cutscene.
 - Scripts address objects by local ID 1–64, 127 or 255, never 228–231.
@@ -476,9 +500,9 @@ For the reviewers before #24 and #25 start:
    reading a sign or using the start menu. The alternative is to send `false`
    only for battles and warps, which needs per-exit hooks. Is "hidden while
    busy" acceptable for v1?
-2. **Frozen during cutscenes.** Section 6 stops moving remote players while a
-   script runs and catches them up afterwards. OK, or should they be hidden
-   during scripts?
+2. **Held during cutscenes.** Section 6 lets a step in progress finish, then
+   starts no new movement while a script runs and catches them up afterwards.
+   OK, or should they be hidden during scripts?
 3. **Slot reserve of 2.** Is two free object slots the right margin, or should
    #25 measure the busiest maps first?
 4. **`PALSLOT_NPC_SPECIAL` clash** with an opposite-gender remote player and a
