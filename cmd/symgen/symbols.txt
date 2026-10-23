@@ -1,17 +1,3 @@
-# Global symbols exported to the Lua client, one C identifier per line.
-# Add data objects. Add a function only when the client compares it with a
-# function pointer stored in RAM (for example gMain.callback2). Thumb function
-# values keep their state bit (bit 0) in the ELF; symgen exports them verbatim,
-# which is exactly the value the game stores in such pointers.
-# A file-static symbol is allowed only if its name is unique in the ELF; symgen
-# fails on conflicting duplicates, so a rename or clash breaks loudly.
-# Keep struct field offsets in docs/memory-map.md, not in this allowlist.
-gObjectEvents
-gPlayerAvatar
-gSaveBlock1Ptr
-gSaveBlock2Ptr
-gMain
-CB1_Overworld
-CB2_Overworld
-sPlayTimeCounterState
+# Global symbols used by the Lua client, one C identifier per line.
+# The ROM owns game-struct reads from milestone 0.4 onward.
 gCoopMailbox

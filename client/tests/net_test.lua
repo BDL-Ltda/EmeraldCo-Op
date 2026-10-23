@@ -365,9 +365,8 @@ tests["net.lua does not use mGBA globals"] = function()
 	end
 end
 
-tests["a throttled hidden presence after a soft reset is still sent"] = function()
-	-- joined() sent the first presence at 16 ms. memory.lua reports the hidden
-	-- tuple once, inside the throttle window, then no position at all.
+tests["a throttled hidden presence survives a later no-position sample"] = function()
+	-- Keep the hidden tuple while it waits behind the send throttle.
 	local w = joined()
 	w.step(16, state(5, 3, 1, { visible = false }))
 	for _ = 1, 1000 do w.step(16, { visible = false }) end

@@ -162,7 +162,7 @@ function M.hello(playerId, joinKey, trainerId, gender, clientVersion)
 		trainerId = trainerId, gender = gender, clientVersion = clientVersion }
 end
 
--- state: memory.lua's getPlayerState() result with every position field set.
+-- state: decoded outbound mailbox presence with every position field set.
 function M.presence(playerId, state)
 	return { v = M.VERSION, type = "presence", playerId = playerId, mapGroup = state.mapGroup,
 		mapNum = state.mapNum, x = state.x, y = state.y, facing = state.facing, visible = state.visible }

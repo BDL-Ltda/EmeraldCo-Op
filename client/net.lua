@@ -1,4 +1,4 @@
--- Network client for milestone 0.2 (#17): connects to the relay server, sends
+-- Network client: connects to the relay server, sends
 -- hello, presence on change or every 10 s and a ping every 5 s, and logs
 -- the other players. Protocol: docs/protocol.md.
 --
@@ -283,11 +283,9 @@ function M.new(config, env)
 			M.CLIENT_VERSION))
 	end
 
-	-- Called once per game loop with memory.lua's getPlayerState().
+	-- Called when the ROM publishes a local mailbox presence.
 	function client.setPlayerState(_, s)
-		-- A sample without a position must not replace one that is still waiting
-		-- for the throttle or the budget: after a soft reset memory.lua reports
-		-- the last position as hidden only once, then no position at all.
+		-- Keep the latest mailbox snapshot while a socket send is throttled.
 		if s.mapGroup ~= nil or not state or state.mapGroup == nil or samePresence(state, lastSent) then
 			state = s
 		end
@@ -324,9 +322,7 @@ function M.new(config, env)
 				lastPingAt = now
 				send(protocol.ping(now))
 			end
-			-- After reset, memory.lua drops its position after reporting hidden
-			-- once. Renew that last transmitted hidden tuple until a fresh state
-			-- exists; never turn it visible or resurrect it across reconnects.
+			-- Renew the last valid mailbox tuple while the ROM is idle.
 			local presenceState = state and state.mapGroup ~= nil and state or lastSent
 			local refreshDue = lastPresenceAt and now - lastPresenceAt >= M.PRESENCE_REFRESH_MS
 				and not protocol.checkPresenceState(presenceState)

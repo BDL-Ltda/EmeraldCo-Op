@@ -90,6 +90,10 @@ function Mailbox:setLuaConnected(connected)
 	self:write8(LAYOUT.flags, flags)
 end
 
+function Mailbox:isLuaConnected()
+	return self:read8(LAYOUT.flags) & M.FLAG_LUA_CONNECTED ~= 0
+end
+
 local function nextIndex(index)
 	return (index + 1) % LAYOUT.slotCount
 end

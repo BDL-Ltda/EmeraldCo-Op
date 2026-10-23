@@ -1,8 +1,8 @@
 # ROM local presence (#24)
 
 The ROM publishes local state through `COOP_MSG_PRESENCE` in the outbound
-mailbox. It does not connect to the server or draw remote players. Socket
-integration belongs to #26; remote rendering belongs to #25.
+mailbox. It does not connect to the server or draw remote players; the Lua
+bridge handles the socket and the ROM remote-player module handles rendering.
 
 ## Publishing rules
 
@@ -34,10 +34,10 @@ The [13-byte layout](memory-map.md#presence-payload) is shared with
 assertions prevent accidental padding. No mailbox layout version bump is
 needed: the existing `PRESENCE` contract is being implemented.
 
-This ROM visibility means **controllable overworld**, not the older direct
-memory reader's "game session running" semantics. The existing bridge still
-uses that reader until #26; it is unchanged by #24. The network client's
-10-second presence renewal remains separate from this change-only ROM stream.
+This ROM visibility means **controllable overworld**, unlike the older direct
+memory reader's "game session running" semantics. The bridge now consumes the
+mailbox stream. The network client's 10-second presence renewal remains
+separate from this change-only ROM stream.
 
 ## Automated tests
 

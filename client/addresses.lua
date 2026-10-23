@@ -3,14 +3,6 @@ return {
   romSha1 = "ab60e843b809acf58943b8e90b156a3554deaade",
   romCrc32 = "97387731",
   symbols = {
-    ["CB1_Overworld"] = { addr = 0x0813D191, size = 40 },
-    ["CB2_Overworld"] = { addr = 0x0813D211, size = 108 },
     ["gCoopMailbox"] = { addr = 0x0203CF6C, size = 1034 },
-    ["gMain"] = { addr = 0x030036CC, size = 1084 },
-    ["gObjectEvents"] = { addr = 0x02006620, size = 576 },
-    ["gPlayerAvatar"] = { addr = 0x02006860, size = 36 },
-    ["gSaveBlock1Ptr"] = { addr = 0x030071F0, size = 4 },
-    ["gSaveBlock2Ptr"] = { addr = 0x030071F4, size = 4 },
-    ["sPlayTimeCounterState"] = { addr = 0x03000B56, size = 1 },
   },
 }
