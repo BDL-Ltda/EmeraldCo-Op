@@ -4,6 +4,7 @@
 -- Before doing anything else it loads config.lua and addresses.lua and checks
 -- that the loaded ROM is the exact build addresses.lua was generated from. On
 -- any problem it logs a clear error and stops; the game keeps running normally.
+-- Then it reads the player state and connects to the server (net.lua).
 
 local DIR = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"
 
@@ -30,6 +31,8 @@ probe:close()
 package.path = DIR .. "lib/?.lua;" .. DIR .. "?.lua;" .. package.path
 local romcheck = require("romcheck")
 local memory = require("memory")
+local net = require("net")
+local netclock = require("netclock")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -62,6 +65,27 @@ if not addresses then
 	return
 end
 
+-- The network client, or nil when config.lua's network settings are invalid:
+-- the player state is still read and logged.
+local client, nerr = net.new(config, {
+	-- mGBA's connect blocks the emulator until it succeeds or fails.
+	connect = function(host, port)
+		local s = socket.tcp()
+		local ok, err = s:connect(host, port)
+		if not ok then
+			s:close()
+			return nil, err
+		end
+		return s
+	end,
+	again = socket.ERRORS.AGAIN,
+	log = function(line) console:log(line) end,
+	logError = function(line) console:error(line) end,
+})
+if not client then
+	fail(nerr)
+end
+
 -- Reads the player state once per game loop, but only while the loaded ROM is
 -- the verified build: on any other ROM the addresses mean nothing.
 local reader = nil
@@ -72,6 +96,9 @@ local function readState()
 		return
 	end
 	local state = reader.getPlayerState()
+	if client then
+		client:setPlayerState(state)
+	end
 	local line = memory.format(state)
 	if line ~= lastLine then
 		console:log(line)
@@ -93,6 +120,9 @@ end
 -- only read after the ROM is verified.
 local function verifyRom()
 	reader, lastLine, lastIdentity = nil, nil, nil
+	if client then
+		client:close("a game was loaded")
+	end
 	local ok, msg = romcheck.verify(addresses.romCrc32, emu:checksum())
 	if not ok then
 		fail(msg)
@@ -106,13 +136,36 @@ local function verifyRom()
 	end
 end
 
+-- The network clock advances one frame (about 16.7 ms) per frame but never
+-- runs ahead of the wall clock, so fast-forward can't break the server's
+-- per-second limit (lib/netclock.lua). Socket events are only polled once per
+-- frame, so a finer clock would not measure latency any better.
+local clock = netclock.new()
+local function updateNet()
+	local now = clock:tick(os.time())
+	if client and reader then
+		client:update(now)
+	end
+end
+
+local function stopNet()
+	if client then
+		client:close("emulation stopped")
+	end
+end
+
 console:log("[bridge] Emerald Co-Op bridge started")
 callbacks:add("start", verifyRom)
+callbacks:add("stop", stopNet)
+callbacks:add("shutdown", stopNet)
 -- Not "frame": a heavy game loop (map loads, route-edge crossings, save block
 -- moves) can run past the end of a frame, so a frame callback can see memory
 -- half updated. The game reads the keypad only at the top of its main loop,
 -- when the previous iteration is complete (see docs/memory-map.md).
 callbacks:add("keysRead", readState)
+-- Networking only moves bytes and the last state read above, so it runs every
+-- frame, like mGBA's own socket polling.
+callbacks:add("frame", updateNet)
 if emu then
 	verifyRom()
 end

@@ -133,7 +133,9 @@ In Go, `protocol.Decoder` reports these cases as errors matching `ErrVersionMism
 Lua's pure [JSON and framing modules](../client/README.md#pure-json-codec) decode
 the representation and split complete lines; they do not validate message
 fields. The shared Lua test runner round-trips every JSON example above and
-feeds them through arbitrary chunk splits. Lua network integration remains #17.
+feeds them through arbitrary chunk splits. The client's
+[network module](../client/README.md#networking) (`client/lib/protocol.lua`)
+validates every message it receives against the field rules above.
 
 ## Connection sequences
 

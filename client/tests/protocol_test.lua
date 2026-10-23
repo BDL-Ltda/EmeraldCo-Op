@@ -41,7 +41,7 @@ tests["all documentation messages survive arbitrary stream splits"] = function()
 end
 
 tests["pure transport modules do not mention platform globals"] = function()
-	for _, path in ipairs({ "client/lib/json.lua", "client/lib/framing.lua" }) do
+	for _, path in ipairs({ "client/lib/json.lua", "client/lib/framing.lua", "client/lib/protocol.lua" }) do
 		local source = assert(io.open(path, "r"))
 		local text = source:read("a")
 		source:close()

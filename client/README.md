@@ -54,13 +54,72 @@ position fields stay `nil` until the new session has a fresh snapshot. The
 rules and every offset are in
 [memory map: player state](../docs/memory-map.md#player-state).
 
+## Networking
+
+`net.lua` connects to the [relay server](../docs/server.md) with the settings in
+`config.lua` and speaks the [protocol](../docs/protocol.md). It waits until a
+game session is running, because `hello` carries the save's `trainerId` and
+`gender`. Then it:
+
+1. connects and sends `hello`;
+2. after `welcome`, sends `presence` whenever the tile, map, facing or
+   `visible` changes (at most once every 2 frames), and a `ping` every 5
+   seconds. It sends at most 20 messages per second, so even fast-forward
+   stays below the server's limit of 50. A change that has to wait is sent
+   once there is room, so the latest state (including `hidden`) always goes
+   out;
+3. logs the other players and the round-trip latency:
+
+```text
+[net] connecting to the server
+[net] connected; sending hello
+[net] joined as bernardo; 1 other player(s) online
+[remote] leo is here (trainerId 12345, gender 1)
+[remote] leo 0:9 7,5 WEST visible
+[remote] davi joined (trainerId 54321, gender 0)
+[remote] davi 1:4 12,8 NORTH visible
+[net] latency 42 ms
+[remote] davi left (disconnect)
+```
+
+Latency is logged on the first pong and then about once a minute (every pong
+with `DEBUG = true`). The network clock (`lib/netclock.lua`) advances one
+frame (about 16.7 ms) per frame, because mGBA only polls sockets once per
+frame, but never runs ahead of the wall clock. Under fast-forward it holds at
+the end of each real second, so pings, retries and the message budget keep
+real-time pace, and latency reads lower than it is.
+
+Socket reads and sends never wait. **Connecting does**: mGBA's `connect`
+blocks the game until it succeeds or fails, which on Windows takes about 2 s
+when no server is listening ([mGBA scripting](../docs/mgba-scripting.md#gotchas)).
+After a lost connection or a failed attempt the client retries every 5 seconds,
+so expect a short freeze every 5 s while the server is down.
+
+| Log | Meaning and what to do |
+| --- | --- |
+| `network disabled: <setting> ...` | A network setting in `config.lua` is invalid. The player state is still logged. Fix it and reload the script. |
+| `the server rejected this client: bad_key (...)` then `stopped` | Wrong `JOIN_KEY`. Fix `config.lua` and reload the script; it does not retry. |
+| `version_mismatch`, `bad_hello` or `another protocol version`, then `stopped` | Client and server are from different revisions. Update, then reload the script. |
+| `room_full` | Five players are already connected. Retried every 5 s. |
+| `disconnected: ...; retrying in 5 s` | The connection was lost; it reconnects with a new `hello`. |
+| `ignoring an invalid message from the server: ...` | The server sent a message that breaks the protocol rules. It is skipped; report it. |
+
+Loading another save (a new `trainerId` or `gender`) reconnects at once with a
+new `hello`; the server replaces the old connection. Logs never contain the
+join key, the server address or raw messages.
+
+To try it locally, run the server (see [server development](../docs/server.md))
+with `SERVER_HOST = "127.0.0.1"` in `config.lua`, load the bridge in two mGBA
+instances with different `PLAYER_ID`s, or in one plus a
+[fake client](../docs/fakeclient.md).
+
 ## Local configuration
 
 `config.example.lua` lists every setting: `SERVER_HOST`, `SERVER_PORT`,
 `PLAYER_ID`, `JOIN_KEY` and `DEBUG`. Your `config.lua` is ignored by Git. Set a
 unique `PLAYER_ID` and keep any real join key and server address private. The
-network settings are used by the network client
-([issue #17](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/17)).
+network settings are used by the [network client](#networking); `DEBUG = true`
+also logs each presence sent and every ping's latency.
 
 ## Generated addresses
 
@@ -77,13 +136,18 @@ the command, required build inputs, allowlist, validation and regeneration rules
 - `bridge.lua`: entry point loaded in mGBA.
 - `memory.lua`: reads the player state through the bus it is given (`emu` in
   mGBA). The only place with struct offsets, in one table at the top.
+- `net.lua`: the network client. It gets mGBA's socket, the console and a
+  clock from `bridge.lua`, so tests drive it with fakes.
 - `lib/`: pure modules (no `emu`, `socket` or `callbacks`), testable outside
-  mGBA. `romcheck.lua` compares the ROM hash; `json.lua` and `framing.lua`
-  provide the transport primitives described below.
+  mGBA. `romcheck.lua` compares the ROM hash; `netclock.lua` is the network
+  clock; `json.lua` and `framing.lua`
+  provide the transport primitives described below; `protocol.lua` builds the
+  client's messages and validates the server's.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
   folder, sorts suites and test names, prints pass/fail and exits non-zero on
-  failure. It includes ROM checks, fake-memory player-state checks and every
-  JSON example in `docs/protocol.md`.
+  failure. It includes ROM checks, fake-memory player-state checks, every
+  JSON example in `docs/protocol.md`, message validation and the network
+  client driven by a fake socket and clock.
 - `spike/`: the throwaway scripting spike from
   [issue #8](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/8).
 
@@ -134,8 +198,8 @@ There are no external dependencies.
 `encode` returns JSON text without LF; the network client must also enforce
 the outgoing line limit and add the separator. The codec handles JSON
 representation, not message validation. Checking version,
-required fields, ranges and unknown message types belongs to the network client
-in #17; these primitives do not add networking or change the wire protocol.
+required fields, ranges and unknown message types is `protocol.lua`'s job (see
+[Networking](#networking)).
 
 ## Pure line framing
 
