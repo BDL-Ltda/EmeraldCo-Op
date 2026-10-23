@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Remote Player Rendering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#65</span>
+  <h1>Remote players walk around inside the game</h1>
+  <p class="lede">The ROM reads the presence messages Lua writes into the mailbox and draws up to four other players as real Brendan/May overworld characters. They walk, turn and teleport, and you can walk through them.</p>
+  <div class="meta">
+    <span>closes <b>#25</b></span>
+    <span>branch <b>feat/25-render-remote-players</b></span>
+    <span>files <b>5 + 7 in rom/</b></span>
+    <span>lines <b>+395 / −12</b></span>
+    <span>milestone <b>0.4</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>The inbound ring finally has a reader</h2>
+    <p>#22 built <code>gCoopMailbox</code> with an inbound ring (Lua → ROM), and #23 defined the <code>PRESENCE</code> payload with a slot byte. Until now nothing in the ROM consumed it. This PR adds that consumer, <code>coop/remote_players.c</code>, called once per frame from <code>CB1_Overworld</code>. It follows the #21 design (<code>docs/remote-player-design.md</code>) without changes.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where #25 sits</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="Server to Lua client to the inbound ring of gCoopMailbox, read by the new remote_players module, which drives gObjectEvents.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="300" y="10" width="690" height="310" rx="10"/>
+      <text class="t-zone" x="320" y="38">MGBA · ONE PLAYER'S MACHINE</text>
+      <g class="step" style="--i:0">
+        <rect class="box dim" x="20" y="130" width="230" height="56" rx="6"/>
+        <text class="t-mono" x="36" y="154">Go relay server</text>
+        <text class="t-sub" x="36" y="174">presence of the others</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge" d="M250 158H336" marker-end="url(#m-a)"/>
+        <rect class="box dim" x="340" y="130" width="200" height="56" rx="6"/>
+        <text class="t-mono" x="356" y="154">Lua client</text>
+        <text class="t-sub" x="356" y="174">playerId → slot (#26)</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge" d="M540 158H586" marker-end="url(#m-a)"/>
+        <rect class="box" x="590" y="130" width="160" height="56" rx="6"/>
+        <text class="t-mono" x="606" y="154">inbound ring</text>
+        <text class="t-sub" x="606" y="174">gCoopMailbox (#22)</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge em flow" d="M750 158H786" marker-end="url(#m-ae)"/>
+        <rect class="box pub" x="790" y="120" width="180" height="76" rx="6"/>
+        <text class="t-mono t-em" x="806" y="146">remote_players.c</text>
+        <text class="t-sub" x="806" y="166">4 slots, every frame</text>
+        <text class="t-sub" x="806" y="184">from CB1_Overworld</text>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="edge em flow" d="M880 196V236" marker-end="url(#m-ae)"/>
+        <rect class="box" x="760" y="240" width="210" height="56" rx="6"/>
+        <text class="t-mono" x="776" y="264">gObjectEvents</text>
+        <text class="t-sub" x="776" y="284">local IDs 228–231</text>
+      </g>
+      <g class="step" style="--i:5">
+        <rect class="box pub" x="340" y="240" width="380" height="56" rx="6"/>
+        <text class="t-mono t-em" x="356" y="264">3 one-line hooks in event_object_movement.c</text>
+        <text class="t-sub" x="356" y="284">collision + A-button lookups skip remote objects</text>
+        <path class="edge em" d="M720 268H756" marker-end="url(#m-ae)"/>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added by this PR</span><span><i class="m"></i>already there / other issues</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>Drain, then reconcile every slot, every frame</h2>
+    <p>The module keeps no "spawned" flag. Each frame it finds slot <em>n</em>'s object by local ID <code>228 + n</code> and compares it with what the slot wants. The design calls this reconciliation: one rule handles camera culling, warps, battles, saves and Continue.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">CoopRemote_Update, per slot</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 420" role="img" aria-label="Flow: if Lua is not connected, despawn all. Otherwise pop messages, then per slot: not wanted means despawn; no object means try spawn; wrong graphics means despawn; otherwise step toward the target unless the field is locked.">
+      <defs>
+        <marker id="m-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-be" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <g class="step" style="--i:0">
+        <polygon class="gate" points="130,20 230,60 130,100 30,60"/>
+        <text class="t-mono" x="82" y="65">Lua on?</text>
+        <path class="edge" d="M230 60H316" marker-end="url(#m-b)"/>
+        <text class="t-sub" x="250" y="52">no</text>
+        <rect class="box" x="320" y="36" width="250" height="48" rx="6"/>
+        <text class="t-mono" x="334" y="65">DespawnAll + forget slots</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em" d="M130 100V136" marker-end="url(#m-be)"/>
+        <text class="t-sub" x="140" y="124">yes</text>
+        <rect class="box pub" x="30" y="140" width="250" height="48" rx="6"/>
+        <text class="t-mono t-em" x="44" y="169">Pop PRESENCE / LEAVE</text>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em" d="M280 164H336" marker-end="url(#m-be)"/>
+        <polygon class="gate" points="420,124 510,164 420,204 330,164"/>
+        <text class="t-mono" x="378" y="169">wanted?</text>
+        <text class="t-sub" x="430" y="236">used, visible, same map</text>
+        <path class="edge" d="M510 164H606" marker-end="url(#m-b)"/>
+        <text class="t-sub" x="530" y="156">no</text>
+        <rect class="box" x="610" y="140" width="170" height="48" rx="6"/>
+        <text class="t-mono" x="624" y="169">Despawn</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge em" d="M420 204V256" marker-end="url(#m-be)"/>
+        <polygon class="gate" points="420,260 510,300 420,340 330,300"/>
+        <text class="t-mono" x="384" y="305">object?</text>
+        <path class="edge" d="M330 300H246" marker-end="url(#m-b)"/>
+        <text class="t-sub" x="270" y="292">none</text>
+        <rect class="box pub" x="20" y="276" width="222" height="48" rx="6"/>
+        <text class="t-mono t-em" x="32" y="299">TrySpawn</text><text class="t-sub" x="32" y="316">in view, 2 slots stay free</text>
+      </g>
+      <g class="step" style="--i:4">
+        <path class="edge em" d="M510 300H606" marker-end="url(#m-be)"/>
+        <polygon class="gate" points="690,260 780,300 690,340 600,300"/>
+        <text class="t-mono" x="648" y="305">locked?</text>
+
+        <text class="t-sub" x="600" y="362">yes: wait, a step in progress finishes</text>
+      </g>
+      <g class="step" style="--i:5">
+        <path class="edge em flow" d="M780 300H816" marker-end="url(#m-be)"/>
+        <rect class="box pub" x="820" y="236" width="170" height="128" rx="6"/>
+        <text class="t-mono t-em" x="832" y="262">StepToward</text>
+        <text class="t-sub" x="832" y="286">same tile → turn</text>
+        <text class="t-sub" x="832" y="306">1 tile → walk</text>
+        <text class="t-sub" x="832" y="326">further → teleport</text>
+        <text class="t-sub" x="832" y="346">out of view → remove</text>
+      </g>
+      <g class="step" style="--i:6">
+        <text class="t-sub" x="20" y="400">A slot whose object has the wrong graphics (new player in the slot, or an object restored by Continue) is removed and respawned the next frame.</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>The inbound PRESENCE payload, as the ROM reads it</h2>
+    <p>14 bytes, little-endian and unaligned, so <code>remote_players.c</code> reads it byte by byte. Layout from <code>docs/memory-map.md</code> (#23). Click a field.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-title="mapGroup, mapNum" data-value="0x00, 0x01 · u8 each" data-text="Compared with gSaveBlock1Ptr->location. If they differ the remote is not drawn: v1 shows same-map players only, so crossing a route edge removes them."><small>map</small>00 01</button>
+      <button class="seg" type="button" data-title="x, y" data-value="0x02, 0x04 · s16 each" data-text="Map coordinates. The ROM adds MAP_OFFSET (7) to compare with ObjectEvent.currentCoords. 4-adjacent → walk, same tile → turn, anything else → teleport if in view, otherwise remove until it is."><small>position</small>02–05</button>
+      <button class="seg" type="button" data-title="facing" data-value="0x06 · u8, DIR_* 1–4" data-text="Applied with ObjectEventTurn when the remote is standing on its target. Values outside 1–4 become DIR_SOUTH."><small>facing</small>06</button>
+      <button class="seg" type="button" data-title="visible" data-value="0x07 · u8" data-text="0 hides the remote (battle, menu, warp fade on their side). The object is removed and comes back when visible is 1 again."><small>visible</small>07</button>
+      <button class="seg" type="button" data-title="gender" data-value="0x08 · u8, 0 MALE / 1 FEMALE" data-text="Same gender as the local player → player graphics (Brendan 0, May 89). Opposite gender → rival graphics (100, 105), because Brendan and May share palette slot 0 and the other one would repaint the local player."><small>gender</small>08</button>
+      <button class="seg" type="button" data-title="trainerId" data-value="0x09 · u32" data-text="Not used by the renderer."><small>trainerId</small>09–0C</button>
+      <button class="seg crc" type="button" data-selected data-title="slot" data-value="0x0D · u8, 0–3 · inbound only" data-text="Which remote slot this presence updates. Lua maps playerId → slot. Slot n is drawn as local ID 228 + n. A payload shorter than 14 bytes, or a slot above 3, is ignored. COOP_MSG_LEAVE (new, type 2) carries just this byte and frees the slot."><small>slot</small>0D</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Mostly the #21 design, plus three small calls</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>Locked field: let the step finish, start nothing</h3>
+      <div class="term">
+        <div><span class="c">// StepToward</span></div>
+        <div>if (ArePlayerFieldControlsLocked())</div>
+        <div>    return;</div>
+        <div>ObjectEventClearHeldMovementIfFinished(obj);</div>
+      </div>
+      <div class="why"><b>Why</b><p>This is the design's review fix. <code>FreezeObjectEvent</code> skips objects with <code>heldMovementActive</code>, so a step in progress keeps playing. Clearing it would stop the sprite between tiles while <code>currentCoords</code> already names the target. So the module returns before clearing anything and catches up after the lock.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Forget every slot when Lua disconnects</h3>
+      <div class="term">
+        <div><span class="c">// CoopRemote_DespawnAll</span></div>
+        <div>memset(sRemotes, 0, sizeof(sRemotes));</div>
+      </div>
+      <div class="why"><b>Why</b><p>A reconnect is a new session. Keeping old slots would draw players who may have left. Lua has to resend presence after reconnecting, which is documented in <code>memory-map.md</code>.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Create <code>coop/overworld.c</code> here</h3>
+      <div class="term">
+        <div>void CB1_Overworld(void) {</div>
+        <div>    ...</div>
+        <div class="ok">    CoopOverworld_Update();</div>
+        <div>}</div>
+      </div>
+      <div class="why"><b>Why</b><p>The design has #24 create it, but #24 and #25 are in progress at the same time. The hook sits outside the <code>callback2</code> check, as section 5 says, and the remote part checks <code>callback2</code> itself. #24 only needs to add <code>CoopPresence_Update();</code>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>A fake Lua client over mGBA's GDB stub</h2>
+    <p>A throwaway Go driver started the ROM in mGBA 0.10.5 with <code>-g</code>, loaded a save with a male player in Littleroot, wrote <code>PRESENCE</code>/<code>LEAVE</code> into the inbound ring (slot first, head last) and read <code>gObjectEvents</code> back. Excerpt of the real log:</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0" class="ok">PASS spawn slot 0 at (10,12) facing south, Brendan gfx    obj#4 (10,12) prev (10,12) f1 gfx 0</div>
+    <div style="--i:1" class="ok">PASS adjacent target starts a walk                        obj#4 (11,12) prev (10,12) f4 gfx 0 held=true</div>
+    <div style="--i:2" class="ok">PASS far target teleports to (5,10)                       obj#4 (5,10) prev (5,10) f1 gfx 0</div>
+    <div style="--i:3" class="ok">PASS female remote uses OBJ_EVENT_GFX_RIVAL_MAY_NORMAL    obj#5 (12,13) prev (12,13) f1 gfx 105</div>
+    <div style="--i:4" class="ok">PASS COOP_MSG_LEAVE frees slot 1                          none</div>
+    <div style="--i:5" class="ok">PASS player walks through the remote                      player (12,12), remote obj#4 (10,12)</div>
+    <div style="--i:6" class="ok">PASS start menu locks the field mid-step                  locked=true obj#4 (9,12) prev (8,12) f4 held=true</div>
+    <div style="--i:7" class="ok">PASS step in progress finishes on (9,12) during the lock  obj#4 (9,12) prev (9,12) f4 held=true</div>
+    <div style="--i:8" class="ok">PASS no new step while locked                             obj#4 (9,12) prev (9,12) f4 held=true</div>
+    <div style="--i:9" class="ok">PASS catches up to (10,12) after the lock ends            locked=false obj#4 (10,12) prev (10,12) f1</div>
+    <div style="--i:10" class="ok">PASS four remotes spawned, reserve kept                   spawned 4, free object slots 8</div>
+    <div style="--i:11" class="ok">PASS everything despawns when lua_connected drops         0 left</div>
+    <div style="--i:12" class="c">done at frame 1122, 0 failure(s)   # 27 checks in total</div>
+  </div>
+  <div class="term">
+    <div><span class="p">$</span> docker compose run --build --rm rom</div>
+    <div class="ok">668d4e0c3c2fe6ad0b37ac8e046619618d80b000  pokeemerald_modern.gba</div>
+    <div><span class="p">$</span> lua client/tests/run.lua</div>
+    <div class="ok">170 passed, 0 failed (11 suites)</div>
+    <div><span class="p">$</span> luacheck client/</div>
+    <div class="ok">Total: 0 warnings / 0 errors in 26 files</div>
+  </div>
+  <p class="small">Not covered locally: screenshots and video, trainer-battle and NPC-talk locks, Continue from a save with remotes on screen, and the rival palette clash. The two-player test (<code>needs:multiplayer-test</code>) is left to the humans in the PR body.</p>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Read <code>rom/src/coop/remote_players.c</code> first (<code>CoopRemote_Update</code> at the bottom, then <code>StepToward</code>), then the three hooks in <code>src/event_object_movement.c</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Is it right to keep processing despawns (map change, LEAVE, disconnect) while the field is locked, and only hold back spawns and moves?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is "forget all slots on disconnect" OK for #26, which must then resend every player's presence?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Does the <code>coop/overworld.c</code> split make merging #24 easy?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#24</b><span>Publishing local presence. Adds <code>CoopPresence_Update()</code> to <code>CoopOverworld_Update</code>.</span></div>
+    <div class="limit"><b>#26</b><span>Lua maps playerId → slot, sends LEAVE, and resends the latest presence when the ring was full (it is not drained during battles).</span></div>
+    <div class="limit"><b>v1 limits</b><span>Running and biking become teleports. No surf blob. Same-map only. Bridge elevation on teleport. Palette clash with special NPCs (design §6).</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#65 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #25 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
