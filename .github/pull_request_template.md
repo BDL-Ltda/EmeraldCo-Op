@@ -1,4 +1,7 @@
-Closes #<!-- Replace with the issue number. -->
+<!-- Use Refs for partial work. Use Closes only when the full issue scope and
+     acceptance requirements are complete. Verify actual GitHub closing links
+     after opening and again before merge; the description alone is not proof. -->
+Refs #<!-- Replace with the issue number. -->
 
 ## What
 
@@ -23,6 +26,7 @@ Closes #<!-- Replace with the issue number. -->
 - [ ] ROM build + addresses.lua regenerated (if rom changed)
 - [ ] Docs updated (if behavior/protocol/memory changed)
 - [ ] No forbidden files or secrets
+- [ ] Actual GitHub closing links match completed scope (see pre-commit skill, step 4)
 
 ## Definition of Done
 

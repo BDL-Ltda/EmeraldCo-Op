@@ -32,7 +32,9 @@ SHA1 <file>` instead of `sha1sum`.
 
 Release versions follow the milestones: `vX.Y`, for example `v0.1`.
 The first presence release is **`v1.0`**; use the
-[v1 checklist and notes template](release-v1.md) for #27.
+[v1 checklist and notes template](release-v1.md). v1.0 is already published;
+remaining release-only acceptance and retrospective work is tracked in
+[#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74).
 
 ## 1. Build the ROM at the release commit
 
@@ -144,6 +146,9 @@ Follow docs/installing.md. You need your own Pokémon Emerald (USA) ROM.
 - Commit: `<full commit hash>`
 - ROM submodule: `<output of git -C rom rev-parse HEAD>`
 - mGBA version: `<version pinned in the README>`
+
+## Acceptance status
+<link to the active acceptance tracker; list observed results and pending cases>
 ```
 
 Never attach a `.gba`, `.elf`, `.map`, save file or anything containing a join
@@ -173,4 +178,8 @@ For **v1.0**, all three developers must install only the downloaded release
 patch and client, then play together over the internet for **20+ minutes**.
 Use the [session checklist](release-v1.md#release-only-acceptance-session).
 Publishing the assets can happen before that session; the session,
-retrospective and v1.5 scheduling keep #27 open until completed.
+retrospective and v1.5 scheduling keep
+[#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74) open until completed.
+For preparation-only PRs, reviewers use the
+[closing-link check](../.claude/skills/pre-commit/SKILL.md#4-check-issue-closing-links)
+to confirm GitHub will leave that tracker open.

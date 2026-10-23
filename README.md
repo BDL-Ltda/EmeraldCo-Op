@@ -14,8 +14,9 @@ in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 Players should follow [Installing](docs/installing.md) and use the patch and
 client from the same release. The [v1 release checklist](docs/release-v1.md)
-tracks packaging and the pending release-only, three-developer acceptance
-session; earlier development playtests do not complete that session.
+records published v1.0 packaging and the pending release-only, three-developer
+acceptance session in [#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74);
+earlier development playtests do not complete that session.
 
 ## Repository layout
 
@@ -291,8 +292,10 @@ Follow the shared [pick-task](.claude/skills/pick-task/SKILL.md) and
   `chore(infra): 🔧 add repository skeleton`.
 - Run the available checks and the issue's manual test steps. Explain checks
   whose tooling does not exist yet in the PR.
-- Open a PR into `master`, include `Closes #N` and the manual test results, and
-  complete the template's Definition of Done checklist.
+- Open a PR into `master` with the manual test results and the template's
+  Definition of Done checklist. Use `Refs #N` for partial work; use `Closes #N`
+  only for completed issue scope. Follow the pre-commit skill's closing-link
+  review after opening and before merge.
 - Obtain one human approval and passing available CI, then merge with a merge commit.
 
 `master` is protected by a repository ruleset, with no bypass for admins:
