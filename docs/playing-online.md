@@ -3,9 +3,11 @@
 The MVP host is **leomayca's Windows PC**, using IPv4 port forwarding and a
 private shared join key. There is one room with at most five players. The
 [server](server.md) and [fakeclient](fakeclient.md) can test this path without
-a ROM or emulator. The mGBA client connects too and logs the other players in
-its scripting console ([client README](../client/README.md#networking)); remote
-players do not appear in the game itself until milestone 0.4.
+a ROM or emulator. The mGBA client bridges the ROM mailbox to the server, and
+the ROM renders remote Brendan/May avatars on the same map. The optional debug
+panel shows peer positions and connection state
+([client README](../client/README.md#networking)). v1 shares presence only;
+saves, battles and items stay local.
 
 **Validation status:** no CGNAT, confirmed by host **leomayca**. On 2026-10-19,
 leomayca reported a successful external fakeclient connection by
@@ -199,10 +201,13 @@ The installed Lua scripts and patched ROM must match; see
 - `DEBUG`: normally `false`; sanitize any logs before sharing.
 
 The host's own client can use `127.0.0.1`; peers on another network cannot.
-Once a game is running, the bridge connects with these settings and logs
-`[net] joined as <PLAYER_ID>`, then one `[remote]` line per move of each other
-player. See [the client README](../client/README.md#networking) for every log
-line and error.
+Once the ROM publishes valid player state, the bridge connects with these
+settings and logs `[net] joined as <PLAYER_ID>`. Remote avatars appear when
+players are on the same map, in view and object slots are available. Per-move
+`[remote]` console lines require `DEBUG = true`; the panel remains available
+with it disabled. See [the client README](../client/README.md#networking) for
+every log line and error. On disconnect the ROM hides peers on its next
+overworld update; reconnect restores current peers after the ROM resumes.
 
 ## Dynamic addresses and troubleshooting
 
@@ -222,7 +227,7 @@ If friends' addresses are allowlisted, update those restrictions when needed.
 | `bad_key` | Share the same key privately and restart the server/clients after rotation. |
 | `room_full` or a peer is replaced | At most five connections; use distinct player IDs. |
 | `version_mismatch` | Both developers should use compatible code from the same revision. |
-| Fakeclient works but no remote avatar in mGBA | Expected until milestone 0.4: remote players only appear as `[remote]` lines in the scripting console. |
+| Fakeclient works but no remote avatar in mGBA | Verify the matching release ROM/client, `ROM verified` / `mailbox ready` / joined logs, same map and nearby tiles. Return from menus to the overworld. Busy maps prioritize NPCs and retry remote spawns when slots are free. |
 
 ## Stop hosting and clean up
 

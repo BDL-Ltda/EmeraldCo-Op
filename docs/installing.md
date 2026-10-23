@@ -4,8 +4,10 @@ This guide is for players. Emerald Co-Op is distributed as a **`.bps` patch**
 that you apply to your own Pokémon Emerald ROM. We never distribute the game
 itself.
 
-Releases are published on the repository's
-[Releases page](https://github.com/BDL-Ltda/EmeraldCo-Op/releases). Each release
+Download a published release from the repository's
+[Releases page](https://github.com/BDL-Ltda/EmeraldCo-Op/releases). If there is
+no published release yet, installation from release artifacts is still pending;
+the source archives are not substitutes for the patch and client. Each release
 has two files:
 
 - `emerald-coop-vX.Y.bps`: the ROM patch.
@@ -82,6 +84,10 @@ under folders with accents, such as `C:\Users\Usuário\Downloads`. Inside its
 - The server and join-key settings: the host sends them to you privately. See
   [playing-online.md](playing-online.md).
 
+`PLAYER_ID` must contain 1–16 characters from `a-z`, `A-Z`, `0-9`, `_` or `-`.
+Leave `DEBUG = false` for normal play. Never load `debug/presence.lua` alongside
+`bridge.lua`: only one script may consume the ROM's outbound mailbox.
+
 Keep `config.lua` to yourself. Never post your join key or the server address
 in public.
 
@@ -91,10 +97,26 @@ in public.
 2. Open **Tools → Scripting...**.
 3. In the scripting window, choose **File → Load script...** and select
    `client/bridge.lua`.
+4. Start or continue a game and take a step. The bridge waits for the ROM to
+   publish a valid player identity before connecting. Look for `ROM verified`,
+   `mailbox ready` and `[net] joined as <PLAYER_ID>` in the log.
 
 The scripting window shows the client's log. If it reports a ROM mismatch, you
 loaded a ROM that doesn't match these scripts: patch the ROM again with the
 `.bps` from the same release.
+
+Players on the same map see each other's Brendan/May avatars when nearby.
+Adjacent steps use a walking animation; larger moves teleport. Avatars do not
+block players, and busy maps give NPCs priority. Battles, trading and shared
+items are outside v1. Select **Emerald Co-Op** in the Scripting buffer list to
+see connection status and peer positions. Its host address is private: redact
+it before sharing screenshots. See [Playing online](playing-online.md) if the
+client cannot join or no avatar appears.
+
+Load the bridge only once. Before reloading it, restart mGBA or use **File →
+Reset** in the Scripting window to avoid duplicate callbacks. For multiple
+instances, use separate client folders/configs and ROM/save paths so they do
+not write the same save.
 
 Your save stays on your computer: mGBA stores it next to the patched ROM, named
 after it. Emerald Co-Op only shares your position with other players.

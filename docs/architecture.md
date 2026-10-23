@@ -73,4 +73,9 @@ For the MVP, **leomayca hosts the server with port forwarding**. Access uses a *
 
 **Presence is the only synchronized state in v1.** Players see each other in the overworld; saves, battles and items stay local. PvP battles, trading and other shared gameplay belong to later versions and must be re-planned before implementation. See [ROADMAP.md](ROADMAP.md).
 
+The [v1 release checklist](release-v1.md) separates implementation validation
+from release acceptance: all three developers must install the published patch
+and client and play over the internet for at least 20 minutes. Earlier tests
+of development builds do not establish acceptance of the released artifacts.
+
 Never commit ROMs, saves, savestates, BIOS files, ELF/map build outputs or BPS patches. Build outputs remain local; `client/addresses.lua` is tracked generated data.

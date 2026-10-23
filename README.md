@@ -12,6 +12,11 @@ mailbox and relay, while the ROM renders remote avatars. A text-panel debug
 view remains available in mGBA. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
+Players should follow [Installing](docs/installing.md) and use the patch and
+client from the same release. The [v1 release checklist](docs/release-v1.md)
+tracks packaging and the pending release-only, three-developer acceptance
+session; earlier development playtests do not complete that session.
+
 ## Repository layout
 
 ```text
@@ -227,7 +232,7 @@ automatically; rebuild any existing `symgen` binary after changing the list.
 For diagnostics, add `-symbols PATH` to read a different allowlist, for example
 one containing a fake symbol to verify the missing-symbol error.
 
-The generated Lua module returns a table with `romSha1` and `symbols`.
+The generated Lua module returns a table with `romSha1`, `romCrc32` and `symbols`.
 Each `symbols["NAME"]` entry contains `addr` and `size`. Entries are sorted by
 symbol name, with LF line endings, a generated-file header and no timestamps,
 so identical inputs produce byte-identical output. Missing allowlisted symbols,
