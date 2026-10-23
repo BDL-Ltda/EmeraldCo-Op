@@ -174,8 +174,9 @@ Download both files from the release page (not your local copies), follow
 [installing.md](installing.md), and confirm the SHA1 matches the release notes.
 For a milestone release, ask another developer to do this too.
 
-For **v1.0**, all three developers must install only the downloaded release
-patch and client, then play together over the internet for **20+ minutes**.
+For **v1.0**, two developers (bernardosevero and leomayca) must install only
+the downloaded release patch and client, then play together over the internet
+for **20+ minutes**.
 Use the [session checklist](release-v1.md#release-only-acceptance-session).
 Publishing the assets can happen before that session; the session,
 retrospective and v1.5 scheduling keep

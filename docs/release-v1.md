@@ -23,7 +23,7 @@ items and saves remain local. Follow [Releasing](releasing.md) for commands.
   apply the downloaded patch and verify the patched SHA1.
 
 These checks cover packaging and patch installation. An emulator playthrough
-and the three-developer acceptance session remain pending.
+and the two-developer acceptance session remain pending.
 
 Do not check these boxes from earlier builds. The ROM hash in generated
 `client/addresses.lua` identifies the expected ROM; measure the release build
@@ -120,7 +120,7 @@ The host shares the server address and join key privately.
 ## Validation and known limits
 
 - Automated checks: <links to green Go, Lua and ROM CI at the release commit>.
-- Release-only three-developer session: pending;
+- Release-only two-developer session: pending;
   [acceptance tracker #27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
 - Only presence is shared. Avatars appear on the same map and in view when
   object/sprite slots are available. Menus/battles keep the last peer position;
@@ -133,7 +133,7 @@ The host shares the server address and join key privately.
 
 **Pending.** Prior development validation is recorded in
 [acceptance-26.md](acceptance-26.md); it does not satisfy this release test.
-The three testers are bernardosevero, leomayca and DaviAlencastro. Arrange the
+The two testers are bernardosevero and leomayca. Arrange the
 time privately. Each installs the published BPS and client into a fresh
 ASCII-only folder, with a unique player ID and separate ROM/save path. No
 locally built ROM or development client may substitute for the release assets.
@@ -146,7 +146,7 @@ pass/fail and tester names for every case:
 
 | Case | Expected result | Result |
 | --- | --- | --- |
-| Littleroot, all three trainers nearby | Each sees the other two real avatars. | Pending |
+| Littleroot, both trainers nearby | Each sees the other's real avatar. | Pending |
 | Walk and turn in every direction | Adjacent steps animate; facing matches; larger moves teleport. | Pending |
 | Route 101, house entry, warp and return | Different-map avatars disappear and return on the same map. | Pending |
 | Walk through each other's tiles | No blocking or unintended interaction. | Pending |
