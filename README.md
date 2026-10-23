@@ -7,8 +7,9 @@ overworld. Saves, battles and items stay local in v1.
 The ROM build, ELF symbol generator and single-room presence server are
 available. The server authenticates players, relays presence, answers pings
 and removes inactive, flooding or slow connections. A terminal fake client
-simulates walking players for server tests; there is no working Lua network
-client yet. Follow progress
+simulates walking players for server tests. The mGBA Lua client sends local
+player state and logs remote players; it does not render remote avatars yet.
+Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -239,7 +240,7 @@ API differs between versions, and development builds are not supported. The
 client uses mGBA's Lua 5.4 scripting and native sockets; see
 [mGBA scripting](docs/mgba-scripting.md) for the API, gotchas, how to load a
 script and the spike script `client/spike/hello.lua`.
-See the [client README](client/README.md) for the planned configuration.
+See the [client README](client/README.md) for configuration and networking.
 `client/config.example.lua` is tracked; private settings belong in the ignored
 `client/config.lua`. Keep join keys and public IP addresses private.
 
