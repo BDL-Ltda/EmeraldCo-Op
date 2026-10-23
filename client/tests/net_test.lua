@@ -4,7 +4,7 @@ local tests = {}
 
 local AGAIN = "again"
 local KEY = "secret-key-123"
-local CONFIG = { SERVER_HOST = "127.0.0.1", SERVER_PORT = 8765, PLAYER_ID = "bernardo", JOIN_KEY = KEY }
+local CONFIG = { SERVER_HOST = "127.0.0.1", SERVER_PORT = 8765, PLAYER_ID = "bernardo", JOIN_KEY = KEY, DEBUG = true }
 
 -- A socket shaped like mGBA's: the test plays the server through it.
 local function newSocket()
@@ -41,7 +41,7 @@ end
 
 -- A client plus its world: sockets it opened, logs and a clock.
 local function setup(config)
-	local world = { sockets = {}, logs = {}, errors = {}, refuse = nil }
+	local world = { sockets = {}, logs = {}, errors = {}, events = {}, refuse = nil }
 	local cfg = {}
 	for k, v in pairs(CONFIG) do cfg[k] = v end
 	for k, v in pairs(config or {}) do cfg[k] = v end
@@ -60,6 +60,9 @@ local function setup(config)
 		again = AGAIN,
 		log = function(text) world.logs[#world.logs + 1] = text end,
 		logError = function(text) world.errors[#world.errors + 1] = text end,
+		onEvent = function(kind, data, now)
+			world.events[#world.events + 1] = { kind = kind, data = data, now = now }
+		end,
 	}))
 	world.now = 0
 	function world.step(ms, state)
@@ -160,7 +163,7 @@ tests["welcome starts presence and ping"] = function()
 	assert(w.client:isConnected())
 end
 
-tests["presence is sent only when the state changes"] = function()
+tests["presence changes are sent without per-frame repeats"] = function()
 	local w = joined()
 	w.step(33, state())
 	w.step(33, state())
@@ -375,7 +378,7 @@ tests["a throttled hidden presence after a soft reset is still sent"] = function
 			hidden = hidden + 1
 		end
 	end
-	h.eq(hidden, 1)
+	h.eq(hidden, 2) -- Initial hidden transition plus its 10-second renewal.
 	assert(w.client:isConnected())
 end
 
@@ -474,6 +477,142 @@ tests["fast-forward stays below the server's rate limit"] = function()
 		if i > 1 then assert(count + perSecond[i - 1] < 50, "two seconds sent " .. count + perSecond[i - 1]) end
 	end
 	assert(perSecond[3] > 0, "nothing was sent")
+end
+
+tests["quiet mode still publishes validated panel events"] = function()
+	local w = joined({ DEBUG = false })
+	w.step(42)
+	w.sock().deliver('{"v":1,"type":"join","playerId":"davi","trainerId":7,"gender":0}\n'
+		.. '{"v":1,"type":"presence","playerId":"davi","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
+		.. '{"v":1,"type":"pong","t":16}\n'
+		.. '{"v":1,"type":"leave","playerId":"davi","reason":"disconnect"}\n')
+	assert(not w.logged("[remote]"))
+	local types = {}
+	for _, event in ipairs(w.events) do
+		if event.kind == "message" then types[#types + 1] = event.data.type end
+		assert(not assert(json.encode(event)):find(KEY, 1, true), "event leaks the join key")
+	end
+	h.eq(table.concat(types, ","), "welcome,join,presence,pong,leave")
+	h.eq(w.events[#w.events].now, w.now)
+	local count = #w.events
+	w.sock().deliver('{"v":1,"type":"presence","playerId":"invalid"}\n'
+		.. '{"v":1,"type":"future"}\n')
+	h.eq(#w.events, count)
+	w.sock().deliver({ err = "disconnected" })
+	h.eq(w.events[#w.events].data, "Retrying")
+end
+
+tests["unchanged presence renews at ten seconds without extra updates"] = function()
+	local w = joined()
+	w.step(net.PRESENCE_REFRESH_MS - 1, state())
+	for _, m in ipairs(w.sock().take()) do assert(m.type ~= "presence") end
+	w.step(1, state())
+	local sent = w.sock().take()
+	h.eq(#sent, 1)
+	h.eq(sent[1].type, "presence")
+	h.eq(sent[1].x, 5)
+	w.step(33, state(8))
+	h.eq(w.sock().take()[1].x, 8)
+	w.step(net.PRESENCE_REFRESH_MS - 1, state(8))
+	for _, m in ipairs(w.sock().take()) do assert(m.type ~= "presence") end
+	w.step(1, state(8))
+	local renewed = w.sock().take()
+	h.eq(renewed[#renewed].x, 8)
+end
+
+tests["two idle clients remain in each others panels beyond 45 seconds"] = function()
+	local debugview = require("debugview")
+	local alice, bob = setup({ PLAYER_ID = "alice" }), setup({ PLAYER_ID = "bob" })
+	local views = { debugview.new("localhost", "alice"), debugview.new("localhost", "bob") }
+	local worlds = { alice, bob }
+	local eventIndex, presenceCount = { 1, 1 }, { 0, 0 }
+	for i, w in ipairs(worlds) do
+		w.step(0, state())
+		w.sock().take() -- hello
+		local peerId = i == 1 and "bob" or "alice"
+		w.sock().deliver('{"v":1,"type":"welcome","players":[{"playerId":"' .. peerId
+			.. '","trainerId":12345,"gender":1}]}\n')
+		views[i]:setPlayerState(state())
+	end
+	for _ = 1, 450 do
+		for i, w in ipairs(worlds) do
+			w.step(100, state()) -- Same tile/facing throughout, including menus/dialogue.
+			for _, m in ipairs(w.sock().take()) do
+				if m.type == "presence" then
+					presenceCount[i] = presenceCount[i] + 1
+					local other = worlds[i == 1 and 2 or 1]
+					other.sock().deliver(assert(json.encode(m)) .. "\n")
+				elseif m.type == "ping" then
+					w.sock().deliver(assert(json.encode({ v = 1, type = "pong", t = m.t })) .. "\n")
+				end
+			end
+		end
+		for i, w in ipairs(worlds) do
+			while eventIndex[i] <= #w.events do
+				local event = w.events[eventIndex[i]]
+				views[i]:onEvent(event.kind, event.data, event.now)
+				eventIndex[i] = eventIndex[i] + 1
+			end
+			views[i]:update(w.now)
+			local peer = views[i].remotePlayers[i == 1 and "bob" or "alice"]
+			assert(peer, "idle peer expired while its connection was alive")
+			h.eq(peer.visible, true)
+			h.eq(peer.x, 5)
+			h.eq(peer.trainerId, 12345)
+		end
+	end
+	for _, count in ipairs(presenceCount) do h.eq(count, 5) end
+	assert(alice.client:isConnected() and bob.client:isConnected())
+end
+
+tests["reset hidden state keeps renewing without resurrecting the avatar"] = function()
+	local view = require("debugview").new("localhost", "observer")
+	view:onEvent("message", { type = "welcome", players = {
+		{ playerId = "bernardo", trainerId = 12345, gender = 1, presence = state() },
+	} }, 0)
+	local w = joined()
+	w.step(16, state(5, 3, 1, { visible = false }))
+	local hidden = 0
+	for _ = 1, 450 do
+		w.step(100, { visible = false })
+		for _, m in ipairs(w.sock().take()) do
+			if m.type == "presence" then
+				h.eq(m.visible, false)
+				hidden = hidden + 1
+				view:onEvent("message", m, w.now)
+			end
+		end
+		view:update(w.now)
+		local peer = view.remotePlayers.bernardo
+		assert(peer, "hidden peer expired")
+		h.eq(peer.visible, false)
+	end
+	h.eq(hidden, 5)
+end
+
+tests["renewals wait for a writable socket without building a backlog"] = function()
+	local w = joined()
+	w.sock().sendError = AGAIN
+	for _ = 1, 450 do w.step(100, state()) end
+	h.eq(#w.sock().take(), 0)
+	w.sock().sendError = nil
+	w.step(1)
+	local sent = w.sock().take()
+	assert(#sent <= 3, "renewal backlog was flushed in a burst")
+	h.eq(sent[#sent].type, "presence")
+	h.eq(sent[#sent].x, 5)
+end
+
+tests["invalid states are not renewed or repeatedly logged"] = function()
+	local w = joined()
+	w.step(net.PRESENCE_REFRESH_MS, state(5, 3, 0))
+	for _ = 1, 100 do w.step(100, state(5, 3, 0)) end
+	for _, m in ipairs(w.sock().take()) do assert(m.type ~= "presence") end
+	local count = 0
+	for _, text in ipairs(w.logs) do
+		if text:find("not sending presence", 1, true) then count = count + 1 end
+	end
+	h.eq(count, 1)
 end
 
 return tests

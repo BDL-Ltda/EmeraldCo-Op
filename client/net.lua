@@ -1,5 +1,5 @@
 -- Network client for milestone 0.2 (#17): connects to the relay server, sends
--- hello, presence when the local state changes and a ping every 5 s, and logs
+-- hello, presence on change or every 10 s and a ping every 5 s, and logs
 -- the other players. Protocol: docs/protocol.md.
 --
 -- Pure apart from what it is given: no emu, socket or callbacks globals, so
@@ -12,6 +12,8 @@ local protocol = require("protocol")
 local M = {
 	CLIENT_VERSION = "0.2.0",
 	PING_INTERVAL_MS = 5000,
+	-- Renew unchanged state before other panels' 30-second stale timeout.
+	PRESENCE_REFRESH_MS = 10000,
 	RETRY_INTERVAL_MS = 5000,
 	-- The server closes a connection that sends more than 50 messages in one
 	-- second. Presence goes out at most once per 2 frames (one frame is about
@@ -72,6 +74,8 @@ end
 --     shape as mGBA's socket.tcp(). connect may block (docs/mgba-scripting.md).
 --   again: the error string for "would block" (socket.ERRORS.AGAIN in mGBA).
 --   log(line), logError(line): console output.
+--   onEvent(kind, data, nowMs), optional: status changes and validated server
+--     messages for the debug panel. Never receives a hello or the join key.
 -- Returns a client, or nil and an error for an invalid config.
 function M.new(config, env)
 	local configError = M.checkConfig(config)
@@ -99,6 +103,9 @@ function M.new(config, env)
 	local budgetSecond, sentThisSecond = nil, 0
 
 	local client = {}
+	local function notify(kind, data)
+		if env.onEvent then env.onEvent(kind, data, now) end
+	end
 
 	local function disconnect(why, retryIn)
 		if not sock then return end
@@ -106,6 +113,7 @@ function M.new(config, env)
 		sock, framer, outbox, joined = nil, nil, "", false
 		helloIdentity, lastSent, lastPresenceAt, lastPingAt = nil, nil, nil, nil
 		s:close()
+		notify("status", stopped and "Stopped" or "Retrying")
 		if stopped then
 			logError("[net] disconnected: " .. why)
 			return
@@ -166,21 +174,26 @@ function M.new(config, env)
 
 	local function onMessage(m)
 		local kind = m.type
+		if not m.unknown then notify("message", m) end
 		if m.unknown then
 			if verbose then log("[net] ignoring unknown message type " .. kind) end
 		elseif kind == "welcome" then
 			joined = true
 			log(string.format("[net] joined as %s; %d other player(s) online", config.PLAYER_ID, #m.players))
 			for _, p in ipairs(m.players) do
-				log(string.format("[remote] %s is here (trainerId %d, gender %d)", p.playerId, p.trainerId, p.gender))
-				if p.presence then log("[remote] " .. p.playerId .. " " .. formatPresence(p.presence)) end
+				if verbose then
+					log(string.format("[remote] %s is here (trainerId %d, gender %d)", p.playerId, p.trainerId, p.gender))
+					if p.presence then log("[remote] " .. p.playerId .. " " .. formatPresence(p.presence)) end
+				end
 			end
 		elseif kind == "join" then
-			log(string.format("[remote] %s joined (trainerId %d, gender %d)", m.playerId, m.trainerId, m.gender))
+			if verbose then
+				log(string.format("[remote] %s joined (trainerId %d, gender %d)", m.playerId, m.trainerId, m.gender))
+			end
 		elseif kind == "presence" then
-			log("[remote] " .. m.playerId .. " " .. formatPresence(m))
+			if verbose then log("[remote] " .. m.playerId .. " " .. formatPresence(m)) end
 		elseif kind == "leave" then
-			log(string.format("[remote] %s left (%s)", m.playerId, m.reason))
+			if verbose then log(string.format("[remote] %s left (%s)", m.playerId, m.reason)) end
 		elseif kind == "pong" then
 			pongs = pongs + 1
 			if verbose or pongs % M.LATENCY_LOG_EVERY == 1 then
@@ -250,15 +263,18 @@ function M.new(config, env)
 			return
 		end
 		log("[net] connecting to the server")
+		notify("status", "Connecting")
 		-- Blocks the game until it succeeds or fails.
 		local s, err = env.connect(config.SERVER_HOST, config.SERVER_PORT)
 		if not s then
+			notify("status", "Retrying")
 			nextAttempt = now + M.RETRY_INTERVAL_MS
 			logError(string.format("[net] connect failed: %s; retrying in %d s",
 				tostring(err), M.RETRY_INTERVAL_MS // 1000))
 			return
 		end
 		sock, framer, outbox = s, framing.new(), ""
+		notify("status", "Awaiting welcome")
 		s:add("received", onReceived)
 		s:add("error", function(_, e) disconnect(tostring(e)) end)
 		log("[net] connected; sending hello")
@@ -308,15 +324,21 @@ function M.new(config, env)
 				lastPingAt = now
 				send(protocol.ping(now))
 			end
-			if state and state.mapGroup ~= nil and not samePresence(state, lastSent)
+			-- After reset, memory.lua drops its position after reporting hidden
+			-- once. Renew that last transmitted hidden tuple until a fresh state
+			-- exists; never turn it visible or resurrect it across reconnects.
+			local presenceState = state and state.mapGroup ~= nil and state or lastSent
+			local refreshDue = lastPresenceAt and now - lastPresenceAt >= M.PRESENCE_REFRESH_MS
+				and not protocol.checkPresenceState(presenceState)
+			if presenceState and (not samePresence(presenceState, lastSent) or refreshDue)
 				and (not lastPresenceAt or now - lastPresenceAt >= M.MIN_PRESENCE_INTERVAL_MS) and readyToSend() then
-				local reason = protocol.checkPresenceState(state)
+				local reason = protocol.checkPresenceState(presenceState)
 				if reason then
 					-- Remembered as sent so it is skipped (and logged) once, not every frame.
-					lastSent = state
+					lastSent = presenceState
 					if verbose then log("[net] not sending presence: " .. reason) end
 				else
-					local message = protocol.presence(config.PLAYER_ID, state)
+					local message = protocol.presence(config.PLAYER_ID, presenceState)
 					lastSent, lastPresenceAt = message, now
 					if verbose then log("[net] sent presence " .. formatPresence(message)) end
 					send(message)
@@ -330,6 +352,7 @@ function M.new(config, env)
 	-- The next update() reconnects once a verified game is running again.
 	function client.close(_, why)
 		disconnect(why, 0)
+		notify("status", stopped and "Stopped" or "Waiting for game")
 		identity, state = nil, nil
 		waitingLogged = false
 	end

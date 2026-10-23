@@ -36,7 +36,7 @@ another game is loaded with the script still running.
 Once the ROM is verified, `bridge.lua` reads the local player state once per game
 loop (in mGBA's `keysRead` callback, see the
 [memory map](../docs/memory-map.md#when-to-read-the-keysread-callback))
-with `memory.lua` and logs it **only when it changes**:
+with `memory.lua`. With `DEBUG=true`, it logs that state **only when it changes**:
 
 ```text
 [state] no position  hidden
@@ -63,12 +63,14 @@ game session is running, because `hello` carries the save's `trainerId` and
 
 1. connects and sends `hello`;
 2. after `welcome`, sends `presence` whenever the tile, map, facing or
-   `visible` changes (at most once every 2 frames), and a `ping` every 5
+   `visible` changes (at most once every 2 frames), renews unchanged presence
+   every 10 seconds, and sends a `ping` every 5
    seconds. It sends at most 20 messages per second, so even fast-forward
    stays below the server's limit of 50. A change that has to wait is sent
    once there is room, so the latest state (including `hidden`) always goes
    out;
-3. logs the other players and the round-trip latency:
+3. updates the **Emerald Co-Op** text panel and, with `DEBUG = true`, logs
+   the other players. Connection errors remain visible with either setting:
 
 ```text
 [net] connecting to the server
@@ -113,6 +115,60 @@ with `SERVER_HOST = "127.0.0.1"` in `config.lua`, load the bridge in two mGBA
 instances with different `PLAYER_ID`s, or in one plus a
 [fake client](../docs/fakeclient.md).
 
+## Debug panel (0.3)
+
+In the mGBA Scripting window, select **Emerald Co-Op** in the buffer list.
+The panel stays available with `DEBUG = false`, while per-move local and remote
+console messages are suppressed. Lifecycle messages and errors still appear.
+Set `DEBUG = true` for the full state/presence diagnostics.
+
+```text
+Connected to localhost  as leo  (latency 42 ms)
+Me:    0:9  5,3  SOUTH  visible
+Remote players: 2
+  davi  1:4  12,8  NORTH  visible  different map
+  joao  0:9  7,3  WEST  hidden  same map
+```
+
+Rows are sorted by player ID. A welcome fills the table with identities and any
+available presence; a join without presence says `awaiting presence`. Updates
+show map, tile, facing and visibility. `same map` requires both map group and
+map number to match the local player's map; before a position exists it says
+`map unknown`. A replacement clears the previous session's position.
+
+Leave removes the row. Losing the connection clears all remote rows and the
+latency; reconnecting replaces them from the new welcome. As required by #20,
+a row also expires after **30 seconds without a welcome/join/presence update**
+while connected. Pongs do not refresh it. The client renews its last valid
+presence every **10 seconds**, including an unchanged position in menus or
+dialogue, so connected idle players remain listed. A hidden state is renewed as
+hidden even after the memory reader drops its position on reset. Refreshes use
+the same send budget and partial-write handling as changes; a blocked socket
+does not accumulate a backlog of renewal messages. Clients without this renewal
+(including the current idle fakeclient) can still expire from this debug view.
+Expiry is a local display timeout, not a server disconnect.
+
+The panel redraws only when text changes, at most every **250 ms** (four times
+per second). Stop/shutdown clears it immediately. `lib/debugview.lua` owns the
+pure model and formatter; `net.lua` publishes validated events through the
+optional `onEvent(kind, data, nowMs)` hook. That hook never receives the outbound
+hello or join key. Only `bridge.lua` touches `console:createBuffer`, `clear` and
+`print`. No drawing over the game and no ROM changes are involved.
+
+For a manual check, run a local server, one mGBA and a second client with
+`fakeclient -pattern warp` (see [fakeclient.md](../docs/fakeclient.md)). Walk or
+turn in the game and watch the Me row. The remote row's coordinates/facing
+should change and alternate between `same map` and `different map` as the bot
+warps. Close the bot and confirm its row disappears. Repeat with two mGBAs,
+including standing still or reading a menu/dialogue for at least 45 seconds:
+both players must remain listed without moving. Record the developers involved
+for the multiplayer acceptance check. Both mGBAs must use this updated client.
+
+Restart mGBA, or use **File > Reset** in its Scripting window, before loading
+`bridge.lua` again; loading it twice starts two sets of callbacks/connections.
+The panel includes the configured host. Remove private host addresses from
+screenshots or use a localhost-only test before posting evidence publicly.
+
 ## Local configuration
 
 `config.example.lua` lists every setting: `SERVER_HOST`, `SERVER_PORT`,
@@ -140,7 +196,8 @@ the command, required build inputs, allowlist, validation and regeneration rules
   clock from `bridge.lua`, so tests drive it with fakes.
 - `lib/`: pure modules (no `emu`, `socket` or `callbacks`), testable outside
   mGBA. `romcheck.lua` compares the ROM hash; `netclock.lua` is the network
-  clock; `json.lua` and `framing.lua`
+  clock; `debugview.lua` owns the remote-player table and throttled panel text;
+  `json.lua` and `framing.lua`
   provide the transport primitives described below; `protocol.lua` builds the
   client's messages and validates the server's.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
