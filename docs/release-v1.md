@@ -1,10 +1,10 @@
-# v1.0 release and acceptance (#74)
+# v1.0 release and acceptance (#27)
 
-Outstanding acceptance is tracked in
-[issue #74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74). Preparation and
-publication originated in [#27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
-PR #71's closing linkage auto-closed #27 before release acceptance; it was later
-reopened. Record remaining session and retrospective results in #74.
+Release and acceptance are tracked in
+[issue #27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27). PR #71's
+closing linkage auto-closed #27 before release acceptance; it was reopened, and
+[#74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74) corrected the docs and
+review process. Record remaining session and retrospective results in #27.
 v1 synchronizes overworld presence for up to five players. Battles, trades,
 items and saves remain local. Follow [Releasing](releasing.md) for commands.
 
@@ -57,7 +57,7 @@ checksum. Flips v198 created the BPS. Applying the published patch to that base
 produced byte-identical output to the fresh mod build. No ROM was uploaded.
 [Go, Lua and ROM CI](https://github.com/BDL-Ltda/EmeraldCo-Op/actions/runs/39976041089)
 passed at the release commit. These results do not establish multiplayer
-acceptance; that evidence belongs in #74.
+acceptance; that evidence belongs in #27.
 
 ### Earlier preparation evidence
 
@@ -82,7 +82,7 @@ Docker build or a patch round-trip.
 
 That preflight was superseded by the fresh build and published-asset checks
 above. The release-only session, retrospective and planning date remain pending
-in #74.
+in #27.
 
 ## Release notes template
 
@@ -121,7 +121,7 @@ The host shares the server address and join key privately.
 
 - Automated checks: <links to green Go, Lua and ROM CI at the release commit>.
 - Release-only three-developer session: pending;
-  [acceptance tracker #74](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/74).
+  [acceptance tracker #27](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/27).
 - Only presence is shared. Avatars appear on the same map and in view when
   object/sprite slots are available. Menus/battles keep the last peer position;
   local menus can delay mailbox handoff until the overworld resumes.
@@ -161,19 +161,19 @@ Keep a short video or screenshots plus sanitized observations. Redact the
 panel's host, join keys, real trainer IDs and desktop content. Never upload
 ROMs, saves or raw server logs. Open an issue for each bug with the release
 tag, reproduction, expected/actual result and sanitized evidence; link it
-from #74. Leave untested cases pending.
+from #27. Leave untested cases pending.
 
 ## Retrospective and v1.5 planning
 
-Complete in #74 after the release session; do not infer outcomes in advance:
+Complete in #27 after the release session; do not infer outcomes in advance:
 
 - Session evidence and remaining bugs: <links>.
 - What worked: <observed results>.
 - What to change before v1.5: <actions, owners and linked issues>.
 - v1.5 re-planning: <agreed date, time, timezone and participants>.
 
-Keep #74 open until the released-artifact session, retrospective and scheduling
-are complete. Partial preparation PRs reference #74 and pass the
+Keep #27 open until the released-artifact session, retrospective and scheduling
+are complete. Partial preparation PRs reference #27 and pass the
 [closing-link review](../.claude/skills/pre-commit/SKILL.md#4-check-issue-closing-links)
 after opening and before merge. The review checks GitHub's actual closing
-linkage; `Refs #74` in the description alone does not guarantee it stays open.
+linkage; `Refs #27` in the description alone does not guarantee it stays open.
