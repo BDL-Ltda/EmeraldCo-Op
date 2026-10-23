@@ -103,3 +103,4 @@ Closes #<issue>
 - After opening the PR, move the issue to **In review** on the board (see the `pick-task` skill for the command; In review = `d1478c1a`).
 - If the PR is a `feat` or `fix`, then use the `pr-walkthrough` skill (`.claude/skills/pr-walkthrough/SKILL.md`) to create the PR's walkthrough page and post it as a PR comment (it is not part of the PR's code). Skip it for every other type.
 - One human approval is required before merging. Never approve or merge your own PR.
+- If the PR moves the `rom` submodule pointer: the pinned commit must descend from the fork's `master` (`BDL-Ltda/pokeemerald`). After the PR merges, fast-forward the fork's `master` to it (see "Changing the ROM" in the README). Never force-push the fork.

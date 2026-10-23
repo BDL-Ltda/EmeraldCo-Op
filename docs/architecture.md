@@ -6,7 +6,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 
 | Path | Responsibility |
 | --- | --- |
-| `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
+| `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([BDL-Ltda/pokeemerald](https://github.com/BDL-Ltda/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
 | `cmd/server/` | Go relay server entry point. |
 | `cmd/fakeclient/` | Go client that simulates square, idle and warp patterns without an emulator; see [fakeclient.md](fakeclient.md). |
 | `cmd/echoserver/` | Line echo server for testing client sockets ([mgba-scripting.md](mgba-scripting.md)); not the relay. |
