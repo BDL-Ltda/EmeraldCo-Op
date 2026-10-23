@@ -19,8 +19,8 @@ addresses. `cmd/symgen` reads the built ELF using Go's standard-library
 Symbol selection lives in
 [`cmd/symgen/symbols.txt`](../cmd/symgen/symbols.txt). The allowlist names global
 data objects, plus the few functions the client compares with function pointers
-stored in RAM (see [Position validity](#position-validity)). Later issues can extend it
-as needed, for example when `gCoopMailbox` is introduced.
+stored in RAM (see [Position validity](#position-validity)), and `gCoopMailbox`
+(see [Mailbox](#mailbox)). Later issues can extend it as needed.
 
 See [Generating client addresses](../README.md#generating-client-addresses) for
 the command, required build inputs, validation, map verification and regeneration
@@ -36,9 +36,11 @@ These are the fields the client reads for `hello` and `presence` (see
 `symbols["NAME"].addr` from `client/addresses.lua`; `[ptr]` means "read the
 32-bit pointer stored there". The GBA is **little-endian**.
 
-Decomp links point at our fork at the pinned submodule commit
+Decomp links point at our fork at upstream commit
 [`731ad5b`](https://github.com/DaviAlencastro/pokeemerald/tree/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881).
-**When the submodule pointer moves, re-verify this section** (see
+The submodule now pins a later commit that only adds the [mailbox](#mailbox)
+(new files plus two lines in `src/main.c`); none of the structs or code cited
+below changed, so the links stay on `731ad5b`. **When the submodule pointer moves, re-verify this section** (see
 [How the offsets were verified](#how-the-offsets-were-verified)) and update the
 links.
 
@@ -289,6 +291,104 @@ Never by eye. On the pinned commit, inside the ROM build image
 [main-10]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L10
 [main-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L11
 
-## Future layouts
+## Mailbox
 
-The 0.4+ **`gCoopMailbox`** design is recorded in [architecture.md](architecture.md). Its exact memory layout will be documented here when implemented; the planned header and two 16-slot rings do not establish offsets or a binary contract yet.
+From milestone 0.4 the ROM and the Lua client exchange messages through
+**`gCoopMailbox`**, a 1034-byte (`0x40A`) struct in EWRAM. Its address is
+`symbols["gCoopMailbox"].addr` from `client/addresses.lua`; the design is in
+[architecture.md](architecture.md#lua-and-rom-mailbox-04-onward). The layout below
+is a binary contract between the ROM and Lua. It is defined in
+[`include/coop/mailbox.h`][mailbox_h] and locked by `STATIC_ASSERT`s in
+[`src/coop/mailbox.c`][mailbox_c]: a ROM build fails if the struct drifts from
+this table. Any change bumps `layoutVersion` and must update this section in the
+same pull request.
+
+Every field is a single byte or a byte array, so the struct has no padding and
+no multi-byte integers: endianness and alignment never matter.
+
+### Header and rings
+
+Offsets are from `gCoopMailbox`.
+
+| Offset | Size | Field | Written by | Meaning |
+| --- | --- | --- | --- | --- |
+| `0x000` | 4 | `magic` | ROM | ASCII `C` `O` `O` `P` (`43 4F 4F 50`), no terminator. Written last by `CoopMailbox_Init`, so a valid magic means the header is ready. |
+| `0x004` | 1 | `layoutVersion` | ROM | `1`. Lua must refuse to use a mailbox with another version. |
+| `0x005` | 1 | `flags` | both, see below | Bit 0 `lua_connected`, bit 1 `rom_ready`, bits 2–7 reserved (0). |
+| `0x006` | 1 | `outbound.head` | ROM | Next outbound slot the ROM fills (0–15). |
+| `0x007` | 1 | `outbound.tail` | Lua | Next outbound slot Lua reads (0–15). |
+| `0x008` | 512 | `outbound.slots[16]` | ROM | 16 slots × 32 bytes; slot `i` is at `0x008 + i * 0x20`. |
+| `0x208` | 1 | `inbound.head` | Lua | Next inbound slot Lua fills (0–15). |
+| `0x209` | 1 | `inbound.tail` | ROM | Next inbound slot the ROM reads (0–15). |
+| `0x20A` | 512 | `inbound.slots[16]` | Lua | 16 slots × 32 bytes; slot `i` is at `0x20A + i * 0x20`. |
+
+`flags` bits:
+
+| Bit | Mask | Name | Owner | Meaning |
+| --- | --- | --- | --- | --- |
+| 0 | `0x01` | `lua_connected` | Lua | Set while the Lua client is attached to the mailbox; cleared by Lua when it stops. Read by `CoopMailbox_IsLuaConnected()`. |
+| 1 | `0x02` | `rom_ready` | ROM | Set by `CoopMailbox_Init()` at boot. |
+
+Lua must change only its own bit, with a read-modify-write of the `flags` byte
+that keeps `rom_ready` intact.
+
+### Slot
+
+Each slot is 32 bytes (`0x20`). Offsets are from the start of the slot.
+
+| Offset | Size | Field | Meaning |
+| --- | --- | --- | --- |
+| `0x00` | 1 | `type` | Message type, see [Message types](#message-types). |
+| `0x01` | 1 | `length` | Number of valid payload bytes, 0–30. |
+| `0x02` | 30 | `payload` | Message bytes. The ROM zero-fills the bytes after `length` in outbound slots. |
+
+Every message fits in one slot. Multi-slot messages are deferred to layout v2.
+
+### Message types
+
+[`include/constants/coop.h`][coop_constants_h] is the source of truth. The Lua
+client mirrors these values; never renumber one.
+
+| Value | Constant | Direction | Payload |
+| --- | --- | --- | --- |
+| `0` | `COOP_MSG_NONE` | none | Reserved: never sent. |
+| `1` | `COOP_MSG_PRESENCE` | both | Defined by the presence issues ([#23](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/23), [#24](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/24)). |
+
+### Ring rules
+
+Each ring has **one writer and one reader**. The ROM writes only
+`outbound.head` and `inbound.tail`; Lua writes only `outbound.tail` and
+`inbound.head`. No locks are needed.
+
+- **Write:** if `(head + 1) % 16 == tail` the ring is full and the message is
+  dropped. Otherwise fill `slots[head]` completely, **then** set
+  `head = (head + 1) % 16`.
+- **Read:** if `tail == head` the ring is empty. Otherwise copy `slots[tail]`,
+  **then** set `tail = (tail + 1) % 16`.
+- A ring therefore holds at most **15** messages.
+
+Lua runs between frames, but mGBA's frame callback can fire while the game is in
+the middle of a mailbox call. The ordering above is what keeps that safe: the
+ROM uses a compiler barrier so it never moves a slot write after its `head`
+update, and Lua must keep the same order (slot first, index last). The ROM
+clamps an inbound `length` above 30 to 30.
+
+`CoopMailbox_Init()` runs once per boot, from `AgbMain` before the main loop,
+including after a soft reset. It zeroes the whole mailbox (both rings empty,
+`lua_connected` cleared) and then writes the header. A Lua client that sees
+`rom_ready` drop or the magic disappear must treat the mailbox as reset.
+
+### C API
+
+Declared in [`include/coop/mailbox.h`][mailbox_h]:
+
+| Function | Ring | Behavior |
+| --- | --- | --- |
+| `void CoopMailbox_Init(void)` | both | Zeroes the mailbox, sets `layoutVersion`, `rom_ready` and the magic. |
+| `bool8 CoopMailbox_Push(u8 type, const void *payload, u8 len)` | outbound | Queues one message. Returns `FALSE` and writes nothing if the ring is full or `len > 30`. |
+| `bool8 CoopMailbox_Pop(struct CoopMailboxSlot *msg)` | inbound | Copies the oldest message to `*msg` and frees its slot. Returns `FALSE` if the ring is empty. |
+| `bool8 CoopMailbox_IsLuaConnected(void)` | header | `TRUE` while `lua_connected` is set. |
+
+[mailbox_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
+[mailbox_c]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
+[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/constants/coop.h
