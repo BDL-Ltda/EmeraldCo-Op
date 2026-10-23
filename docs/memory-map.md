@@ -353,6 +353,7 @@ client mirrors these values; never renumber one.
 | --- | --- | --- | --- |
 | `0` | `COOP_MSG_NONE` | none | Reserved: never sent. |
 | `1` | `COOP_MSG_PRESENCE` | both | See [Presence payload](#presence-payload). |
+| `2` | `COOP_MSG_LEAVE` | inbound | 1 byte: the remote slot (`0`–`3`) to free. See [Remote slots](#remote-slots). |
 
 ### Presence payload
 
@@ -378,6 +379,46 @@ unaligned inside the slot, so the ROM must copy them byte by byte (or with
 Lua to ROM. A reader must reject a payload shorter than 13 bytes and ignore
 bytes it doesn't know past the ones above, so a later field can be appended
 without breaking older readers.
+
+### Remote slots
+
+The ROM keeps a table of **4 remote slots** (`COOP_REMOTE_SLOTS` in
+[`include/coop/remote_players.h`][remote_players_h]). Lua owns the mapping from
+the server's `playerId` to a slot: it picks a free slot for a new player, writes
+that slot into every inbound `PRESENCE` for the player (payload offset `0x0D`),
+and sends `COOP_MSG_LEAVE` with the slot when the player leaves, so the slot can
+be reused. The ROM
+([`src/coop/remote_players.c`][remote_players_c], issue
+[#25](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/25)):
+
+- stores the latest `PRESENCE` per slot, and ignores an inbound `PRESENCE`
+  shorter than 14 bytes or with a slot above 3, and a `LEAVE` with a slot above
+  3;
+- draws slot `n` as the object event with local ID `228 + n` while the slot is
+  used, `visible` is `1`, the slot's map equals the local map and
+  `lua_connected` is set; otherwise it removes that object;
+- removes every remote object, **forgets every slot** and **discards every
+  queued inbound message** (by popping them, so only the ROM's `inbound.tail`
+  moves) on each overworld frame while `lua_connected` is clear. Reconnect
+  handoff for Lua: set `lua_connected` **before** pushing the first message of
+  the new session (in the same frame callback is fine), then send `PRESENCE`
+  for every player again. Anything pushed while the bit is clear may be
+  dropped;
+- drains the inbound ring only while the overworld runs (`CB1_Overworld` with
+  `callback2 == CB2_Overworld`). During battles, full-screen menus and map
+  loads the ring is not read and can fill up, and Lua's writes are then
+  dropped. Lua should keep the latest presence of each player and send it again
+  once the ring has room, instead of relying on every message arriving.
+
+Busy maps: a remote player is spawned only while at least 2 of the 16 object
+event slots stay free afterwards, only when its tile is in view, and never
+while a script, the start menu or battle setup holds the field. A remote that
+walks out of view is removed by the ROM as soon as its step ends (the game's
+own culling keeps objects whose spawn tile is still in view), and is spawned
+again when its tile is back in view. When object
+event or sprite slots run out it is simply not drawn and is retried every frame:
+nothing crashes, and map NPCs keep priority. Full behavior and the reasons are
+in [remote-player-design.md](remote-player-design.md).
 
 ### Ring rules
 
@@ -436,4 +477,6 @@ indices.
 
 [mailbox_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
 [mailbox_c]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
-[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/constants/coop.h
+[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
+[remote_players_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
+[remote_players_c]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c
