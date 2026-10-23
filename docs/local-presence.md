@@ -35,9 +35,12 @@ assertions prevent accidental padding. No mailbox layout version bump is
 needed: the existing `PRESENCE` contract is being implemented.
 
 This ROM visibility means **controllable overworld**, unlike the older direct
-memory reader's "game session running" semantics. The bridge now consumes the
-mailbox stream. The network client's 10-second presence renewal remains
-separate from this change-only ROM stream.
+memory reader's "game session running" semantics. The bridge consumes the
+mailbox stream and shows its visibility in the local panel, but maps valid
+outbound tuples to `visible = true` on the wire to preserve protocol v1's
+running-session contract. A reset closes that connection. See the explicit
+[bridge mapping](mailbox-bridge.md#lifecycle-and-visibility). The network
+client's 10-second renewal remains separate from this change-only ROM stream.
 
 ## Automated tests
 

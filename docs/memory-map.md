@@ -36,7 +36,7 @@ These are the fields the client reads for `hello` and `presence` (see
 32-bit pointer stored there". The GBA is **little-endian**.
 
 Decomp links point at our fork at upstream commit
-[`731ad5b`](https://github.com/DaviAlencastro/pokeemerald/tree/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881).
+[`731ad5b`](https://github.com/BDL-Ltda/pokeemerald/tree/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881).
 The submodule now pins a later commit that only adds the [mailbox](#mailbox)
 (new files plus two lines in `src/main.c`); none of the structs or code cited
 below changed, so the links stay on `731ad5b`. **When the submodule pointer moves, re-verify this section** (see
@@ -243,53 +243,53 @@ Never by eye. On the pinned commit, inside the ROM build image
    differs from the normal build, so step 1, not this one, is the reference for
    the shipped ROM; struct layout does not depend on `-g`.
 
-[load_save-41]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L41
-[load_save-70]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L70-L82
-[load_save-84]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L84-L119
-[battle_main-590]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_main.c#L590
-[overworld-2071]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L2071-L2075
-[overworld-1459]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1459-L1463
-[overworld-1484]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1484-L1492
-[overworld-1572]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1572-L1580
-[overworld-1577]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1577
-[overworld-1582]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1582-L1588
-[transition-1026]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_transition.c#L1026-L1030
-[avatar-37]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L37-L38
-[avatar-1141]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L1141-L1145
-[avatar-1182]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L1182-L1185
-[link-326]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/link.c#L326
-[global-174]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L174-L178
-[global-508]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L508
-[global-511]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L511
-[global-513]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L513
-[global-544]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L544
-[global-581]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L581-L588
-[global-984]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L984
-[global-987]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L987
-[global-1081]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L1081
-[fieldmap-194]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L194-L255
-[fieldmap-235]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L235
-[fieldmap-237]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L237-L243
-[fieldmap-342]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L342
-[fieldmap-349]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L349
-[fieldmap-371]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L371-L374
-[fieldmap_h-18]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/fieldmap.h#L18
-[const-46]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L46
-[const-81]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L81
-[const-113]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L113-L114
-[const-138]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L138-L141
-[maps-12]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/maps.h#L12
-[play_time-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L4-L11
-[play_time-31]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L31-L34
-[main-437]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L428-L438
-[main-89]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L89-L169
-[main-252]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L250-L253
-[camera-414]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_camera.c#L360-L420
-[new_game-165]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/new_game.c#L165
-[overworld-1539]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1532-L1540
-[overworld-1735]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1705-L1736
-[main-10]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L10
-[main-11]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L11
+[load_save-41]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L41
+[load_save-70]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L70-L82
+[load_save-84]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/load_save.c#L84-L119
+[battle_main-590]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_main.c#L590
+[overworld-2071]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L2071-L2075
+[overworld-1459]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1459-L1463
+[overworld-1484]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1484-L1492
+[overworld-1572]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1572-L1580
+[overworld-1577]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1577
+[overworld-1582]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1582-L1588
+[transition-1026]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/battle_transition.c#L1026-L1030
+[avatar-37]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L37-L38
+[avatar-1141]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L1141-L1145
+[avatar-1182]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_player_avatar.c#L1182-L1185
+[link-326]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/link.c#L326
+[global-174]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L174-L178
+[global-508]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L508
+[global-511]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L511
+[global-513]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L513
+[global-544]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L544
+[global-581]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L581-L588
+[global-984]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L984
+[global-987]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L987
+[global-1081]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.h#L1081
+[fieldmap-194]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L194-L255
+[fieldmap-235]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L235
+[fieldmap-237]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L237-L243
+[fieldmap-342]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L342
+[fieldmap-349]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L349
+[fieldmap-371]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/global.fieldmap.h#L371-L374
+[fieldmap_h-18]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/fieldmap.h#L18
+[const-46]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L46
+[const-81]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L81
+[const-113]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L113-L114
+[const-138]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/global.h#L138-L141
+[maps-12]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/maps.h#L12
+[play_time-11]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L4-L11
+[play_time-31]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/play_time.c#L31-L34
+[main-437]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L428-L438
+[main-89]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L89-L169
+[main-252]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/main.c#L250-L253
+[camera-414]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/field_camera.c#L360-L420
+[new_game-165]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/new_game.c#L165
+[overworld-1539]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1532-L1540
+[overworld-1735]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/overworld.c#L1705-L1736
+[main-10]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L10
+[main-11]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/main.h#L11
 
 ## Mailbox
 
@@ -385,8 +385,11 @@ The outbound C definition is `struct CoopPresence` in
 `rom/src/coop/presence.c`. [Local publishing](local-presence.md) now implements
 this layout: `visible` is true only in controllable overworld play. A hidden
 transition retains the last complete tuple rather than reading a loading map.
-The bridge now consumes this mailbox payload. The old direct reader's session
-visibility above applies only to milestones 0.1–0.3.
+The bridge consumes this mailbox payload for the local panel. Outgoing JSON
+maps each valid tuple to `visible = true`, preserving protocol v1's running-
+session semantics without struct reads; reset closes the socket instead.
+Incoming network visibility is copied unchanged. See the explicit
+[bridge mapping](mailbox-bridge.md#lifecycle-and-visibility).
 
 ### Remote slots
 
@@ -407,11 +410,12 @@ be reused. The ROM
   `lua_connected` is set; otherwise it removes that object;
 - removes every remote object, **forgets every slot** and **discards every
   queued inbound message** (by popping them, so only the ROM's `inbound.tail`
-  moves) on each overworld frame while `lua_connected` is clear. Reconnect
-  handoff for Lua: set `lua_connected` **before** pushing the first message of
-  the new session (in the same frame callback is fine), then send `PRESENCE`
-  for every player again. Anything pushed while the bit is clear may be
-  dropped;
+  moves) on each overworld frame while `lua_connected` is clear. The bridge
+  waits for this old queue to empty, sets `lua_connected` **before** pushing
+  the new session's messages, clears all four previous slots with `LEAVE`,
+  then sends `PRESENCE` for every current player. Anything pushed while the
+  bit is clear may be dropped. A menu/battle delays this handoff until the
+  ROM resumes its consumer;
 - drains the inbound ring only while the overworld runs (`CB1_Overworld` with
   `callback2 == CB2_Overworld`). During battles, full-screen menus and map
   loads the ring is not read and can fill up, and Lua's writes are then
@@ -476,6 +480,7 @@ mGBA's `emu` in the emulator and a table in tests), with the base address
 | `:check()` | header | Returns `true, message`, or `false, message` if the magic, `layoutVersion` or `rom_ready` is wrong. |
 | `:setLuaConnected(bool)` | header | Sets or clears `lua_connected`, keeping the other bits. |
 | `:isLuaConnected()` | header | Reads the Lua-owned bit, allowing the bridge to detect a mailbox reset between frame checks. |
+| `:isInboundEmpty()` | inbound indices, read only | Returns whether the ROM has consumed/discarded the queue; false plus a reason on invalid indices. Used for reconnect handoff, never writes the ROM-owned tail. |
 | `:pop()` | outbound | Returns `{type, payload}` (payload as a byte string) or `nil` when empty, then advances `outbound.tail`. |
 | `:push(type, payload)` | inbound | Fills the slot (zero-padded) and then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
 | `encodePresence(t)` / `decodePresence(bytes)` | none | Convert between a [presence payload](#presence-payload) and a table; `slot` is present only in the 14-byte form. Return `nil, error` on bad input. |
@@ -484,8 +489,8 @@ Both ring calls read `head` and `tail` from memory every time and return an
 error if either is above 15, so a reset mailbox is never read with stale
 indices.
 
-[mailbox_h]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
-[mailbox_c]: https://github.com/DaviAlencastro/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
-[coop_constants_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
-[remote_players_h]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
-[remote_players_c]: https://github.com/DaviAlencastro/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c
+[mailbox_h]: https://github.com/BDL-Ltda/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
+[mailbox_c]: https://github.com/BDL-Ltda/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
+[coop_constants_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
+[remote_players_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
+[remote_players_c]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c

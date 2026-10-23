@@ -65,6 +65,22 @@ local PRESENCE = {
 	mapGroup = 0, mapNum = 9, x = 7, y = -1, facing = 4, visible = true, gender = 1, trainerId = 0xDEADBEEF,
 }
 
+test("inbound emptiness observes ROM tail without writing it", function()
+	local mem, box = booted()
+	eq(box:isInboundEmpty(), true)
+	assert(box:push(mailbox.MSG.LEAVE, string.char(0)))
+	eq(box:isInboundEmpty(), false)
+	romPop(mem)
+	mem.writes = {}
+	eq(box:isInboundEmpty(), true)
+	eq(#mem.writes, 0)
+	mem.bytes[BASE + IN_HEAD] = 16
+	local empty, err = box:isInboundEmpty()
+	eq(empty, false)
+	assert(err:find("indices out of range", 1, true))
+	eq(#mem.writes, 0)
+end)
+
 test("check passes on a booted mailbox", function()
 	local _, box = booted()
 	local ok, msg = box:check()

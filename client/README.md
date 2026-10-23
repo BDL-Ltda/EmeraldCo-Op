@@ -46,6 +46,11 @@ visibility, gender and trainer ID. The client reads no game structs. The ROM
 marks presence hidden while field controls are locked and publishes a fresh
 visible snapshot when play resumes; see [local presence](../docs/local-presence.md).
 The debug panel's Me row uses these same mailbox snapshots.
+The wire protocol's `visible` still means a running session: the bridge maps
+valid outbound snapshots to `visible = true` on the network, keeping peers at
+their last complete position during menus/battles. The local Me row retains
+the ROM's controllable-overworld visibility. A reset closes the session.
+See [mailbox bridge lifecycle and acceptance](../docs/mailbox-bridge.md).
 
 ## Networking
 
@@ -139,15 +144,17 @@ map number to match the local player's map; before a position exists it says
 
 Leave removes the row and frees the ROM slot. Losing the connection clears all
 remote rows and the latency and clears `lua_connected`, so the ROM hides remote
-objects. A new welcome sets the flag before replaying peer presence into the
-inbound ring. If that ring fills during a menu or battle, the client retains
+objects on its next overworld update. A new welcome waits for the ROM to
+discard the old inbound queue while the flag is clear, then sets the flag,
+clears all four old slots with `LEAVE` and replays current peer presence.
+If that ring fills during a menu or battle, the client retains
 the latest state for each peer and retries it when the ROM drains the ring.
 As required by #20,
 a row also expires after **30 seconds without a welcome/join/presence update**
 while connected. Pongs do not refresh it. The client renews its last valid
 presence every **10 seconds**, including an unchanged position in menus or
-dialogue, so connected idle players remain listed. A hidden state is renewed as
-hidden while the ROM publishes no new position. Refreshes use
+dialogue, so connected idle players remain listed. Network visibility retains
+the v1 running-session meaning described above. Refreshes use
 the same send budget and partial-write handling as changes; a blocked socket
 does not accumulate a backlog of renewal messages. Clients without this renewal
 (including the current idle fakeclient) can still expire from this debug view.

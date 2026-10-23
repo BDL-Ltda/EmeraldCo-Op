@@ -275,8 +275,10 @@ function M.new(config, env)
 		end
 		sock, framer, outbox = s, framing.new(), ""
 		notify("status", "Awaiting welcome")
-		s:add("received", onReceived)
-		s:add("error", function(_, e) disconnect(tostring(e)) end)
+		-- A queued event from a closed socket must not read or disconnect a
+		-- replacement connection after a ROM reset/reconnect.
+		s:add("received", function() if sock == s then onReceived() end end)
+		s:add("error", function(_, e) if sock == s then disconnect(tostring(e)) end end)
 		log("[net] connected; sending hello")
 		helloIdentity = identity
 		send(protocol.hello(config.PLAYER_ID, config.JOIN_KEY, identity.trainerId, identity.gender,

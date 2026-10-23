@@ -59,6 +59,14 @@ Every field listed for a type is required and must not be `null`, unless it is m
 | `code` | string | One of the error codes below. |
 | `message` | string | 0–256 characters, no control characters. Human-readable detail. |
 
+The 0.4 [mailbox bridge](mailbox-bridge.md#lifecycle-and-visibility) preserves
+these v1 field meanings: the ROM's local `visible` bit denotes controllable
+overworld play, so valid outbound snapshots are mapped to network
+`visible = true` for the running session. Menus and battles retain the last
+complete tuple; reset closes the connection. Incoming wire visibility is
+copied unchanged to the ROM. This mapping adds no fields or message types and
+does not change the protocol version.
+
 Integers must be JSON integers: `1.5` or `"1"` is rejected.
 
 ### Examples

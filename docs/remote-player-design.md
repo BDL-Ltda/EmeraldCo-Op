@@ -539,9 +539,9 @@ breakpoint per frame, plus reads of `gObjectEvents`. Results:
 | Door warp | Gone inside May's house. Respawned after walking out |
 | A on the remote | No script ran, the field kept running and the player could still move |
 
-[tree]: https://github.com/DaviAlencastro/pokeemerald/tree/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881
-[spike]: https://github.com/DaviAlencastro/pokeemerald/tree/spike/21-remote-object-event
-[spawn-param]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L1510-L1528
-[localids]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/event_objects.h#L297-L305
-[collide]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L4706-L4723
-[by-position]: https://github.com/DaviAlencastro/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L2192-L2206
+[tree]: https://github.com/BDL-Ltda/pokeemerald/tree/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881
+[spike]: https://github.com/BDL-Ltda/pokeemerald/tree/spike/21-remote-object-event
+[spawn-param]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L1510-L1528
+[localids]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/include/constants/event_objects.h#L297-L305
+[collide]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L4706-L4723
+[by-position]: https://github.com/BDL-Ltda/pokeemerald/blob/731ad5bfd6e6f265508d0efcca0ba42f9dcf5881/src/event_object_movement.c#L2192-L2206

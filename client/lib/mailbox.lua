@@ -94,6 +94,17 @@ function Mailbox:isLuaConnected()
 	return self:read8(LAYOUT.flags) & M.FLAG_LUA_CONNECTED ~= 0
 end
 
+-- Reconnect waits for the ROM to discard the previous session's inbound
+-- messages while lua_connected is clear. Lua must never move the ROM's tail.
+function Mailbox:isInboundEmpty()
+	local head = self:read8(LAYOUT.inboundHead)
+	local tail = self:read8(LAYOUT.inboundTail)
+	if head >= LAYOUT.slotCount or tail >= LAYOUT.slotCount then
+		return false, "mailbox inbound indices out of range"
+	end
+	return head == tail
+end
+
 local function nextIndex(index)
 	return (index + 1) % LAYOUT.slotCount
 end

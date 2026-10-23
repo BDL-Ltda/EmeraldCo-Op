@@ -15,10 +15,18 @@ local function bridge(validRom)
 	end
 	local config = { SERVER_HOST = "localhost", SERVER_PORT = 8765, PLAYER_ID = "me",
 		JOIN_KEY = "test-only-key", DEBUG = false }
-	local box = { connected = true }
-	function box.check(_) return true, "mailbox ready" end
+	local box = { connected = true, valid = true, checks = 0, writes = 0 }
+	function box:check()
+		self.checks = self.checks + 1
+		return self.valid, self.valid and "mailbox ready" or "mailbox reset"
+	end
+	function box.isInboundEmpty() return true end
 	function box:isLuaConnected() return self.connected end
-	function box:setLuaConnected(value) self.connected = value end
+	function box:setLuaConnected(value)
+		assert(self.valid, "must not write an invalid mailbox")
+		self.writes = self.writes + 1
+		self.connected = value
+	end
 	function box.pop(_)
 		if #outbound == 0 then return nil end
 		return table.remove(outbound, 1)
@@ -26,8 +34,11 @@ local function bridge(validRom)
 	function box.push(_) return true end
 	local client = {}
 	function client.setPlayerState(_, state) states[#states + 1] = state end
-	function client.update(_) end
-	function client.close(_) end
+	function client.update(_) client.updates = (client.updates or 0) + 1 end
+	function client.close(_)
+		client.closes = (client.closes or 0) + 1
+		if client.adapter then client.adapter.onEvent("status", "Waiting for game", 0) end
+	end
 	local env = setmetatable({
 		console = {
 			createBuffer = function(_, name) h.eq(name, "Emerald Co-Op"); return buffer end,
@@ -45,7 +56,9 @@ local function bridge(validRom)
 			error("unexpected file")
 		end,
 		require = function(name)
-			if name == "romcheck" then return { verify = function() return validRom, "ROM fixture" end } end
+			if name == "romcheck" then
+				return { verify = function() return box.romValid ~= false and validRom, "ROM fixture" end }
+			end
 			if name == "mailbox" then
 				return setmetatable({ new = function() return box end }, { __index = mailbox })
 			end
@@ -70,11 +83,63 @@ tests["the bridge reads the mailbox every frame and updates its panel"] = functi
 	h.eq(b.states[1].trainerId, 42)
 	assert(b.lines[#b.lines]:find("Me:    0:9  5,3  SOUTH  visible", 1, true))
 	b.client.adapter.onEvent("message", { type = "welcome", players = {} }, 0)
+	b.handlers.frame()
 	h.eq(b.box.connected, true)
 	b.client.adapter.onEvent("status", "Retrying", 0)
 	h.eq(b.box.connected, false)
 	b.handlers.shutdown()
 	assert(b.lines[#b.lines]:find("waiting for game", 1, true))
+end
+
+tests["stop prevents frame callbacks from restarting until a verified start"] = function()
+	local b = bridge(true)
+	b.handlers.frame()
+	b.handlers.stop()
+	local updates, checks = b.client.updates, b.box.checks
+	b.handlers.frame()
+	h.eq(b.client.updates, updates)
+	h.eq(b.box.checks, checks)
+	b.handlers.start()
+	b.handlers.frame()
+	h.eq(b.client.updates, updates + 1)
+end
+
+tests["invalid mailbox closes the socket without writing until reinitialized"] = function()
+	local b = bridge(true)
+	b.client.adapter.onEvent("message", { type = "welcome", players = {} }, 0)
+	b.handlers.frame()
+	h.eq(b.box.connected, true)
+	local writes, closes = b.box.writes, b.client.closes
+	b.box.valid = false
+	b.handlers.frame()
+	h.eq(b.box.writes, writes)
+	h.eq(b.client.closes, closes + 1)
+	b.box.valid, b.box.connected = true, false
+	b.handlers.frame()
+	h.eq(b.box.connected, false)
+end
+
+tests["a soft reset with an already valid header closes the old session"] = function()
+	local b = bridge(true)
+	b.client.adapter.onEvent("message", { type = "welcome", players = {} }, 0)
+	b.handlers.frame()
+	local closes = b.client.closes
+	b.box.connected = false
+	b.handlers.frame()
+	h.eq(b.client.closes, closes + 1)
+	h.eq(b.box.connected, false)
+end
+
+tests["switching to an unverified ROM never writes the old mailbox"] = function()
+	local b = bridge(true)
+	b.client.adapter.onEvent("message", { type = "welcome", players = {} }, 0)
+	b.handlers.frame()
+	local writes, updates = b.box.writes, b.client.updates
+	b.box.romValid = false
+	b.handlers.start()
+	b.handlers.frame()
+	h.eq(b.box.writes, writes)
+	h.eq(b.client.updates, updates)
 end
 
 tests["a mismatched ROM never opens the mailbox"] = function()

@@ -6,7 +6,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 
 | Path | Responsibility |
 | --- | --- |
-| `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([DaviAlencastro/pokeemerald](https://github.com/DaviAlencastro/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
+| `rom/` | Our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) ([BDL-Ltda/pokeemerald](https://github.com/BDL-Ltda/pokeemerald)) tracked as a Git submodule. New co-op C code will belong in `rom/src/coop/` and `rom/include/coop/`. |
 | `cmd/server/` | Go relay server entry point. |
 | `cmd/fakeclient/` | Go client that simulates square, idle and warp patterns without an emulator; see [fakeclient.md](fakeclient.md). |
 | `cmd/echoserver/` | Line echo server for testing client sockets ([mgba-scripting.md](mgba-scripting.md)); not the relay. |
@@ -52,6 +52,10 @@ ROM and Lua communicate through an EWRAM mailbox named **`gCoopMailbox`**. Its h
 | Inbound | Lua | ROM | Lua to ROM |
 
 Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a **dumb pipe between the mailbox and the socket**; the ROM owns the in-game co-op behavior. The ROM side lives in `rom/src/coop/mailbox.c` ([issue #22](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/22)). The exact byte layout, flag bits, message types, ring rules and C API are recorded in [memory-map.md](memory-map.md#mailbox); its address comes from `client/addresses.lua`.
+
+The [mailbox bridge](mailbox-bridge.md) documents reset/reconnect handoff,
+slot allocation, the explicit ROM-to-v1 visibility mapping and the two-instance
+emulator acceptance test. The legacy direct game-struct reader is removed.
 
 ## Remote players in the overworld (0.4)
 

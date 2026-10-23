@@ -200,6 +200,7 @@ local function stopNet()
 		client:close("emulation stopped")
 	end
 	if pipe then pipe.disconnect() end
+	pipe, box = nil, nil
 	ready = false
 	view:setPlayerState(nil)
 	-- No frame follows stop/shutdown, so publish the cleared state immediately.

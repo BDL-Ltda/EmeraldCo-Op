@@ -2,10 +2,10 @@
 -- The mailbox and network client are injected so this module stays pure.
 local mailbox = require("mailbox")
 
-local M = {}
+local M = { MAX_OUTBOUND_PER_FRAME = 15 }
 
 function M.new(box, client, view, logError)
-	local connected = false
+	local connected, active = false, false
 	local players, slots, leaving = {}, {}, {}
 
 	local function forget()
@@ -16,32 +16,41 @@ function M.new(box, client, view, logError)
 
 	function bridge.disconnect()
 		if connected then box:setLuaConnected(false) end
-		connected = false
+		connected, active = false, false
 		forget()
 	end
 
 	-- A reset invalidates the mailbox header, so do not write to it.
 	function bridge.reset()
-		connected = false
+		connected, active = false, false
 		forget()
 	end
 
 	function bridge.isConnected()
-		return connected
+		return active
 	end
 
 	function bridge.drainOutbound()
-		while true do
+		-- Bound work even if the ROM publishes while this callback runs.
+		for _ = 1, M.MAX_OUTBOUND_PER_FRAME do
 			local message, err = box:pop()
 			if err then logError("[bridge] " .. err); return end
 			if not message then return end
 			if message.type == mailbox.MSG.PRESENCE then
 				local state, decodeError = mailbox.decodePresence(message.payload)
-				if state and #message.payload == mailbox.PRESENCE_LENGTH then
+				if state then
+					-- Byte 14 is a slot only inbound; outbound extensions are unknown.
+					state.slot = nil
 					-- Validate the decoded fields before handing them to the protocol.
 					local _, validationError = mailbox.encodePresence(state)
 					if not validationError then
-						client:setPlayerState(state)
+						-- Mailbox visibility is controllable-overworld state. Wire v1
+						-- means a running session, including menus/battles. Every ROM
+						-- snapshot has a session; reset closes the socket instead.
+						local wire = {}
+						for key, value in pairs(state) do wire[key] = value end
+						wire.visible = true
+						client:setPlayerState(wire)
 						view:setPlayerState(state)
 					else
 						logError("[bridge] invalid outbound presence: " .. validationError)
@@ -71,8 +80,10 @@ function M.new(box, client, view, logError)
 		if kind ~= "message" then return end
 		if data.type == "welcome" then
 			forget()
-			connected = true
-			box:setLuaConnected(true)
+			connected, active = true, false
+			box:setLuaConnected(false)
+			-- Also clear slots restored from a save or a previous script instance.
+			for slot = 1, mailbox.REMOTE_SLOTS do leaving[slot] = true end
 			for _, entry in ipairs(data.players) do
 				players[entry.playerId] = { trainerId = entry.trainerId, gender = entry.gender,
 					presence = entry.presence }
@@ -95,6 +106,17 @@ function M.new(box, client, view, logError)
 
 	function bridge.flushInbound()
 		if not connected then return end
+		if not active then
+			local empty, err = box:isInboundEmpty()
+			if not empty then
+				if err then logError("[bridge] " .. err) end
+				return
+			end
+			-- With the old queue drained, these four LEAVEs fit before any new
+			-- presence. The ROM owns the tail and the session's object cleanup.
+			box:setLuaConnected(true)
+			active = true
+		end
 		for slot = 1, mailbox.REMOTE_SLOTS do
 			if leaving[slot] then
 				local ok, err = box:push(mailbox.MSG.LEAVE, string.char(slot - 1))

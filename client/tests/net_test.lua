@@ -614,4 +614,18 @@ tests["invalid states are not renewed or repeatedly logged"] = function()
 	h.eq(count, 1)
 end
 
+tests["late callbacks from a closed socket cannot affect the replacement"] = function()
+	local w = joined()
+	local old = w.sock()
+	w.client:close("ROM reset")
+	w.step(16, state())
+	local current = w.sock()
+	current.deliver('{"v":1,"type":"welcome","players":[]}\n')
+	w.step(16)
+	old.handlers.error(old, "late old error")
+	old.handlers.received(old)
+	h.eq(current.closed, false)
+	h.eq(w.client.isConnected(), true)
+end
+
 return tests
