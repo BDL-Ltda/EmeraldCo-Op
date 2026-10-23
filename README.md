@@ -7,9 +7,9 @@ overworld. Saves, battles and items stay local in v1.
 The ROM build, ELF symbol generator and single-room presence server are
 available. The server authenticates players, relays presence, answers pings
 and removes inactive, flooding or slow connections. A terminal fake client
-simulates walking players for server tests. The Lua client connects mGBA to the
-relay and shows remote players in a text-panel debug view; in-game avatars remain
-planned for milestone 0.4. Follow progress
+simulates walking players for server tests. The Lua client bridges the ROM
+mailbox and relay, while the ROM renders remote avatars. A text-panel debug
+view remains available in mGBA. Follow progress
 in the [milestones](https://github.com/BDL-Ltda/EmeraldCo-Op/milestones).
 
 ## Repository layout
@@ -220,9 +220,8 @@ establish whether a separately supplied ELF belongs to it. The client checks
 scripts (see [client/README.md](client/README.md)).
 
 The default allowlist is [cmd/symgen/symbols.txt](cmd/symgen/symbols.txt):
-`gObjectEvents`, `gPlayerAvatar`, `gSaveBlock1Ptr`, `gSaveBlock2Ptr`, `gMain`,
-`CB1_Overworld`, `CB2_Overworld`, `sPlayTimeCounterState` and `gCoopMailbox` (see
-the [memory map](docs/memory-map.md) for what each is used for).
+only `gCoopMailbox`, the client’s shared-memory interface with the ROM (see
+the [memory map](docs/memory-map.md)).
 The file is embedded when the tool is compiled. `go run` picks up edits
 automatically; rebuild any existing `symgen` binary after changing the list.
 For diagnostics, add `-symbols PATH` to read a different allowlist, for example
@@ -237,19 +236,15 @@ missing-symbol error names the symbol. Validation failures preserve an existing
 output file. Successful writes use a temporary file in the output directory
 followed by replacement of the target file.
 
-Spot-check a generated symbol against its entry in
-`rom/pokeemerald_modern.map`. Function entries are the `.map` address plus 1
-(the Thumb bit), and file-static symbols such as `sPlayTimeCounterState` are not in
-the `.map`: check those with `arm-none-eabi-readelf -s`. Then rerun the command and check that
+Spot-check the generated mailbox symbol against its entry in
+`rom/pokeemerald_modern.map`. Then rerun the command and check that
 `git diff -- client/addresses.lua` shows no unexpected changes. Never edit
 `client/addresses.lua` by hand or copy its numeric addresses elsewhere.
 
 **Rebuild and regenerate after every ROM source, submodule, toolchain or build
 configuration change. Commit `client/addresses.lua` in the same pull request.**
-Keep the ELF, ROM and map local. Struct field offsets belong to
-[issue #9](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/9), not this generator;
-see the [memory map](docs/memory-map.md). Runtime client integration remains
-future work in [issue #10](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/10).
+Keep the ELF, ROM and map local. The historical game-struct offsets are in the
+[memory map](docs/memory-map.md); the client no longer reads them.
 
 ## Client development
 
@@ -269,7 +264,7 @@ See the [client README](client/README.md) for configuration and networking.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
 - [Fake client](docs/fakeclient.md): simulated walking, warp and idle players for terminal tests.
-- [Memory map](docs/memory-map.md): generated globals and future struct offsets (#9).
+- [Memory map](docs/memory-map.md): generated globals, historical offsets and the ROM mailbox.
 - [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.
 - [Playing online](docs/playing-online.md): IPv4 hosting, TCP forwarding and external validation (#18).
 - [Networking acceptance](docs/acceptance-0.2.md): three-developer milestone 0.2 test results (#19).

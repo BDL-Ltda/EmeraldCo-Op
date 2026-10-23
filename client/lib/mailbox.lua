@@ -39,6 +39,19 @@ M.MSG = { NONE = 0, PRESENCE = 1, LEAVE = 2 }
 local Mailbox = {}
 Mailbox.__index = Mailbox
 
+-- Lua owns the next unpublished inbound slot. Its final payload bytes may
+-- hold a local reset marker: the ROM cannot read them before head advances.
+-- CoopMailbox_Init clears them even if the valid header is restored between
+-- callbacks. This is not a message, flag, reserved slot or layout change.
+local RESET_MARKER = "LUA!"
+local function markReset(self, head)
+	self.resetOffset = LAYOUT.inboundSlots + head * LAYOUT.slotSize
+		+ LAYOUT.slotPayload + LAYOUT.payloadMax - #RESET_MARKER
+	for i = 1, #RESET_MARKER do
+		self:write8(self.resetOffset + i - 1, RESET_MARKER:byte(i))
+	end
+end
+
 -- mem: anything with read8(address) / write8(address, value), e.g. mGBA's emu.
 -- baseAddr: addresses.symbols.gCoopMailbox.addr from client/addresses.lua.
 function M.new(mem, baseAddr)
@@ -90,6 +103,41 @@ function Mailbox:setLuaConnected(connected)
 	self:write8(LAYOUT.flags, flags)
 end
 
+function Mailbox:isLuaConnected()
+	return self:read8(LAYOUT.flags) & M.FLAG_LUA_CONNECTED ~= 0
+end
+
+-- Reconnect waits for the ROM to discard the previous session's inbound
+-- messages while lua_connected is clear. Lua must never move the ROM's tail.
+function Mailbox:isInboundEmpty()
+	local head = self:read8(LAYOUT.inboundHead)
+	local tail = self:read8(LAYOUT.inboundTail)
+	if head >= LAYOUT.slotCount or tail >= LAYOUT.slotCount then
+		return false, "mailbox inbound indices out of range"
+	end
+	return head == tail
+end
+
+-- Opt in after check() succeeds. No index moves and no slot is published.
+function Mailbox:watchReset()
+	local head = self:read8(LAYOUT.inboundHead)
+	local tail = self:read8(LAYOUT.inboundTail)
+	if head >= LAYOUT.slotCount or tail >= LAYOUT.slotCount then
+		return false, "mailbox inbound indices out of range"
+	end
+	markReset(self, head)
+	return true
+end
+
+-- Read only; independent of socket state, connected flags and ring indices.
+function Mailbox:wasReset()
+	if not self.resetOffset then return false end
+	for i = 1, #RESET_MARKER do
+		if self:read8(self.resetOffset + i - 1) ~= RESET_MARKER:byte(i) then return true end
+	end
+	return false
+end
+
 local function nextIndex(index)
 	return (index + 1) % LAYOUT.slotCount
 end
@@ -136,6 +184,10 @@ function Mailbox:push(msgType, payload)
 	for i = 0, LAYOUT.payloadMax - 1 do
 		self:write8(slot + LAYOUT.slotPayload + i, i < #payload and payload:byte(i + 1) or 0)
 	end
+	-- Move the local marker to the next free slot before publishing this one.
+	-- Successful pushes preserve tracking through wraps; full/invalid pushes
+	-- leave both the queued messages and the marker untouched.
+	if self.resetOffset then markReset(self, nextIndex(head)) end
 	self:write8(LAYOUT.inboundHead, nextIndex(head))
 	return true
 end

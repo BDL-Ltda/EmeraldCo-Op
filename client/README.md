@@ -11,7 +11,7 @@ See the [architecture](../docs/architecture.md) and
 For the #24 ROM publisher test, load `debug/presence.lua` **instead of**
 `bridge.lua`. It prints outbound mailbox messages without a config or server.
 See [local presence testing](../docs/local-presence.md#manual-mgba-test-no-server-or-second-player).
-The regular bridge still reads game structs until #26 connects it to the mailbox.
+The regular bridge reads the same mailbox and connects it to the server.
 
 ## Running it
 
@@ -32,39 +32,36 @@ on the first problem. The game itself keeps running.
 | `config.lua` exists and returns a table | `config.lua not found. Copy client/config.example.lua to client/config.lua and fill it in.` |
 | `addresses.lua` loads | `addresses.lua not found. ...` |
 | The loaded ROM's CRC32 equals `romCrc32` | `ROM mismatch: expected <x>, got <y>. Apply the matching .bps patch.` |
+| `gCoopMailbox` exists and its header has the expected magic, version and `rom_ready` bit | The bridge waits for initialization or reports the mismatch; no socket or game-struct read occurs. |
 
-On success it logs `ROM verified (<crc32>)`. The check runs again whenever
-another game is loaded with the script still running.
+On success it logs `ROM verified (<crc32>)` and `mailbox ready (layout v1)`.
+The checks run again whenever another game is loaded with the script still
+running; the mailbox header is also checked each frame to catch soft resets.
+A reset marker in Lua's next unpublished inbound slot additionally detects a
+reset that finishes between frames while the connection bit is already clear.
+The bridge then discards the old identity/position and waits for fresh ROM
+state before reconnecting; see [reset tracking](../docs/memory-map.md#ring-rules).
 
 ## Player state
 
-Once the ROM is verified, `bridge.lua` reads the local player state once per game
-loop (in mGBA's `keysRead` callback, see the
-[memory map](../docs/memory-map.md#when-to-read-the-keysread-callback))
-with `memory.lua`. With `DEBUG=true`, it logs that state **only when it changes**:
-
-```text
-[state] no position  hidden
-[state] trainerId 12345  gender 0
-[state] map 0:9  pos 5,3  facing SOUTH  visible
-```
-
-`getPlayerState()` returns `mapGroup`, `mapNum`, `x`, `y` (map coordinates),
-`facing` (the game's `DIR_*` value), `visible`, `gender` and `trainerId`.
-`visible` is true for the whole game session and false before a game starts
-(title screen, main menu, new-game intro). During map loads, battles and
-full-screen menus the position keeps the last snapshot read in the field. On a
-soft reset the last snapshot is reported once as `hidden` and then dropped;
-position fields stay `nil` until the new session has a fresh snapshot. The
-rules and every offset are in
-[memory map: player state](../docs/memory-map.md#player-state).
+After verifying the ROM and checking the mailbox header, `bridge.lua` drains
+outbound `PRESENCE` messages every frame. The ROM supplies map, tile, facing,
+visibility, gender and trainer ID. The client reads no game structs. The ROM
+marks presence hidden while field controls are locked and publishes a fresh
+visible snapshot when play resumes; see [local presence](../docs/local-presence.md).
+The debug panel's Me row uses these same mailbox snapshots.
+The wire protocol's `visible` still means a running session: the bridge maps
+valid outbound snapshots to `visible = true` on the network, keeping peers at
+their last complete position during menus/battles. The local Me row retains
+the ROM's controllable-overworld visibility. A reset closes the session.
+See [mailbox bridge lifecycle and acceptance](../docs/mailbox-bridge.md).
 
 ## Networking
 
 `net.lua` connects to the [relay server](../docs/server.md) with the settings in
 `config.lua` and speaks the [protocol](../docs/protocol.md). It waits until a
-game session is running, because `hello` carries the save's `trainerId` and
-`gender`. Then it:
+mailbox publishes a valid identity, because `hello` carries the save's
+`trainerId` and `gender`. Then it:
 
 1. connects and sends `hello`;
 2. after `welcome`, sends `presence` whenever the tile, map, facing or
@@ -104,7 +101,7 @@ so expect a short freeze every 5 s while the server is down.
 
 | Log | Meaning and what to do |
 | --- | --- |
-| `network disabled: <setting> ...` | A network setting in `config.lua` is invalid. The player state is still logged. Fix it and reload the script. |
+| `network disabled: <setting> ...` | A network setting in `config.lua` is invalid. The panel still shows local mailbox state. Fix it and reload the script. |
 | `the server rejected this client: bad_key (...)` then `stopped` | Wrong `JOIN_KEY`. Fix `config.lua` and reload the script; it does not retry. |
 | `version_mismatch`, `bad_hello` or `another protocol version`, then `stopped` | Client and server are from different revisions. Update, then reload the script. |
 | `room_full` | Five players are already connected. Retried every 5 s. |
@@ -119,6 +116,14 @@ To try it locally, run the server (see [server development](../docs/server.md))
 with `SERVER_HOST = "127.0.0.1"` in `config.lua`, load the bridge in two mGBA
 instances with different `PLAYER_ID`s, or in one plus a
 [fake client](../docs/fakeclient.md).
+
+For the 0.4 in-game check, use two mGBA 0.10.5 instances running the matching
+ROM and separate local configs. Walk and turn in each game while both players
+are on the same map; each should see the other move. Stop the local server:
+both remote avatars should disappear. Restart it and wait for both clients to
+reconnect; the avatars should return without reloading the scripts. Check that
+the debug panel follows the same positions and connection state. Keep ROMs,
+saves, join keys and public addresses out of shared logs and screenshots.
 
 ## Debug panel (0.3)
 
@@ -141,13 +146,19 @@ show map, tile, facing and visibility. `same map` requires both map group and
 map number to match the local player's map; before a position exists it says
 `map unknown`. A replacement clears the previous session's position.
 
-Leave removes the row. Losing the connection clears all remote rows and the
-latency; reconnecting replaces them from the new welcome. As required by #20,
+Leave removes the row and frees the ROM slot. Losing the connection clears all
+remote rows and the latency and clears `lua_connected`, so the ROM hides remote
+objects on its next overworld update. A new welcome waits for the ROM to
+discard the old inbound queue while the flag is clear, then sets the flag,
+clears all four old slots with `LEAVE` and replays current peer presence.
+If that ring fills during a menu or battle, the client retains
+the latest state for each peer and retries it when the ROM drains the ring.
+As required by #20,
 a row also expires after **30 seconds without a welcome/join/presence update**
 while connected. Pongs do not refresh it. The client renews its last valid
 presence every **10 seconds**, including an unchanged position in menus or
-dialogue, so connected idle players remain listed. A hidden state is renewed as
-hidden even after the memory reader drops its position on reset. Refreshes use
+dialogue, so connected idle players remain listed. Network visibility retains
+the v1 running-session meaning described above. Refreshes use
 the same send budget and partial-write handling as changes; a blocked socket
 does not accumulate a backlog of renewal messages. Clients without this renewal
 (including the current idle fakeclient) can still expire from this debug view.
@@ -195,8 +206,8 @@ the command, required build inputs, allowlist, validation and regeneration rules
 ## Layout and tests
 
 - `bridge.lua`: entry point loaded in mGBA.
-- `memory.lua`: reads the player state through the bus it is given (`emu` in
-  mGBA). The only place with struct offsets, in one table at the top.
+- `lib/mailbox.lua`: reads and writes only `gCoopMailbox` through the injected
+  byte bus; `lib/mailboxbridge.lua` maps validated network peers to ROM slots.
 - `net.lua`: the network client. It gets mGBA's socket, the console and a
   clock from `bridge.lua`, so tests drive it with fakes.
 - `lib/`: pure modules (no `emu`, `socket` or `callbacks`), testable outside
@@ -207,7 +218,7 @@ the command, required build inputs, allowlist, validation and regeneration rules
   client's messages and validates the server's.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
   folder, sorts suites and test names, prints pass/fail and exits non-zero on
-  failure. It includes ROM checks, fake-memory player-state checks, every
+  failure. It includes ROM checks, fake-memory mailbox checks, every
   JSON example in `docs/protocol.md`, message validation and the network
   client driven by a fake socket and clock.
 - `spike/`: the throwaway scripting spike from

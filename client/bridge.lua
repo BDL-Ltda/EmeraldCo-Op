@@ -4,7 +4,7 @@
 -- Before doing anything else it loads config.lua and addresses.lua and checks
 -- that the loaded ROM is the exact build addresses.lua was generated from. On
 -- any problem it logs a clear error and stops; the game keeps running normally.
--- Then it reads the player state and connects to the server (net.lua).
+-- Then it moves presence between the ROM mailbox and the server (net.lua).
 
 local DIR = debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./"
 
@@ -30,7 +30,8 @@ probe:close()
 
 package.path = DIR .. "lib/?.lua;" .. DIR .. "?.lua;" .. package.path
 local romcheck = require("romcheck")
-local memory = require("memory")
+local mailbox = require("mailbox")
+local mailboxbridge = require("mailboxbridge")
 local net = require("net")
 local netclock = require("netclock")
 local debugview = require("debugview")
@@ -68,7 +69,6 @@ end
 
 local view = debugview.new(config.SERVER_HOST, config.PLAYER_ID)
 local panel = console:createBuffer("Emerald Co-Op")
-local verbose = config.DEBUG == true
 
 local function drawPanel(text)
 	local lines, columns = {}, 80
@@ -85,8 +85,8 @@ local function drawPanel(text)
 	end
 end
 
--- The network client, or nil when config.lua's network settings are invalid:
--- the player state is still read and logged.
+local pipe
+-- The network client, or nil when config.lua's network settings are invalid.
 local client, nerr = net.new(config, {
 	-- mGBA's connect blocks the emulator until it succeeds or fails.
 	connect = function(host, port)
@@ -101,48 +101,35 @@ local client, nerr = net.new(config, {
 	again = socket.ERRORS.AGAIN,
 	log = function(line) console:log(line) end,
 	logError = function(line) console:error(line) end,
-	onEvent = function(kind, data, now) view:onEvent(kind, data, now) end,
+	onEvent = function(kind, data, now)
+		view:onEvent(kind, data, now)
+		if pipe then pipe:onEvent(kind, data) end
+	end,
 })
 if not client then
 	fail(nerr)
 	view:onEvent("status", "Network disabled", 0)
 end
 
--- Reads the player state once per game loop, but only while the loaded ROM is
--- the verified build: on any other ROM the addresses mean nothing.
-local reader = nil
-local lastLine, lastIdentity = nil, nil
+local box, ready = nil, false
+local lastMailboxError
 
-local function readState()
-	if not reader then
-		return
+local function checkMailbox()
+	local ok, reason = box:check()
+	if ok and not ready then
+		local watching, err = box:watchReset()
+		if not watching then return false, err end
 	end
-	local state = reader.getPlayerState()
-	view:setPlayerState(state)
-	if client then
-		client:setPlayerState(state)
-	end
-	local line = memory.format(state)
-	if verbose and line ~= lastLine then
-		console:log(line)
-		lastLine = line
-	end
-	-- Logged again for each new game session.
-	local identity = nil
-	if state.trainerId then
-		identity = string.format("[state] trainerId %d  gender %d", state.trainerId, state.gender)
-		if verbose and identity ~= lastIdentity then
-			console:log(identity)
-		end
-	end
-	lastIdentity = identity
+	return ok, reason
 end
 
 -- Runs once a game is loaded, and again whenever another game is started, so
 -- switching ROMs with the script still loaded is caught too. Game memory is
 -- only read after the ROM is verified.
 local function verifyRom()
-	reader, lastLine, lastIdentity = nil, nil, nil
+	-- A different ROM may already occupy RAM here; never write the old address.
+	if pipe then pipe.reset() end
+	pipe, box, ready, lastMailboxError = nil, nil, false, nil
 	view:setPlayerState(nil)
 	if client then
 		client:close("a game was loaded")
@@ -154,12 +141,25 @@ local function verifyRom()
 		return
 	end
 	console:log("[bridge] " .. msg)
-	local rerr
-	reader, rerr = memory.new(emu, addresses.symbols)
-	if not reader then
-		fail(rerr)
-		view:onEvent("status", "Memory reader unavailable", 0)
+	local symbol = addresses.symbols and addresses.symbols.gCoopMailbox
+	if not symbol or type(symbol.addr) ~= "number" then
+		fail("addresses.lua has no gCoopMailbox symbol. Regenerate it from the matching ROM build.")
+		view:onEvent("status", "Mailbox unavailable", 0)
+		return
 	end
+	box = mailbox.new(emu, symbol.addr)
+	-- A loaded ROM may still be booting. Check now and retry each frame.
+	local mailboxOk, reason = checkMailbox()
+	if mailboxOk then
+		ready = true
+		box:setLuaConnected(false)
+		console:log("[bridge] " .. reason)
+	else
+		lastMailboxError = reason
+		console:log("[bridge] waiting for mailbox: " .. reason)
+	end
+	pipe = mailboxbridge.new(box, client or { setPlayerState = function() end }, view,
+		function(line) console:error(line) end)
 end
 
 -- The network clock advances one frame (about 16.7 ms) per frame but never
@@ -171,8 +171,37 @@ local networkNow = 0
 local function updateNet()
 	local now = clock:tick(os.time())
 	networkNow = now
-	if client and reader then
-		client:update(now)
+	if box then
+		local ok, reason = checkMailbox()
+		if not ok then
+			if ready then
+				ready = false
+				if pipe then pipe.reset() end
+				if client then client:close("mailbox reset") end
+				view:setPlayerState(nil)
+			end
+			if reason ~= lastMailboxError then
+				console:error("[bridge] mailbox unavailable: " .. reason)
+				lastMailboxError = reason
+			end
+		elseif not ready then
+			ready, lastMailboxError = true, nil
+			box:setLuaConnected(false)
+			console:log("[bridge] " .. reason)
+		elseif box:wasReset() or (pipe and pipe.isConnected() and not box:isLuaConnected()) then
+			-- Detect completed resets even while retrying, awaiting welcome or
+			-- waiting for the ROM handoff, when lua_connected is already clear.
+			ready = false
+			pipe.reset()
+			if client then client:close("mailbox reset") end
+			box:setLuaConnected(false) -- header was checked; no old session survives
+			view:setPlayerState(nil)
+		end
+	end
+	if pipe and ready then
+		pipe.drainOutbound()
+		if client then client:update(now) end
+		pipe.flushInbound()
 	end
 	local text = view:update(now)
 	if text then drawPanel(text) end
@@ -182,6 +211,9 @@ local function stopNet()
 	if client then
 		client:close("emulation stopped")
 	end
+	if pipe then pipe.disconnect() end
+	pipe, box = nil, nil
+	ready = false
 	view:setPlayerState(nil)
 	-- No frame follows stop/shutdown, so publish the cleared state immediately.
 	local text = view:update(networkNow, true)
@@ -192,13 +224,7 @@ console:log("[bridge] Emerald Co-Op bridge started")
 callbacks:add("start", verifyRom)
 callbacks:add("stop", stopNet)
 callbacks:add("shutdown", stopNet)
--- Not "frame": a heavy game loop (map loads, route-edge crossings, save block
--- moves) can run past the end of a frame, so a frame callback can see memory
--- half updated. The game reads the keypad only at the top of its main loop,
--- when the previous iteration is complete (see docs/memory-map.md).
-callbacks:add("keysRead", readState)
--- Networking only moves bytes and the last state read above, so it runs every
--- frame, like mGBA's own socket polling.
+-- Both mailbox directions and the socket are serviced once per frame.
 callbacks:add("frame", updateNet)
 if emu then
 	verifyRom()

@@ -17,17 +17,16 @@ addresses. `cmd/symgen` reads the built ELF using Go's standard-library
 | `symbols["NAME"].size` | Symbol size in bytes from the ELF. |
 
 Symbol selection lives in
-[`cmd/symgen/symbols.txt`](../cmd/symgen/symbols.txt). The allowlist names global
-data objects, plus the few functions the client compares with function pointers
-stored in RAM (see [Position validity](#position-validity)), and `gCoopMailbox`
-(see [Mailbox](#mailbox)). Later issues can extend it as needed.
+[`cmd/symgen/symbols.txt`](../cmd/symgen/symbols.txt). The current allowlist
+contains only `gCoopMailbox` (see [Mailbox](#mailbox)). Earlier milestones also
+exported game globals and functions for the direct player-state reader.
 
 See [Generating client addresses](../README.md#generating-client-addresses) for
 the command, required build inputs, validation, map verification and regeneration
 rules. Never hand-write or guess global addresses, or edit the generated module.
-Update this document if the memory layout changes. The client reads the fields
-below in [`client/memory.lua`](../client/memory.lua), whose offset table must
-match this document.
+Update this document if the memory layout changes. The current client reads
+only `gCoopMailbox`; the player-state offsets below document the historical
+direct reader used through milestone 0.3.
 
 ## Player state
 
@@ -58,9 +57,10 @@ So read `gSaveBlock1Ptr` / `gSaveBlock2Ptr` **again on every read** and add the
 field offset to the value you just read. Never cache the pointer or a derived
 address across frames.
 
-### When to read: the `keysRead` callback
+### Historical reader timing: the `keysRead` callback
 
-Read the player state from mGBA's **`keysRead`** callback, not from `frame`.
+The 0.1–0.3 client read player state from mGBA's **`keysRead`** callback.
+The current mailbox bridge polls the completed ring slots once per frame.
 A `frame` callback fires at the end of every video frame, wherever the game's
 code happens to be. A heavy game loop iteration (a map load, a save block move,
 a route-edge crossing) runs past the frame boundary, so a `frame` callback can
@@ -326,7 +326,7 @@ Offsets are from `gCoopMailbox`.
 
 | Bit | Mask | Name | Owner | Meaning |
 | --- | --- | --- | --- | --- |
-| 0 | `0x01` | `lua_connected` | Lua | Set while the Lua client is attached to the mailbox; cleared by Lua when it stops. Read by `CoopMailbox_IsLuaConnected()`. |
+| 0 | `0x01` | `lua_connected` | Lua | Set after a server `welcome` while the authenticated socket and mailbox are valid; cleared on disconnect or stop. Read by `CoopMailbox_IsLuaConnected()`. |
 | 1 | `0x02` | `rom_ready` | ROM | Set by `CoopMailbox_Init()` at boot. |
 
 Lua must change only its own bit, with a read-modify-write of the `flags` byte
@@ -385,8 +385,11 @@ The outbound C definition is `struct CoopPresence` in
 `rom/src/coop/presence.c`. [Local publishing](local-presence.md) now implements
 this layout: `visible` is true only in controllable overworld play. A hidden
 transition retains the last complete tuple rather than reading a loading map.
-The old direct-memory reader's session visibility above remains in use by
-`bridge.lua` until the mailbox/socket integration in #26.
+The bridge consumes this mailbox payload for the local panel. Outgoing JSON
+maps each valid tuple to `visible = true`, preserving protocol v1's running-
+session semantics without struct reads; reset closes the socket instead.
+Incoming network visibility is copied unchanged. See the explicit
+[bridge mapping](mailbox-bridge.md#lifecycle-and-visibility).
 
 ### Remote slots
 
@@ -407,11 +410,12 @@ be reused. The ROM
   `lua_connected` is set; otherwise it removes that object;
 - removes every remote object, **forgets every slot** and **discards every
   queued inbound message** (by popping them, so only the ROM's `inbound.tail`
-  moves) on each overworld frame while `lua_connected` is clear. Reconnect
-  handoff for Lua: set `lua_connected` **before** pushing the first message of
-  the new session (in the same frame callback is fine), then send `PRESENCE`
-  for every player again. Anything pushed while the bit is clear may be
-  dropped;
+  moves) on each overworld frame while `lua_connected` is clear. The bridge
+  waits for this old queue to empty, sets `lua_connected` **before** pushing
+  the new session's messages, clears all four previous slots with `LEAVE`,
+  then sends `PRESENCE` for every current player. Anything pushed while the
+  bit is clear may be dropped. A menu/battle delays this handoff until the
+  ROM resumes its consumer;
 - drains the inbound ring only while the overworld runs (`CB1_Overworld` with
   `callback2 == CB2_Overworld`). During battles, full-screen menus and map
   loads the ring is not read and can fill up, and Lua's writes are then
@@ -452,6 +456,22 @@ including after a soft reset. It zeroes the whole mailbox (both rings empty,
 `lua_connected` cleared) and then writes the header. A Lua client that sees
 `rom_ready` drop or the magic disappear must treat the mailbox as reset.
 
+The main bridge also detects an initialization that finishes entirely between
+frame callbacks, including while disconnected or awaiting reconnect handoff.
+It opts into a Lua-local reset watch: the final four payload bytes of the
+**next unpublished inbound slot** hold `LUA!`. That slot is always free under
+the existing ring rules and belongs to Lua. The marker never advances an
+index, publishes a message or reserves extra capacity; the ROM cannot consume
+it. Before publishing a normal push, Lua writes the actual zero-padded payload
+and moves the marker to the next free slot. Full/invalid pushes do not move it.
+
+`CoopMailbox_Init` zeroes the marker, even if the header and every observed
+index already have their pre-reset values and `lua_connected` was already
+clear. Losing the marker invalidates cached identity/position and the socket;
+the bridge waits for a fresh ROM tuple before rejoining. This uses only
+existing Lua-owned slot storage: no struct/flag/layout/version or ROM change.
+Only one Lua writer/reader may attach to each ring, as before.
+
 ### C API
 
 Declared in [`include/coop/mailbox.h`][mailbox_h]:
@@ -475,8 +495,12 @@ mGBA's `emu` in the emulator and a table in tests), with the base address
 | `Mailbox.new(mem, baseAddr)` | none | Wraps the mailbox. Reads nothing. |
 | `:check()` | header | Returns `true, message`, or `false, message` if the magic, `layoutVersion` or `rom_ready` is wrong. |
 | `:setLuaConnected(bool)` | header | Sets or clears `lua_connected`, keeping the other bits. |
+| `:isLuaConnected()` | header | Reads the Lua-owned bit, allowing the bridge to detect a mailbox reset between frame checks. |
+| `:isInboundEmpty()` | inbound indices, read only | Returns whether the ROM has consumed/discarded the queue; false plus a reason on invalid indices. Used for reconnect handoff, never writes the ROM-owned tail. |
+| `:watchReset()` | next unpublished inbound slot | Arms the local reset marker after a successful header check. Returns true, or false and a reason on invalid indices. Does not publish anything. |
+| `:wasReset()` | watched inbound slot, read only | Returns true if an armed marker was lost, independently of connection state. Returns false before opting in. |
 | `:pop()` | outbound | Returns `{type, payload}` (payload as a byte string) or `nil` when empty, then advances `outbound.tail`. |
-| `:push(type, payload)` | inbound | Fills the slot (zero-padded) and then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
+| `:push(type, payload)` | inbound | Fills the slot (zero-padded), moves an armed local reset marker to the next free slot, then advances `inbound.head`. Returns `false, reason` if the ring is full, `type` is not 1–255 or the payload is over 30 bytes. |
 | `encodePresence(t)` / `decodePresence(bytes)` | none | Convert between a [presence payload](#presence-payload) and a table; `slot` is present only in the 14-byte form. Return `nil, error` on bad input. |
 
 Both ring calls read `head` and `tail` from memory every time and return an

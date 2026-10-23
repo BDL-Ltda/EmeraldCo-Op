@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay, terminal fake client, Lua client networking, the Lua/ROM mailbox, the [ROM local-presence publisher](local-presence.md) and the ROM rendering of remote players from the inbound ring ([issue #25](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/25)) are available, including a text-panel debug view of remote players in mGBA (see [client/README.md](../client/README.md#debug-panel-03)). Mailbox/socket integration remains planned in #26. See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
+This document records the design agreed in [issue #2](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/2). The ROM build, symbol generator, single-room presence relay, terminal fake client, Lua client networking, the Lua/ROM mailbox, the [ROM local-presence publisher](local-presence.md), the ROM rendering of remote players from the inbound ring ([issue #25](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/25)) and the mailbox/socket bridge are available, including a text-panel debug view of remote players in mGBA (see [client/README.md](../client/README.md#debug-panel-03)). See [server.md](server.md) for the implemented lifecycle, relay and current limits, and [fakeclient.md](fakeclient.md) for simulated-player tests. Read this document before starting a task. If a decision needs to change, discuss it in the relevant issue first.
 
 ## Components and ownership
 
@@ -52,6 +52,10 @@ ROM and Lua communicate through an EWRAM mailbox named **`gCoopMailbox`**. Its h
 | Inbound | Lua | ROM | Lua to ROM |
 
 Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a **dumb pipe between the mailbox and the socket**; the ROM owns the in-game co-op behavior. The ROM side lives in `rom/src/coop/mailbox.c` ([issue #22](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/22)). The exact byte layout, flag bits, message types, ring rules and C API are recorded in [memory-map.md](memory-map.md#mailbox); its address comes from `client/addresses.lua`.
+
+The [mailbox bridge](mailbox-bridge.md) documents reset/reconnect handoff,
+slot allocation, the explicit ROM-to-v1 visibility mapping and the two-instance
+emulator acceptance test. The legacy direct game-struct reader is removed.
 
 ## Remote players in the overworld (0.4)
 
