@@ -53,6 +53,10 @@ ROM and Lua communicate through an EWRAM mailbox named **`gCoopMailbox`**. Its h
 
 Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a **dumb pipe between the mailbox and the socket**; the ROM owns the in-game co-op behavior. The ROM side lives in `rom/src/coop/mailbox.c` ([issue #22](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/22)). The exact byte layout, flag bits, message types, ring rules and C API are recorded in [memory-map.md](memory-map.md#mailbox); its address comes from `client/addresses.lua`.
 
+## Remote players in the overworld (0.4)
+
+The ROM draws each remote player as a normal object event with a reserved local ID, updated every frame from `CB1_Overworld`, with collision and interaction turned off for those objects. [remote-player-design.md](remote-player-design.md) records how, the risks, and the module layout for publishing presence and rendering remote players.
+
 ## Networking, identity and hosting
 
 The protocol is **JSON lines over TCP**, with a generic envelope containing `v`, `type` and message-specific fields. [Issue #12](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/12) defines the detailed contract in [protocol.md](protocol.md).
