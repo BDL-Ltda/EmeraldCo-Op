@@ -4,7 +4,7 @@ Instructions for every contributor to Emerald Co-Op: coding agents (Claude Code,
 
 ## What this project is
 
-A co-op mod for Pokémon Emerald: players see each other in the overworld (v1), later battle, trade and play together. Pieces:
+A co-op mod for Pokémon Emerald: players see each other in the overworld (v1), later trade, battle and play together. Pieces:
 
 - `rom/`: our fork of [pret/pokeemerald](https://github.com/pret/pokeemerald) (git submodule). New C code goes in `rom/src/coop/` and `rom/include/coop/`.
 - `cmd/`, `internal/`: one Go module at the repo root (server, `fakeclient`, `symgen`). Standard library only.

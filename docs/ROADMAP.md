@@ -21,8 +21,8 @@ Milestones 0.1-0.3 read the unmodified game's state through Lua. Starting at 0.4
 
 | Version | Planned direction |
 | --- | --- |
-| v1.5 | PvP battles. |
-| v2 | Trading. |
+| v1.5 | Trading. |
+| v2 | PvP battles. |
 | v2.5 | Duo battle against an NPC. |
 | v3 | Shared profile. |
 | v4 | Nuzlocke mode. |
