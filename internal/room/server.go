@@ -390,6 +390,8 @@ func (s *Server) handle(conn net.Conn, authenticated func()) {
 			s.presence(c, msg)
 		case protocol.Ping:
 			s.pong(c, msg)
+		case protocol.Relayed:
+			s.relay(c, msg)
 		default:
 			s.reject(c, protocol.CodeBadMessage)
 			return
@@ -471,6 +473,17 @@ func (s *Server) presence(c *client, msg protocol.Presence) {
 	c.player.Presence = &state
 	msg.PlayerID = c.player.PlayerID
 	s.broadcast(msg, c)
+}
+
+// relay sends a trade message to every other player, stamped with the
+// sender's ID. The server neither routes by targetId nor keeps trade state.
+func (s *Server) relay(c *client, msg protocol.Relayed) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.players[c.player.PlayerID] != c {
+		return
+	}
+	s.broadcast(msg.WithPlayerID(c.player.PlayerID), c)
 }
 
 func (s *Server) pong(c *client, msg protocol.Ping) {

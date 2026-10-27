@@ -16,6 +16,7 @@ Run commands from the repository root with the Go version pinned in `go.mod`.
 | `-key` | `FAKECLIENT_JOIN_KEY` environment fallback | Shared join key; required, 1–64 characters with no control characters. An explicit flag overrides the environment. |
 | `-pattern` | `square` | `square`, `idle` or `warp`. |
 | `-steps-per-sec` | `4` | Finite number greater than zero and at most 40. Controls walking speed. |
+| `-trade` | Empty (off) | A player ID. After the initial presence, send one of each [trade message](protocol.md#trade-messages) addressed to it, once. |
 
 Prefer the environment fallback so the key does not appear in the command line
 or shell history. In PowerShell, enter it privately:
@@ -27,8 +28,11 @@ go run ./cmd/fakeclient -id bot1
 
 Do not post real keys, public server addresses or raw hello messages. Logs show
 human-readable events, not raw payloads or join keys. They cover welcome and its
-player snapshot, joins, presence, leaves, pong, errors and unknown messages.
-Unknown message types are reported and ignored without logging their payloads.
+player snapshot, joins, presence, leaves, pong, errors, trade messages and
+unknown messages. Unknown message types are reported and ignored without
+logging their payloads; trade `data` and `pokemon` fields are logged by size
+only. The client prints every trade message it receives, whatever its
+`targetId`, and never answers one.
 
 ## Simulated behavior
 
@@ -91,6 +95,14 @@ the heartbeat keeps B connected. Stop both clients and the server after testing.
 You can remove the test key from each client shell with
 `Remove-Item Env:FAKECLIENT_JOIN_KEY`, and from the server shell with
 `Remove-Item Env:SERVER_JOIN_KEY`.
+
+To check the trade relay, start B with `-pattern idle -trade bot1` while A is
+connected. B prints `[trade] sent 8 sample trade messages to bot1`, and A
+prints, in order, `[trade_available] bot2 available=true`, `[trade_invite]`,
+`[trade_accept]`, `[trade_decline] ... reason=declined`,
+`[trade_cancel] ... reason=canceled`, `[trade_link] bot2 -> bot1 seq=0 bytes=4`,
+`[trade_confirm] bot2 -> bot1 bytes=100` and `[trade_available] bot2
+available=false`. B sees none of them echoed.
 
 Record joins, peer presence, map switches, heartbeat and leave results in the
 pull request, including the tested revision. Older lifecycle-only checkouts

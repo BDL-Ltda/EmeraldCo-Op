@@ -46,6 +46,21 @@ func TestRoundTrip(t *testing.T) {
 		{"error room_full", Error{Code: CodeRoomFull, Message: "room is full"}},
 		{"error version_mismatch", Error{Code: CodeVersionMismatch, Message: "server speaks v1"}},
 		{"error bad_hello", Error{Code: CodeBadHello, Message: "bad hello"}},
+		{"trade_available on", TradeAvailable{PlayerID: "leo", Available: true}},
+		{"trade_available off", TradeAvailable{PlayerID: "leo", Available: false}},
+		{"trade_invite", TradeInvite{PlayerID: "leo", TargetID: "davi"}},
+		{"trade_accept", TradeAccept{PlayerID: "davi", TargetID: "leo"}},
+		{"trade_decline declined", TradeDecline{PlayerID: "davi", TargetID: "leo", Reason: DeclineDeclined}},
+		{"trade_decline timeout", TradeDecline{PlayerID: "davi", TargetID: "leo", Reason: DeclineTimeout}},
+		{"trade_decline busy", TradeDecline{PlayerID: "davi", TargetID: "leo", Reason: DeclineBusy}},
+		{"trade_cancel canceled", TradeCancel{PlayerID: "leo", TargetID: "davi", Reason: CancelCanceled}},
+		{"trade_cancel timeout", TradeCancel{PlayerID: "leo", TargetID: "davi", Reason: CancelTimeout}},
+		{"trade_cancel disconnected", TradeCancel{PlayerID: "leo", TargetID: "davi", Reason: CancelDisconnected}},
+		{"trade_link", TradeLink{PlayerID: "leo", TargetID: "davi", Seq: 7, Data: "00ff10ab"}},
+		{"trade_link empty", TradeLink{PlayerID: "leo", TargetID: "davi", Seq: 0, Data: ""}},
+		{"trade_link largest", TradeLink{PlayerID: "0123456789abcdef", TargetID: "fedcba9876543210",
+			Seq: 4294967295, Data: strings.Repeat("ff", MaxTradeLinkBytes)}},
+		{"trade_confirm", TradeConfirm{PlayerID: "leo", TargetID: "davi", Pokemon: strings.Repeat("a5", PokemonBytes)}},
 	}
 
 	for _, tt := range tests {
@@ -57,7 +72,7 @@ func TestRoundTrip(t *testing.T) {
 			if !bytes.HasSuffix(line, []byte("\n")) || bytes.Count(line, []byte("\n")) != 1 {
 				t.Fatalf("Encode must produce exactly one line ending in \\n, got %q", line)
 			}
-			if !bytes.HasPrefix(line, []byte(`{"v":1,"type":"`+tt.msg.Type()+`"`)) {
+			if !bytes.HasPrefix(line, []byte(`{"v":2,"type":"`+tt.msg.Type()+`"`)) {
 				t.Fatalf("line must start with v and type, got %q", line)
 			}
 
@@ -72,12 +87,47 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTradeMessagesAreRelayedWithSenderID(t *testing.T) {
+	messages := []Message{
+		TradeAvailable{PlayerID: "x", Available: true},
+		TradeInvite{PlayerID: "x", TargetID: "b"},
+		TradeAccept{PlayerID: "x", TargetID: "b"},
+		TradeDecline{PlayerID: "x", TargetID: "b", Reason: DeclineBusy},
+		TradeCancel{PlayerID: "x", TargetID: "b", Reason: CancelTimeout},
+		TradeLink{PlayerID: "x", TargetID: "b", Seq: 1, Data: "00"},
+		TradeConfirm{PlayerID: "x", TargetID: "b", Pokemon: strings.Repeat("00", PokemonBytes)},
+	}
+	for _, msg := range messages {
+		relayed, ok := msg.(Relayed)
+		if !ok {
+			t.Fatalf("%s does not implement Relayed", msg.Type())
+		}
+		stamped := relayed.WithPlayerID("a")
+		if stamped.Type() != msg.Type() {
+			t.Fatalf("%s: WithPlayerID changed the type to %s", msg.Type(), stamped.Type())
+		}
+		line, err := Encode(stamped)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(line, []byte(`"playerId":"a"`)) || bytes.Contains(line, []byte(`"playerId":"x"`)) {
+			t.Fatalf("%s: got %s", msg.Type(), line)
+		}
+	}
+	// Server-only and presence messages are not relayed through this path.
+	for _, msg := range []Message{Presence{}, Ping{}, Hello{}, Welcome{}} {
+		if _, ok := msg.(Relayed); ok {
+			t.Fatalf("%s must not implement Relayed", msg.Type())
+		}
+	}
+}
+
 func TestEncodeNilPlayersAsEmptyArray(t *testing.T) {
 	line, err := Encode(Welcome{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "{\"v\":1,\"type\":\"welcome\",\"players\":[]}\n"; string(line) != want {
+	if want := "{\"v\":2,\"type\":\"welcome\",\"players\":[]}\n"; string(line) != want {
 		t.Fatalf("got %q, want %q", line, want)
 	}
 }
@@ -87,7 +137,7 @@ func TestEncodeDoesNotEscapeHTML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "{\"v\":1,\"type\":\"error\",\"code\":\"bad_message\",\"message\":\"<a> & <b>\"}\n"; string(line) != want {
+	if want := "{\"v\":2,\"type\":\"error\",\"code\":\"bad_message\",\"message\":\"<a> & <b>\"}\n"; string(line) != want {
 		t.Fatalf("got %q, want %q", line, want)
 	}
 }
@@ -99,7 +149,7 @@ func TestEncodeRejects(t *testing.T) {
 		want error
 	}{
 		{"nil", nil, ErrUnencodable},
-		{"unknown", Unknown{TypeName: "trade", Raw: []byte(`{"v":1,"type":"trade"}`)}, ErrUnencodable},
+		{"unknown", Unknown{TypeName: "trade", Raw: []byte(`{"v":2,"type":"trade"}`)}, ErrUnencodable},
 		{"unknown pointer", &Unknown{TypeName: "trade"}, ErrUnencodable},
 		{"invalid message", Ping{T: -1}, ErrInvalid},
 	}
@@ -120,70 +170,98 @@ func TestParseValidation(t *testing.T) {
 		field string
 	}{
 		// Required fields.
-		{"hello missing playerId", `{"v":1,"type":"hello","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "playerId"},
-		{"hello null joinKey", `{"v":1,"type":"hello","playerId":"a","joinKey":null,"trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
-		{"hello missing trainerId", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","gender":0,"clientVersion":"0.2.0"}`, "trainerId"},
-		{"hello missing gender", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"clientVersion":"0.2.0"}`, "gender"},
-		{"hello missing clientVersion", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0}`, "clientVersion"},
-		{"welcome missing players", `{"v":1,"type":"welcome"}`, "players"},
-		{"welcome null players", `{"v":1,"type":"welcome","players":null}`, "players"},
-		{"welcome player missing trainerId", `{"v":1,"type":"welcome","players":[{"playerId":"a","gender":0}]}`, "players[0].trainerId"},
-		{"welcome null player", `{"v":1,"type":"welcome","players":[null]}`, "players[0].playerId"},
-		{"welcome presence missing visible", `{"v":1,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0,"presence":{"mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1}}]}`, "players[0].presence.visible"},
-		{"join missing gender", `{"v":1,"type":"join","playerId":"a","trainerId":1}`, "gender"},
-		{"presence missing x", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"y":0,"facing":1,"visible":true}`, "x"},
-		{"presence missing visible", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1}`, "visible"},
-		{"leave missing reason", `{"v":1,"type":"leave","playerId":"a"}`, "reason"},
-		{"ping missing t", `{"v":1,"type":"ping"}`, "t"},
-		{"pong null t", `{"v":1,"type":"pong","t":null}`, "t"},
-		{"error missing message", `{"v":1,"type":"error","code":"bad_key"}`, "message"},
+		{"hello missing playerId", `{"v":2,"type":"hello","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "playerId"},
+		{"hello null joinKey", `{"v":2,"type":"hello","playerId":"a","joinKey":null,"trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
+		{"hello missing trainerId", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","gender":0,"clientVersion":"0.2.0"}`, "trainerId"},
+		{"hello missing gender", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"clientVersion":"0.2.0"}`, "gender"},
+		{"hello missing clientVersion", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0}`, "clientVersion"},
+		{"welcome missing players", `{"v":2,"type":"welcome"}`, "players"},
+		{"welcome null players", `{"v":2,"type":"welcome","players":null}`, "players"},
+		{"welcome player missing trainerId", `{"v":2,"type":"welcome","players":[{"playerId":"a","gender":0}]}`, "players[0].trainerId"},
+		{"welcome null player", `{"v":2,"type":"welcome","players":[null]}`, "players[0].playerId"},
+		{"welcome presence missing visible", `{"v":2,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0,"presence":{"mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1}}]}`, "players[0].presence.visible"},
+		{"join missing gender", `{"v":2,"type":"join","playerId":"a","trainerId":1}`, "gender"},
+		{"presence missing x", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"y":0,"facing":1,"visible":true}`, "x"},
+		{"presence missing visible", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1}`, "visible"},
+		{"leave missing reason", `{"v":2,"type":"leave","playerId":"a"}`, "reason"},
+		{"ping missing t", `{"v":2,"type":"ping"}`, "t"},
+		{"pong null t", `{"v":2,"type":"pong","t":null}`, "t"},
+		{"error missing message", `{"v":2,"type":"error","code":"bad_key"}`, "message"},
 
 		// playerId.
-		{"playerId empty", `{"v":1,"type":"join","playerId":"","trainerId":1,"gender":0}`, "playerId"},
-		{"playerId too long", `{"v":1,"type":"join","playerId":"0123456789abcdefg","trainerId":1,"gender":0}`, "playerId"},
-		{"playerId space", `{"v":1,"type":"join","playerId":"a b","trainerId":1,"gender":0}`, "playerId"},
-		{"playerId dot", `{"v":1,"type":"leave","playerId":"a.b","reason":"timeout"}`, "playerId"},
-		{"playerId non-ASCII", `{"v":1,"type":"presence","playerId":"é","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "playerId"},
-		{"welcome player bad id", `{"v":1,"type":"welcome","players":[{"playerId":"a/b","trainerId":1,"gender":0}]}`, "players[0].playerId"},
-		{"welcome duplicate player", `{"v":1,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0},{"playerId":"a","trainerId":2,"gender":1}]}`, "players[1].playerId"},
+		{"playerId empty", `{"v":2,"type":"join","playerId":"","trainerId":1,"gender":0}`, "playerId"},
+		{"playerId too long", `{"v":2,"type":"join","playerId":"0123456789abcdefg","trainerId":1,"gender":0}`, "playerId"},
+		{"playerId space", `{"v":2,"type":"join","playerId":"a b","trainerId":1,"gender":0}`, "playerId"},
+		{"playerId dot", `{"v":2,"type":"leave","playerId":"a.b","reason":"timeout"}`, "playerId"},
+		{"playerId non-ASCII", `{"v":2,"type":"presence","playerId":"é","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "playerId"},
+		{"welcome player bad id", `{"v":2,"type":"welcome","players":[{"playerId":"a/b","trainerId":1,"gender":0}]}`, "players[0].playerId"},
+		{"welcome duplicate player", `{"v":2,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0},{"playerId":"a","trainerId":2,"gender":1}]}`, "players[1].playerId"},
 
 		// Hello text fields.
-		{"joinKey empty", `{"v":1,"type":"hello","playerId":"a","joinKey":"","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
-		{"joinKey too long", `{"v":1,"type":"hello","playerId":"a","joinKey":"` + strings.Repeat("k", MaxJoinKeyLength+1) + `","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
-		{"joinKey control character", `{"v":1,"type":"hello","playerId":"a","joinKey":"k\n","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
-		{"clientVersion empty", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":""}`, "clientVersion"},
-		{"clientVersion too long", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"` + strings.Repeat("1", MaxClientVersionLength+1) + `"}`, "clientVersion"},
+		{"joinKey empty", `{"v":2,"type":"hello","playerId":"a","joinKey":"","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
+		{"joinKey too long", `{"v":2,"type":"hello","playerId":"a","joinKey":"` + strings.Repeat("k", MaxJoinKeyLength+1) + `","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
+		{"joinKey control character", `{"v":2,"type":"hello","playerId":"a","joinKey":"k\n","trainerId":1,"gender":0,"clientVersion":"0.2.0"}`, "joinKey"},
+		{"clientVersion empty", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":""}`, "clientVersion"},
+		{"clientVersion too long", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"` + strings.Repeat("1", MaxClientVersionLength+1) + `"}`, "clientVersion"},
 
 		// trainerId and gender.
-		{"trainerId negative", `{"v":1,"type":"join","playerId":"a","trainerId":-1,"gender":0}`, "trainerId"},
-		{"trainerId above uint32", `{"v":1,"type":"join","playerId":"a","trainerId":4294967296,"gender":0}`, "trainerId"},
-		{"trainerId string", `{"v":1,"type":"join","playerId":"a","trainerId":"1","gender":0}`, "trainerId"},
-		{"gender 2", `{"v":1,"type":"join","playerId":"a","trainerId":1,"gender":2}`, "gender"},
-		{"gender negative", `{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":-1,"clientVersion":"0.2.0"}`, "gender"},
-		{"welcome player gender", `{"v":1,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":5}]}`, "players[0].gender"},
+		{"trainerId negative", `{"v":2,"type":"join","playerId":"a","trainerId":-1,"gender":0}`, "trainerId"},
+		{"trainerId above uint32", `{"v":2,"type":"join","playerId":"a","trainerId":4294967296,"gender":0}`, "trainerId"},
+		{"trainerId string", `{"v":2,"type":"join","playerId":"a","trainerId":"1","gender":0}`, "trainerId"},
+		{"gender 2", `{"v":2,"type":"join","playerId":"a","trainerId":1,"gender":2}`, "gender"},
+		{"gender negative", `{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":-1,"clientVersion":"0.2.0"}`, "gender"},
+		{"welcome player gender", `{"v":2,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":5}]}`, "players[0].gender"},
 
 		// Presence ranges.
-		{"mapGroup negative", `{"v":1,"type":"presence","playerId":"a","mapGroup":-1,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "mapGroup"},
-		{"mapGroup too big", `{"v":1,"type":"presence","playerId":"a","mapGroup":256,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "mapGroup"},
-		{"mapNum too big", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":256,"x":0,"y":0,"facing":1,"visible":true}`, "mapNum"},
-		{"x too small", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":-32769,"y":0,"facing":1,"visible":true}`, "x"},
-		{"y too big", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":32768,"facing":1,"visible":true}`, "y"},
-		{"x fraction", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":1.5,"y":0,"facing":1,"visible":true}`, "x"},
-		{"facing 0", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":0,"visible":true}`, "facing"},
-		{"facing 5", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":5,"visible":true}`, "facing"},
-		{"visible not bool", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1,"visible":1}`, "visible"},
-		{"welcome presence facing", `{"v":1,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0,"presence":{"mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":9,"visible":true}}]}`, "players[0].presence.facing"},
-		{"welcome too many players", `{"v":1,"type":"welcome","players":[` +
+		{"mapGroup negative", `{"v":2,"type":"presence","playerId":"a","mapGroup":-1,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "mapGroup"},
+		{"mapGroup too big", `{"v":2,"type":"presence","playerId":"a","mapGroup":256,"mapNum":0,"x":0,"y":0,"facing":1,"visible":true}`, "mapGroup"},
+		{"mapNum too big", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":256,"x":0,"y":0,"facing":1,"visible":true}`, "mapNum"},
+		{"x too small", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":-32769,"y":0,"facing":1,"visible":true}`, "x"},
+		{"y too big", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":32768,"facing":1,"visible":true}`, "y"},
+		{"x fraction", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":1.5,"y":0,"facing":1,"visible":true}`, "x"},
+		{"facing 0", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":0,"visible":true}`, "facing"},
+		{"facing 5", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":5,"visible":true}`, "facing"},
+		{"visible not bool", `{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":1,"visible":1}`, "visible"},
+		{"welcome presence facing", `{"v":2,"type":"welcome","players":[{"playerId":"a","trainerId":1,"gender":0,"presence":{"mapGroup":0,"mapNum":0,"x":0,"y":0,"facing":9,"visible":true}}]}`, "players[0].presence.facing"},
+		{"welcome too many players", `{"v":2,"type":"welcome","players":[` +
 			`{"playerId":"a","trainerId":1,"gender":0},{"playerId":"b","trainerId":1,"gender":0},` +
 			`{"playerId":"c","trainerId":1,"gender":0},{"playerId":"d","trainerId":1,"gender":0},` +
 			`{"playerId":"e","trainerId":1,"gender":0}]}`, "players"},
 
 		// Enums and timestamps.
-		{"leave unknown reason", `{"v":1,"type":"leave","playerId":"a","reason":"bored"}`, "reason"},
-		{"ping negative", `{"v":1,"type":"ping","t":-1}`, "t"},
-		{"pong fraction", `{"v":1,"type":"pong","t":1.5}`, "t"},
-		{"error unknown code", `{"v":1,"type":"error","code":"oops","message":""}`, "code"},
-		{"error message too long", `{"v":1,"type":"error","code":"bad_key","message":"` + strings.Repeat("m", MaxErrorMessageLength+1) + `"}`, "message"},
+		{"leave unknown reason", `{"v":2,"type":"leave","playerId":"a","reason":"bored"}`, "reason"},
+		{"ping negative", `{"v":2,"type":"ping","t":-1}`, "t"},
+		{"pong fraction", `{"v":2,"type":"pong","t":1.5}`, "t"},
+		{"error unknown code", `{"v":2,"type":"error","code":"oops","message":""}`, "code"},
+		{"error message too long", `{"v":2,"type":"error","code":"bad_key","message":"` + strings.Repeat("m", MaxErrorMessageLength+1) + `"}`, "message"},
+
+		// Trade messages.
+		{"trade_available missing available", `{"v":2,"type":"trade_available","playerId":"a"}`, "available"},
+		{"trade_available not bool", `{"v":2,"type":"trade_available","playerId":"a","available":1}`, "available"},
+		{"trade_available bad playerId", `{"v":2,"type":"trade_available","playerId":"a b","available":true}`, "playerId"},
+		{"trade_invite missing targetId", `{"v":2,"type":"trade_invite","playerId":"a"}`, "targetId"},
+		{"trade_invite null targetId", `{"v":2,"type":"trade_invite","playerId":"a","targetId":null}`, "targetId"},
+		{"trade_invite empty targetId", `{"v":2,"type":"trade_invite","playerId":"a","targetId":""}`, "targetId"},
+		{"trade_accept targetId too long", `{"v":2,"type":"trade_accept","playerId":"a","targetId":"0123456789abcdefg"}`, "targetId"},
+		{"trade_accept missing playerId", `{"v":2,"type":"trade_accept","targetId":"b"}`, "playerId"},
+		{"trade_decline missing reason", `{"v":2,"type":"trade_decline","playerId":"a","targetId":"b"}`, "reason"},
+		{"trade_decline unknown reason", `{"v":2,"type":"trade_decline","playerId":"a","targetId":"b","reason":"canceled"}`, "reason"},
+		{"trade_cancel unknown reason", `{"v":2,"type":"trade_cancel","playerId":"a","targetId":"b","reason":"busy"}`, "reason"},
+		{"trade_cancel bad targetId", `{"v":2,"type":"trade_cancel","playerId":"a","targetId":"b/c","reason":"timeout"}`, "targetId"},
+		{"trade_link missing seq", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","data":""}`, "seq"},
+		{"trade_link negative seq", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":-1,"data":""}`, "seq"},
+		{"trade_link seq above uint32", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":4294967296,"data":""}`, "seq"},
+		{"trade_link fraction seq", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":1.5,"data":""}`, "seq"},
+		{"trade_link missing data", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0}`, "data"},
+		{"trade_link odd data", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":"abc"}`, "data"},
+		{"trade_link uppercase data", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":"AB"}`, "data"},
+		{"trade_link non-hex data", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":"zz"}`, "data"},
+		{"trade_link oversize data", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":"` + strings.Repeat("00", MaxTradeLinkBytes+1) + `"}`, "data"},
+		{"trade_link data not string", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":[1,2]}`, "data"},
+		{"trade_confirm missing pokemon", `{"v":2,"type":"trade_confirm","playerId":"a","targetId":"b"}`, "pokemon"},
+		{"trade_confirm short pokemon", `{"v":2,"type":"trade_confirm","playerId":"a","targetId":"b","pokemon":"` + strings.Repeat("00", PokemonBytes-1) + `"}`, "pokemon"},
+		{"trade_confirm long pokemon", `{"v":2,"type":"trade_confirm","playerId":"a","targetId":"b","pokemon":"` + strings.Repeat("00", PokemonBytes+1) + `"}`, "pokemon"},
+		{"trade_confirm non-hex pokemon", `{"v":2,"type":"trade_confirm","playerId":"a","targetId":"b","pokemon":"` + strings.Repeat("0g", PokemonBytes) + `"}`, "pokemon"},
 	}
 
 	for _, tt := range tests {
@@ -211,9 +289,9 @@ func TestParseMalformed(t *testing.T) {
 		{"empty", ``},
 		{"garbage", `hello there`},
 		{"binary", "\x00\xff\x13\x37"},
-		{"truncated", `{"v":1,"type":"ping","t":1`},
-		{"two objects", `{"v":1,"type":"ping","t":1}{"v":1,"type":"ping","t":2}`},
-		{"array", `[{"v":1,"type":"ping","t":1}]`},
+		{"truncated", `{"v":2,"type":"ping","t":1`},
+		{"two objects", `{"v":2,"type":"ping","t":1}{"v":2,"type":"ping","t":2}`},
+		{"array", `[{"v":2,"type":"ping","t":1}]`},
 		{"number", `42`},
 		{"null", `null`},
 		{"empty object", `{}`},
@@ -221,9 +299,9 @@ func TestParseMalformed(t *testing.T) {
 		{"null v", `{"v":null,"type":"ping","t":1}`},
 		{"string v", `{"v":"1","type":"ping","t":1}`},
 		{"fraction v", `{"v":1.5,"type":"ping","t":1}`},
-		{"missing type", `{"v":1,"t":1}`},
-		{"empty type", `{"v":1,"type":"","t":1}`},
-		{"number type", `{"v":1,"type":7,"t":1}`},
+		{"missing type", `{"v":2,"t":1}`},
+		{"empty type", `{"v":2,"type":"","t":1}`},
+		{"number type", `{"v":2,"type":7,"t":1}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -238,11 +316,15 @@ func TestParseMalformed(t *testing.T) {
 func TestParseVersionMismatch(t *testing.T) {
 	tests := []string{
 		`{"v":0,"type":"ping","t":1}`,
-		`{"v":2,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"9.0.0"}`,
+		`{"v":3,"type":"ping","t":1}`,
+		// A v1.0 client's hello: valid in v1, rejected by version alone.
+		`{"v":1,"type":"hello","playerId":"bernardo","joinKey":"example-key","trainerId":2882400001,"gender":0,"clientVersion":"0.2.0"}`,
+		`{"v":1,"type":"presence","playerId":"leo","mapGroup":0,"mapNum":9,"x":8,"y":5,"facing":4,"visible":true}`,
+		`{"v":1,"type":"hello","playerId":"a","joinKey":"k","trainerId":1,"gender":0,"clientVersion":"9.0.0"}`,
 		// The version is checked before the type and fields, so a future client
 		// gets version_mismatch rather than bad_message.
-		`{"v":2,"type":"hello","futureField":true}`,
-		`{"v":2,"type":"teleport"}`,
+		`{"v":1,"type":"hello","futureField":true}`,
+		`{"v":1,"type":"teleport"}`,
 	}
 	for _, line := range tests {
 		t.Run(line, func(t *testing.T) {
@@ -255,7 +337,7 @@ func TestParseVersionMismatch(t *testing.T) {
 }
 
 func TestParseUnknownType(t *testing.T) {
-	line := []byte(`{"v":1,"type":"trade","offer":[1,2,3]}`)
+	line := []byte(`{"v":2,"type":"trade","offer":[1,2,3]}`)
 
 	msg, err := Parse(line)
 	if err != nil {
@@ -276,7 +358,7 @@ func TestParseUnknownType(t *testing.T) {
 }
 
 func TestParseIgnoresUnknownFields(t *testing.T) {
-	msg, err := Parse([]byte(`{"v":1,"type":"ping","t":5,"addedInAMinorChange":"x"}`))
+	msg, err := Parse([]byte(`{"v":2,"type":"ping","t":5,"addedInAMinorChange":"x"}`))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -322,7 +404,7 @@ func TestDecodeRejectsEndlessLineWithBoundedMemory(t *testing.T) {
 }
 
 func TestDecodeSkipsOversizeLineAndContinues(t *testing.T) {
-	stream := strings.Repeat("x", 10*MaxLineLength) + "\n" + `{"v":1,"type":"ping","t":7}` + "\n"
+	stream := strings.Repeat("x", 10*MaxLineLength) + "\n" + `{"v":2,"type":"ping","t":7}` + "\n"
 	decoder := NewDecoder(strings.NewReader(stream))
 
 	if _, err := decoder.Decode(); !errors.Is(err, ErrLineTooLong) {
@@ -340,7 +422,7 @@ func TestDecodeSkipsOversizeLineAndContinues(t *testing.T) {
 // paddedPing returns a valid ping line of exactly length bytes, without the
 // newline, by padding it with JSON whitespace.
 func paddedPing(length int) string {
-	prefix := `{"v":1,"type":"ping","t":1`
+	prefix := `{"v":2,"type":"ping","t":1`
 	return prefix + strings.Repeat(" ", length-len(prefix)-1) + "}"
 }
 
@@ -357,11 +439,11 @@ func TestDecodeLineLengthBoundary(t *testing.T) {
 }
 
 func TestDecodeStream(t *testing.T) {
-	stream := `{"v":1,"type":"ping","t":1}` + "\n" +
+	stream := `{"v":2,"type":"ping","t":1}` + "\n" +
 		"garbage\n" +
-		`{"v":1,"type":"future","x":1}` + "\n" +
-		`{"v":1,"type":"leave","playerId":"a","reason":"timeout"}` + "\n" +
-		`{"v":1,"type":"pong","t":2}` // no newline: the stream ends mid-line
+		`{"v":2,"type":"future","x":1}` + "\n" +
+		`{"v":2,"type":"leave","playerId":"a","reason":"timeout"}` + "\n" +
+		`{"v":2,"type":"pong","t":2}` // no newline: the stream ends mid-line
 	decoder := NewDecoder(strings.NewReader(stream))
 
 	if msg, err := decoder.Decode(); err != nil || msg != (Ping{T: 1}) {
@@ -426,7 +508,8 @@ func TestProtocolDocExamples(t *testing.T) {
 		seenTypes[msg.Type()] = true
 	}
 
-	for _, typeName := range []string{TypeHello, TypeWelcome, TypeJoin, TypePresence, TypeLeave, TypePing, TypePong, TypeError} {
+	for _, typeName := range []string{TypeHello, TypeWelcome, TypeJoin, TypePresence, TypeLeave, TypePing, TypePong, TypeError,
+		TypeTradeAvailable, TypeTradeInvite, TypeTradeAccept, TypeTradeDecline, TypeTradeCancel, TypeTradeLink, TypeTradeConfirm} {
 		if !seenTypes[typeName] {
 			t.Errorf("docs/protocol.md has no example for %q", typeName)
 		}

@@ -18,11 +18,11 @@ Every message is a flat JSON object with these two fields first, followed by the
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `v` | integer | Protocol version. This document describes version `1`. |
+| `v` | integer | Protocol version. This document describes version `2`. |
 | `type` | string | Message type, from the table below. |
 
 ```
-{"v":1,"type":"ping","t":1712345678901}
+{"v":2,"type":"ping","t":1712345678901}
 ```
 
 Every field listed for a type is required and must not be `null`, unless it is marked optional. Receivers ignore fields they don't know (see [Versioning](#versioning)).
@@ -38,6 +38,15 @@ Every field listed for a type is required and must not be `null`, unless it is m
 | `leave` | server → others | `playerId`, `reason`: `disconnect` / `timeout` / `kicked` / `replaced` |
 | `ping` / `pong` | both | `t` (sender timestamp in ms, echoed back) |
 | `error` | server → client | `code`: `bad_key` / `bad_message` / `room_full` / `version_mismatch` / `bad_hello`, `message`. The server closes the connection afterwards |
+| `trade_available` | client → server → others | `playerId`, `available` |
+| `trade_invite` | client → server → others | `playerId`, `targetId` |
+| `trade_accept` | client → server → others | `playerId`, `targetId` |
+| `trade_decline` | client → server → others | `playerId`, `targetId`, `reason`: `declined` / `timeout` / `busy` |
+| `trade_cancel` | client → server → others | `playerId`, `targetId`, `reason`: `canceled` / `timeout` / `disconnected` |
+| `trade_link` | client → server → others | `playerId`, `targetId`, `seq`, `data` |
+| `trade_confirm` | client → server → others | `playerId`, `targetId`, `pokemon` |
+
+The `trade_*` messages (v2, [#78](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/78)) are described in [Trade messages](#trade-messages).
 
 ### Field rules
 
@@ -54,10 +63,19 @@ Every field listed for a type is required and must not be `null`, unless it is m
 | `x`, `y` | integer | −32768–32767 (the game stores coordinates as `s16`). |
 | `facing` | integer | 1–4: `1` south, `2` north, `3` west, `4` east, the decomp's `DIR_SOUTH` / `DIR_NORTH` / `DIR_WEST` / `DIR_EAST`. |
 | `visible` | boolean | Whether the player is in a running game session. It is false only before a game starts (boot, title screen, main menu, new-game intro) and true everywhere else, including battles, menus, warps and NPC talk. Other clients don't draw a player whose `visible` is false. While the player is in a battle or menu, the position is the last one read on the field. See [memory-map.md](memory-map.md#visible-signal). |
-| `reason` | string | One of `disconnect`, `timeout`, `kicked`, `replaced`. |
+| `reason` (`leave`) | string | One of `disconnect`, `timeout`, `kicked`, `replaced`. |
 | `t` | integer | Milliseconds, ≥ 0. Only the sender interprets it; the receiver echoes it unchanged. |
 | `code` | string | One of the error codes below. |
 | `message` | string | 0–256 characters, no control characters. Human-readable detail. |
+| `targetId` | string | Same rules as `playerId`. The player a trade message is meant for. |
+| `available` | boolean | `true` while the player waits to trade at a Cable Club attendant, `false` once they stop waiting. |
+| `reason` (`trade_decline`) | string | `declined` (the player said no), `timeout` (no answer in time), `busy` (the player is already inviting, invited or trading). |
+| `reason` (`trade_cancel`) | string | `canceled` (the player backed out), `timeout` (the partner stopped answering), `disconnected` (the partner left the room). |
+| `seq` | integer | 0–4294967295. The sender's sequence number for its `trade_link` messages to this partner. |
+| `data` | string | 0–1024 bytes as lowercase hex (`[0-9a-f]`, even length, at most 2048 characters). Opaque virtual-link bytes; may be empty. |
+| `pokemon` | string | Exactly 100 bytes as lowercase hex (200 characters): the sender's outgoing [`struct Pokemon`][struct-pokemon], byte for byte as in GBA memory (little-endian, encrypted substructs as stored). |
+
+[struct-pokemon]: https://github.com/BDL-Ltda/pokeemerald/blob/662300386fae6899c8f4fea4504f2d9d4303c94c/include/pokemon.h#L219
 
 The 0.4 [mailbox bridge](mailbox-bridge.md#lifecycle-and-visibility) preserves
 these v1 field meanings: the ROM's local `visible` bit denotes controllable
@@ -74,53 +92,145 @@ Integers must be JSON integers: `1.5` or `"1"` is rejected.
 `hello`: the first line a client sends.
 
 ```json
-{"v":1,"type":"hello","playerId":"bernardo","joinKey":"example-key","trainerId":2882400001,"gender":0,"clientVersion":"0.2.0"}
+{"v":2,"type":"hello","playerId":"bernardo","joinKey":"example-key","trainerId":2882400001,"gender":0,"clientVersion":"0.2.0"}
 ```
 
 `welcome`: an empty room, then a room with one player who has moved and one who hasn't yet.
 
 ```json
-{"v":1,"type":"welcome","players":[]}
-{"v":1,"type":"welcome","players":[{"playerId":"leo","trainerId":12345,"gender":1,"presence":{"mapGroup":0,"mapNum":9,"x":7,"y":5,"facing":1,"visible":true}},{"playerId":"davi","trainerId":54321,"gender":0}]}
+{"v":2,"type":"welcome","players":[]}
+{"v":2,"type":"welcome","players":[{"playerId":"leo","trainerId":12345,"gender":1,"presence":{"mapGroup":0,"mapNum":9,"x":7,"y":5,"facing":1,"visible":true}},{"playerId":"davi","trainerId":54321,"gender":0}]}
 ```
 
 `join`:
 
 ```json
-{"v":1,"type":"join","playerId":"davi","trainerId":54321,"gender":0}
+{"v":2,"type":"join","playerId":"davi","trainerId":54321,"gender":0}
 ```
 
 `presence`:
 
 ```json
-{"v":1,"type":"presence","playerId":"leo","mapGroup":0,"mapNum":9,"x":8,"y":5,"facing":4,"visible":true}
+{"v":2,"type":"presence","playerId":"leo","mapGroup":0,"mapNum":9,"x":8,"y":5,"facing":4,"visible":true}
 ```
 
 `leave`, one per reason:
 
 ```json
-{"v":1,"type":"leave","playerId":"davi","reason":"disconnect"}
-{"v":1,"type":"leave","playerId":"davi","reason":"timeout"}
-{"v":1,"type":"leave","playerId":"davi","reason":"kicked"}
-{"v":1,"type":"leave","playerId":"davi","reason":"replaced"}
+{"v":2,"type":"leave","playerId":"davi","reason":"disconnect"}
+{"v":2,"type":"leave","playerId":"davi","reason":"timeout"}
+{"v":2,"type":"leave","playerId":"davi","reason":"kicked"}
+{"v":2,"type":"leave","playerId":"davi","reason":"replaced"}
 ```
 
 `ping` and its `pong`:
 
 ```json
-{"v":1,"type":"ping","t":1712345678901}
-{"v":1,"type":"pong","t":1712345678901}
+{"v":2,"type":"ping","t":1712345678901}
+{"v":2,"type":"pong","t":1712345678901}
 ```
 
 `error`, one per code:
 
 ```json
-{"v":1,"type":"error","code":"bad_key","message":"wrong join key"}
-{"v":1,"type":"error","code":"bad_message","message":"malformed message"}
-{"v":1,"type":"error","code":"room_full","message":"the room is full"}
-{"v":1,"type":"error","code":"version_mismatch","message":"server speaks protocol v1"}
-{"v":1,"type":"error","code":"bad_hello","message":"expected hello"}
+{"v":2,"type":"error","code":"bad_key","message":"wrong join key"}
+{"v":2,"type":"error","code":"bad_message","message":"malformed message"}
+{"v":2,"type":"error","code":"room_full","message":"the room is full"}
+{"v":2,"type":"error","code":"version_mismatch","message":"server speaks protocol v2"}
+{"v":2,"type":"error","code":"bad_hello","message":"expected hello"}
 ```
+
+## Trade messages
+
+Added in v2 for v1.5 trading ([#29](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/29)). Decisions from the re-planning:
+
+- **Broadcast, not routed.** The server relays every trade message to every other player, like `presence`. It replaces `playerId` with the sender's own ID, never echoes the message back, and does not look at `targetId`. Receivers ignore a message whose `targetId` is not their own `playerId` (`trade_available` has no target: everyone uses it).
+- **Trusted clients.** The server only checks the shape of each message against the field rules above and answers a malformed one with `error bad_message`. It keeps no trade state: it doesn't check that a target exists, that an invite came before an accept, or what `data` and `pokemon` contain. The order of the flow below is a contract between clients.
+- **Shared limits.** Trade messages count toward the 50-messages-per-second budget and the 4096-byte line limit like any other message. The largest one, a `trade_link` with 1024 bytes of `data`, is under 2200 bytes.
+
+| type | Sent when |
+| --- | --- |
+| `trade_available` | A player starts (`true`) or stops (`false`) waiting at a Cable Club attendant. The server does not remember availability: a waiting client sends `true` again when it receives a `join`, so newcomers learn about it, and every client treats a `leave` as `false`. |
+| `trade_invite` | A waiting player picks `targetId` from the list. |
+| `trade_accept` | The invited player says yes to `targetId`'s invite. Both then enter the trade session. |
+| `trade_decline` | The invited player says no, doesn't answer in time, or is busy. The inviter returns to waiting. |
+| `trade_cancel` | Either side ends a pending invite or a running session before the trade is saved: the player backed out, the partner stopped answering, or the partner left. |
+| `trade_link` | During a session: the bytes of the virtual link to `targetId` ([#81](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/81)). `seq` lets the receiver spot gaps and duplicates; the protocol gives it no other meaning. |
+| `trade_confirm` | A player confirms the trade. `pokemon` is the Pokémon they give away; the server's trade log pairs the two confirms ([#79](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/79)). |
+
+### Examples
+
+`trade_available`, on and off:
+
+```json
+{"v":2,"type":"trade_available","playerId":"leo","available":true}
+{"v":2,"type":"trade_available","playerId":"leo","available":false}
+```
+
+`trade_invite`, `trade_accept`:
+
+```json
+{"v":2,"type":"trade_invite","playerId":"leo","targetId":"davi"}
+{"v":2,"type":"trade_accept","playerId":"davi","targetId":"leo"}
+```
+
+`trade_decline`, one per reason:
+
+```json
+{"v":2,"type":"trade_decline","playerId":"davi","targetId":"leo","reason":"declined"}
+{"v":2,"type":"trade_decline","playerId":"davi","targetId":"leo","reason":"timeout"}
+{"v":2,"type":"trade_decline","playerId":"davi","targetId":"leo","reason":"busy"}
+```
+
+`trade_cancel`, one per reason:
+
+```json
+{"v":2,"type":"trade_cancel","playerId":"leo","targetId":"davi","reason":"canceled"}
+{"v":2,"type":"trade_cancel","playerId":"leo","targetId":"davi","reason":"timeout"}
+{"v":2,"type":"trade_cancel","playerId":"leo","targetId":"davi","reason":"disconnected"}
+```
+
+`trade_link`, with a payload and empty:
+
+```json
+{"v":2,"type":"trade_link","playerId":"leo","targetId":"davi","seq":0,"data":"0102a0ff"}
+{"v":2,"type":"trade_link","playerId":"leo","targetId":"davi","seq":4294967295,"data":""}
+```
+
+`trade_confirm` (100 zero bytes for illustration; a real one carries the Pokémon's data):
+
+```json
+{"v":2,"type":"trade_confirm","playerId":"leo","targetId":"davi","pokemon":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
+```
+
+### Trade flow
+
+```mermaid
+sequenceDiagram
+    participant A as Client A (leo)
+    participant S as Server
+    participant B as Client B (davi)
+    A->>S: trade_available {available: true}
+    S->>B: trade_available {playerId: "leo", available: true}
+    B->>S: trade_available {available: true}
+    S->>A: trade_available {playerId: "davi", available: true}
+    A->>S: trade_invite {targetId: "davi"}
+    S->>B: trade_invite {playerId: "leo", targetId: "davi"}
+    B->>S: trade_accept {targetId: "leo"}
+    S->>A: trade_accept {playerId: "davi", targetId: "leo"}
+    loop trade session
+        A->>S: trade_link {targetId: "davi", seq, data}
+        S->>B: trade_link {playerId: "leo", ...}
+        B->>S: trade_link {targetId: "leo", seq, data}
+        S->>A: trade_link {playerId: "davi", ...}
+    end
+    A->>S: trade_confirm {targetId: "davi", pokemon}
+    S->>B: trade_confirm {playerId: "leo", ...}
+    B->>S: trade_confirm {targetId: "leo", pokemon}
+    S->>A: trade_confirm {playerId: "davi", ...}
+```
+
+With three or more players, every other player also receives each relayed message and drops those not addressed to it. Instead of `trade_accept`, B can answer with `trade_decline`; either side can send `trade_cancel` until the trade is saved.
 
 ## Errors and rejections
 
@@ -237,5 +347,8 @@ sequenceDiagram
 - Breaking changes bump `v`: removing or renaming a field or type, changing a field's type, meaning or allowed range, making an optional field required, or changing the framing. The commit uses `!` and 💥 with a `BREAKING CHANGE:` line (see the `pre-commit` skill), and this document, the Go package and the Lua client change in the same PR.
 - The server speaks one version. A client with another `v` gets `error version_mismatch` and must be updated; there is no negotiation.
 - `clientVersion` is the client's release version. It is for logs only and does not affect compatibility.
+- **History.**
+  - `1`: the v1.0 release (presence only).
+  - `2`: adds the [trade messages](#trade-messages) ([#78](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/78)); every v1 message keeps its fields and meaning. New message types alone would have been a compatible change, but the trading plan bumps the version so that every client and the server update together, with no negotiation: a v1 client gets `version_mismatch` from a v2 server.
 - **Pre-release revisions.** Until the first client release that sends `presence` ([#17](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/17)), v1 is a draft. Nothing in the field speaks it yet, so a field's meaning can still be revised without a bump, provided the revision is recorded here. From that release on, the rules above apply in full.
   - `visible`: changed from "in controllable overworld play" to "in a running game session" ([decision on #11](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/11#issuecomment-6223791724), PR [#48](https://github.com/BDL-Ltda/EmeraldCo-Op/pull/48)). The server only relays the value, so no released component changes behavior.

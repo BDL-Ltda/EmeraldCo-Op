@@ -21,6 +21,7 @@ type config struct {
 	hello       protocol.Hello
 	pattern     string
 	stepsPerSec float64
+	tradeTarget string
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
@@ -33,6 +34,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.hello.JoinKey, "key", getenv("FAKECLIENT_JOIN_KEY"), "shared key")
 	flags.StringVar(&cfg.pattern, "pattern", "square", "square, idle or warp")
 	flags.Float64Var(&cfg.stepsPerSec, "steps-per-sec", 4, "steps per second (greater than 0, at most 40)")
+	flags.StringVar(&cfg.tradeTarget, "trade", "", "optional player ID to send one of each trade message to after welcome")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return config{}, err
@@ -55,6 +57,11 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	}
 	if float64(time.Second)/cfg.stepsPerSec >= float64(math.MaxInt64) {
 		return config{}, errors.New("steps-per-sec is too small for a timer interval")
+	}
+	if cfg.tradeTarget != "" {
+		if err := (protocol.TradeInvite{PlayerID: "x", TargetID: cfg.tradeTarget}).Validate(); err != nil {
+			return config{}, errors.New("trade must be a valid player ID")
+		}
 	}
 	cfg.hello.TrainerID = 0
 	cfg.hello.Gender = protocol.GenderMale

@@ -215,7 +215,10 @@ the command, required build inputs, allowlist, validation and regeneration rules
   clock; `debugview.lua` owns the remote-player table and throttled panel text;
   `json.lua` and `framing.lua`
   provide the transport primitives described below; `protocol.lua` builds the
-  client's messages and validates the server's.
+  client's messages and validates the server's, including the protocol v2
+  `trade_*` messages (builders such as `tradeInvite`, `check` for outgoing
+  trade messages, and `toHex`/`fromHex` for their byte fields). Nothing sends
+  or handles trade messages yet: that is the trading work in #81–#83.
 - `tests/`: the tiny runner discovers every `*_test.lua` directly in this
   folder, sorts suites and test names, prints pass/fail and exits non-zero on
   failure. It includes ROM checks, fake-memory mailbox checks, every
@@ -282,7 +285,7 @@ invalid limit. The default is the protocol's **4096 bytes excluding LF**.
 ```lua
 local framing = require("framing")
 local framer = assert(framing.new())
-assert(#framer:feed('{"v":1,') == 0)
+assert(#framer:feed('{"v":2,') == 0)
 local lines = assert(framer:feed('"type":"ping","t":1}\n'))
 -- lines[1] is the complete JSON text without LF; decode it separately.
 assert(framer:finish())

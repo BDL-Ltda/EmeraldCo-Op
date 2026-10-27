@@ -159,7 +159,7 @@ func expectInitialPresence(t *testing.T, peer *scriptedPeer) {
 func TestSessionWaitsForWelcomeThenWalksAndCancels(t *testing.T) {
 	peer := startScriptedPeer(t, "-steps-per-sec", "40")
 	expectHello(t, peer)
-	peer.sendRaw(t, "{\"v\":1,\"type\":\"future-handshake\",\"ignored\":true}\n")
+	peer.sendRaw(t, "{\"v\":2,\"type\":\"future-handshake\",\"ignored\":true}\n")
 	if err := peer.conn.SetReadDeadline(time.Now().Add(150 * time.Millisecond)); err != nil {
 		t.Fatal(err)
 	}
@@ -198,6 +198,53 @@ func TestSessionWaitsForWelcomeThenWalksAndCancels(t *testing.T) {
 	}
 }
 
+func TestSessionSendsAndLogsTradeMessages(t *testing.T) {
+	peer := startScriptedPeer(t, "-pattern", "idle", "-trade", "bot2")
+	expectHello(t, peer)
+	peer.send(t, protocol.Welcome{})
+	expectInitialPresence(t, peer)
+	for _, expected := range tradeSamples("bot1", "bot2") {
+		if message := peer.read(t, 2*time.Second); message != expected {
+			t.Fatalf("trade sample: got %#v, want %#v", message, expected)
+		}
+	}
+	pokemon := strings.Repeat("ab", protocol.PokemonBytes)
+	for _, message := range []protocol.Message{
+		protocol.TradeAvailable{PlayerID: "bot2", Available: true},
+		protocol.TradeInvite{PlayerID: "bot2", TargetID: "bot1"},
+		protocol.TradeAccept{PlayerID: "bot2", TargetID: "bot1"},
+		protocol.TradeDecline{PlayerID: "bot2", TargetID: "bot1", Reason: protocol.DeclineBusy},
+		protocol.TradeCancel{PlayerID: "bot2", TargetID: "bot1", Reason: protocol.CancelTimeout},
+		protocol.TradeLink{PlayerID: "bot2", TargetID: "bot1", Seq: 9, Data: "c0ffee"},
+		protocol.TradeConfirm{PlayerID: "bot2", TargetID: "bot1", Pokemon: pokemon},
+	} {
+		peer.send(t, message)
+	}
+	peer.send(t, protocol.Ping{T: 99})
+	if message := peer.read(t, 2*time.Second); message != (protocol.Pong{T: 99}) {
+		t.Fatalf("trade messages must not stop the session, got %#v", message)
+	}
+	peer.cancel()
+	if err := peer.wait(t, 2*time.Second); err != nil {
+		t.Fatalf("trade messages should be logged, not fatal: %v", err)
+	}
+	output := peer.output.String()
+	for _, line := range []string{
+		"[trade] sent 8 sample trade messages to bot2",
+		"[trade_available] bot2 available=true", "[trade_invite] bot2 -> bot1", "[trade_accept] bot2 -> bot1",
+		"[trade_decline] bot2 -> bot1 reason=busy", "[trade_cancel] bot2 -> bot1 reason=timeout",
+		"[trade_link] bot2 -> bot1 seq=9 bytes=3", "[trade_confirm] bot2 -> bot1 bytes=100",
+	} {
+		if !strings.Contains(output, line) {
+			t.Errorf("missing readable log %q in:\n%s", line, output)
+		}
+	}
+	if strings.Contains(output, "c0ffee") || strings.Contains(output, pokemon) {
+		t.Fatal("trade payload bytes were logged")
+	}
+	peer.assertNoKeyDisclosure(t, nil)
+}
+
 func TestSessionLogsIncomingMessagesAndEchoesPing(t *testing.T) {
 	peer := startScriptedPeer(t, "-pattern", "idle")
 	expectHello(t, peer)
@@ -211,7 +258,7 @@ func TestSessionLogsIncomingMessagesAndEchoesPing(t *testing.T) {
 	peer.send(t, protocol.Presence{PlayerID: "remote", PresenceState: snapshot})
 	peer.send(t, protocol.Leave{PlayerID: "remote", Reason: protocol.LeaveDisconnect})
 	peer.send(t, protocol.Pong{T: 4321})
-	peer.sendRaw(t, "{\"v\":1,\"type\":\"future\\nmessage\",\"privatePayload\":\"fixture-unknown-body\"}\n")
+	peer.sendRaw(t, "{\"v\":2,\"type\":\"future\\nmessage\",\"privatePayload\":\"fixture-unknown-body\"}\n")
 	peer.send(t, protocol.Ping{T: 123456789})
 	message := peer.read(t, 2*time.Second)
 	if got, ok := message.(protocol.Pong); !ok || got.T != 123456789 {
@@ -255,7 +302,7 @@ func TestSessionFailurePaths(t *testing.T) {
 				expectInitialPresence(t, peer)
 				switch failure {
 				case "malformed after welcome":
-					peer.sendRaw(t, "{\"v\":1,\"type\":\"presence\"}\n")
+					peer.sendRaw(t, "{\"v\":2,\"type\":\"presence\"}\n")
 				case "disconnect":
 					peer.conn.Close()
 				case "server error":

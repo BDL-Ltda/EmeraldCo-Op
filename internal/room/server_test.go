@@ -178,11 +178,12 @@ func TestRejections(t *testing.T) {
 	for _, tc := range []struct{ name, line, code string }{
 		{"wrong key", strings.Replace(string(good), "test-key", "wrong-key", 1), protocol.CodeBadKey},
 		{"same-length wrong key", strings.Replace(string(good), "test-key", "test-kez", 1), protocol.CodeBadKey},
-		{"wrong version", `{"v":2}` + "\n", protocol.CodeVersionMismatch},
+		{"wrong version", `{"v":1}` + "\n", protocol.CodeVersionMismatch},
+		{"v1 client", strings.Replace(string(good), `"v":2`, `"v":1`, 1), protocol.CodeVersionMismatch},
 		{"garbage", "not JSON\n", protocol.CodeBadMessage},
 		{"oversized", strings.Repeat("x", protocol.MaxLineLength+1) + "\n", protocol.CodeBadMessage},
-		{"missing hello", `{"v":1,"type":"ping","t":0}` + "\n", protocol.CodeBadHello},
-		{"invalid hello", `{"v":1,"type":"hello"}` + "\n", protocol.CodeBadHello},
+		{"missing hello", `{"v":2,"type":"ping","t":0}` + "\n", protocol.CodeBadHello},
+		{"invalid hello", `{"v":2,"type":"hello"}` + "\n", protocol.CodeBadHello},
 		{"invalid envelope", `{"type":"hello"}` + "\n", protocol.CodeBadMessage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -205,7 +206,7 @@ func TestHelloDeadline(t *testing.T) {
 			})
 			p := dial(t, addr)
 			if unknown {
-				p.raw(t, `{"v":1,"type":"future"}`+"\n")
+				p.raw(t, `{"v":2,"type":"future"}`+"\n")
 			}
 			wantError(t, p, protocol.CodeBadHello)
 		})
@@ -246,9 +247,15 @@ func TestDuplicateReplacesAtCapacity(t *testing.T) {
 func TestMessagesAfterHello(t *testing.T) {
 	for _, tc := range []struct{ name, line, code string }{
 		{"malformed", "garbage\n", protocol.CodeBadMessage},
-		{"invalid fields", `{"v":1,"type":"presence"}` + "\n", protocol.CodeBadMessage},
-		{"version", `{"v":2}` + "\n", protocol.CodeVersionMismatch},
-		{"server message", `{"v":1,"type":"welcome","players":[]}` + "\n", protocol.CodeBadMessage},
+		{"invalid fields", `{"v":2,"type":"presence"}` + "\n", protocol.CodeBadMessage},
+		{"version", `{"v":1}` + "\n", protocol.CodeVersionMismatch},
+		{"server message", `{"v":2,"type":"welcome","players":[]}` + "\n", protocol.CodeBadMessage},
+		{"trade invite without target", `{"v":2,"type":"trade_invite","playerId":"a"}` + "\n", protocol.CodeBadMessage},
+		{"trade decline bad reason", `{"v":2,"type":"trade_decline","playerId":"a","targetId":"b","reason":"nope"}` + "\n", protocol.CodeBadMessage},
+		{"trade link oversize", `{"v":2,"type":"trade_link","playerId":"a","targetId":"b","seq":0,"data":"` +
+			strings.Repeat("00", protocol.MaxTradeLinkBytes+1) + `"}` + "\n", protocol.CodeBadMessage},
+		{"trade confirm short", `{"v":2,"type":"trade_confirm","playerId":"a","targetId":"b","pokemon":"00"}` + "\n", protocol.CodeBadMessage},
+		{"v1 presence", `{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":9,"x":8,"y":5,"facing":4,"visible":true}` + "\n", protocol.CodeVersionMismatch},
 		{"second hello", func() string { b, _ := protocol.Encode(hello("a")); return string(b) }(), protocol.CodeBadMessage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -266,13 +273,13 @@ func TestMessagesAfterHello(t *testing.T) {
 func TestUnknownTypesAreIgnored(t *testing.T) {
 	_, addr, _ := testServer(t, 5, nil)
 	a := dial(t, addr)
-	a.raw(t, `{"v":1,"type":"future"}`+"\n")
+	a.raw(t, `{"v":2,"type":"future"}`+"\n")
 	a.send(t, hello("a"))
 	want(t, a, protocol.Welcome{Players: []protocol.Player{}})
 	a.send(t, protocol.Ping{T: 1})
 	want(t, a, protocol.Pong{T: 1})
 	a.send(t, protocol.Presence{PlayerID: "a", PresenceState: protocol.PresenceState{Facing: 1}})
-	a.raw(t, `{"v":1,"type":"future","payload":"ignored"}`+"\n")
+	a.raw(t, `{"v":2,"type":"future","payload":"ignored"}`+"\n")
 	_, _ = enter(t, addr, "b")
 	want(t, a, protocol.Join{PlayerID: "b", TrainerID: 12345})
 }
@@ -341,7 +348,7 @@ func TestLogsDoNotExposeSecrets(t *testing.T) {
 	bad.send(t, h)
 	wantError(t, bad, protocol.CodeBadKey)
 	malformed := dial(t, addr)
-	malformed.raw(t, `{"v":1,"type":"hello","joinKey":"test-key","trainerId":"private-invalid-value"}`+"\n")
+	malformed.raw(t, `{"v":2,"type":"hello","joinKey":"test-key","trainerId":"private-invalid-value"}`+"\n")
 	wantError(t, malformed, protocol.CodeBadHello)
 	a.conn.Close()
 	stop()

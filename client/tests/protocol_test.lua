@@ -18,7 +18,7 @@ for i, example in ipairs(examples) do
 	tests[string.format("protocol documentation example %02d", i)] = function()
 		local value = assert(json.decode(example))
 		local encoded = assert(json.encode(value))
-		assert(encoded:match('^{"v":1,"type":'))
+		assert(encoded:match('^{"v":2,"type":'))
 		h.same(assert(json.decode(encoded)), value)
 		h.eq(assert(json.encode(assert(json.decode(encoded)))), encoded)
 		assert(#encoded <= framing.MAX_LINE_LENGTH)

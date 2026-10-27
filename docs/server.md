@@ -14,7 +14,7 @@ standard library and the existing [protocol](protocol.md). There is one room.
 | `-max-players` | `SERVER_MAX_PLAYERS` | 5; allowed range 1–5 |
 
 An explicit flag overrides its environment variable. The capacity cannot exceed
-five because a protocol v1 welcome can contain at most four other players.
+five because a protocol welcome can contain at most four other players.
 The key follows the protocol's 1–64 character, no-control-character rule.
 Invalid settings fail before listening. Help and configuration errors do not
 print the key, including when it comes from the environment.
@@ -123,6 +123,12 @@ logged: these could contain secrets. The join key is never logged.
   connection's ID before it is stored and queued to every other room member.
   It is never echoed to the sender. Welcome includes each existing player's
   last presence, if available. A replaced reader cannot update its successor.
+- A valid [trade message](protocol.md#trade-messages) (`trade_available`,
+  `trade_invite`, `trade_accept`, `trade_decline`, `trade_cancel`,
+  `trade_link`, `trade_confirm`) gets the same `playerId` overwrite and is
+  queued to every other room member, never back to the sender. The server
+  does not route by `targetId` and stores nothing about trades. Malformed or
+  oversize trade fields reject the sender with `bad_message`.
 - `ping` replies with `pong`, preserving the exact integer `t`. Clients should
   send one every five seconds, including when they have not moved.
 - After hello, **15 seconds without a complete message** closes that connection
@@ -130,7 +136,7 @@ logged: these could contain secrets. The join key is never logged.
   deadline. Complete unknown messages count as activity but still share the
   message-rate limit; the pre-hello five-second deadline remains fixed.
 - Each connection can send **50 complete messages in any rolling one-second
-  window**. Hello, ping, presence and unknown types all count, before and after
+  window**. Hello, ping, presence, trade and unknown types all count, before and after
   authentication. The 51st message sends `error bad_message` and closes; known
   malformed messages already reject immediately. This is per connection, not a
   room-wide cap.
@@ -153,13 +159,13 @@ privately with the key you entered; never post that line or your shell history.
 Terminal A:
 
 ```text
-{"v":1,"type":"hello","playerId":"a","joinKey":"<local-key>","trainerId":1,"gender":0,"clientVersion":"0.2.0"}
+{"v":2,"type":"hello","playerId":"a","joinKey":"<local-key>","trainerId":1,"gender":0,"clientVersion":"0.2.0"}
 ```
 
 Expect a welcome with `players:[]`. In terminal B:
 
 ```text
-{"v":1,"type":"hello","playerId":"b","joinKey":"<local-key>","trainerId":2,"gender":1,"clientVersion":"0.2.0"}
+{"v":2,"type":"hello","playerId":"b","joinKey":"<local-key>","trainerId":2,"gender":1,"clientVersion":"0.2.0"}
 ```
 
 B receives a welcome containing A. A receives B's join. Close B: A receives
@@ -171,14 +177,14 @@ can perform the same line exchanges when `nc` is unavailable on Windows.
 While both clients are connected, send a ping from A:
 
 ```json
-{"v":1,"type":"ping","t":1712345678901}
+{"v":2,"type":"ping","t":1712345678901}
 ```
 
 A receives a pong with the same `t`. Then send presence from B (using A's ID
 deliberately tests that the server overrides it):
 
 ```json
-{"v":1,"type":"presence","playerId":"a","mapGroup":0,"mapNum":9,"x":5,"y":3,"facing":1,"visible":true}
+{"v":2,"type":"presence","playerId":"a","mapGroup":0,"mapNum":9,"x":5,"y":3,"facing":1,"visible":true}
 ```
 
 A receives that presence with `playerId` set to `b`; B gets no echo. A new client

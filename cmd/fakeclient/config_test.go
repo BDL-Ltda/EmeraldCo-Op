@@ -31,7 +31,7 @@ func TestParseConfigDefaultsAndOverrides(t *testing.T) {
 		PlayerID: "bot1", JoinKey: fixtureJoinKey, TrainerID: 0,
 		Gender: protocol.GenderMale, ClientVersion: "fakeclient",
 	}
-	if got.addr != "localhost:8765" || got.pattern != "square" || got.stepsPerSec != 4 || got.hello != wantHello {
+	if got.addr != "localhost:8765" || got.pattern != "square" || got.stepsPerSec != 4 || got.hello != wantHello || got.tradeTarget != "" {
 		t.Fatal("defaults or synthetic identity do not match the documented CLI")
 	}
 	got, err = parseConfig([]string{
@@ -79,6 +79,8 @@ func TestParseConfigRejectsInvalidInputWithoutKeyDisclosure(t *testing.T) {
 		{"invalid speed", []string{"-id", "bot1", "-steps-per-sec", "not-a-number"}, fixtureEnvironment},
 		{"unknown flag", []string{"-id", "bot1", "-unknown"}, fixtureEnvironment},
 		{"positional argument", []string{"-id", "bot1", "extra"}, fixtureEnvironment},
+		{"invalid trade target", []string{"-id", "bot1", "-trade", "bad id"}, fixtureEnvironment},
+		{"long trade target", []string{"-id", "bot1", "-trade", strings.Repeat("a", 17)}, fixtureEnvironment},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := parseConfig(test.args, test.env)

@@ -100,7 +100,7 @@ local function setup()
 		self.bytes[BASE + OUT_HEAD] = (head + 1) % 16
 	end
 	function w:welcome()
-		self.sockets[#self.sockets].deliver({ v = 1, type = "welcome", players = json.array() })
+		self.sockets[#self.sockets].deliver({ v = 2, type = "welcome", players = json.array() })
 		self:frame()
 	end
 	function w.isConnected(_)
@@ -142,7 +142,7 @@ tests["completed reset while awaiting welcome closes the old socket and cached s
 	h.eq(w.sockets[1].closed, true)
 	h.eq(#w.sockets, 1)
 	-- Even a late welcome from the invalidated socket cannot reattach the ROM.
-	w.sockets[1].deliver({ v = 1, type = "welcome", players = json.array() })
+	w.sockets[1].deliver({ v = 2, type = "welcome", players = json.array() })
 	w:frame()
 	h.eq(w:isConnected(), false)
 end

@@ -39,14 +39,14 @@ local function world()
 						end
 					end
 					self.id, self.trainerId, self.gender = m.playerId, m.trainerId, m.gender
-					queue(self, { v = 1, type = "welcome", players = players })
-					broadcast({ v = 1, type = "join", playerId = self.id,
+					queue(self, { v = 2, type = "welcome", players = players })
+					broadcast({ v = 2, type = "join", playerId = self.id,
 						trainerId = self.trainerId, gender = self.gender }, self)
 				elseif m.type == "presence" then
 					self.presence = m
 					broadcast(m, self)
 				elseif m.type == "ping" then
-					queue(self, { v = 1, type = "pong", t = m.t })
+					queue(self, { v = 2, type = "pong", t = m.t })
 				end
 			end
 			return #bytes
@@ -58,7 +58,7 @@ local function world()
 		function sock:close()
 			if self.closed then return end
 			self.closed = true
-			if self.id then broadcast({ v = 1, type = "leave", playerId = self.id, reason = "disconnect" }, self) end
+			if self.id then broadcast({ v = 2, type = "leave", playerId = self.id, reason = "disconnect" }, self) end
 		end
 		w.connections[#w.connections + 1] = sock
 		return sock
