@@ -73,10 +73,11 @@ test below is still required; do not mark it done from simulated tests.
 ## Manual acceptance: two mGBA instances
 
 Use mGBA **0.10.5** and the client from this branch for both players. Use the
-ROM matching `client/addresses.lua` (CRC **97387731**, SHA1
-`ab60e843b809acf58943b8e90b156a3554deaade`). ROM source pin:
-`e4ccbcf592850b8199af0ccf22b84cfdf227aca5`. Build as described in the root
-README if needed. No ROM or save may be committed or uploaded as evidence.
+ROM matching `client/addresses.lua` (its `romCrc32` and `romSha1`), built
+from the `rom` submodule pin of the same commit. The #26 acceptance used CRC
+**97387731**, SHA1 `ab60e843b809acf58943b8e90b156a3554deaade` and ROM pin
+`e4ccbcf592850b8199af0ccf22b84cfdf227aca5`; mailbox layout v2 (#77) changed
+the ROM. Build as described in the root README if needed. No ROM or save may be committed or uploaded as evidence.
 
 1. Start the server. For a localhost-only test in PowerShell:
 
