@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Multi-slot mailbox messages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#90</span>
+  <h1>A whole party fits through the mailbox</h1>
+  <p class="lede">Mailbox layout v2 lets the ROM and Lua exchange messages of up to 1024 bytes, split into 30-byte slots and streamed over several frames. Trading needs 600 bytes per side; PvP can reuse the same framing.</p>
+  <div class="meta">
+    <span>closes <b>#77</b></span>
+    <span>branch <b>feat/77-mailbox-multislot</b></span>
+    <span>files <b>16 + 7 in rom/</b></span>
+    <span>lines <b>+876 / −34 (+578 / −23 in rom/)</b></span>
+    <span>milestone <b>v1.5 Trading</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>A fragment layer on both ends of the same rings</h2>
+    <p>Until now every mailbox message fit in one slot: a 2-byte header and 30 payload bytes. A ring holds at most 15 slots, which is 450 payload bytes, less than one party. This PR keeps the rings and the slot bytes as they are and adds a framing layer on each side: the ROM's <code>mailbox.c</code> and the new pure Lua module <code>fragments.lua</code>. The layout version goes from 1 to 2, so a v1.0 client and this ROM refuse each other.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">ROM, mailbox and Lua with layout v2</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 330" role="img" aria-label="The ROM's co-op code and Lua's mailbox bridge each gain a fragment layer that splits and reassembles messages over the existing outbound and inbound rings.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="290" height="310" rx="10"/>
+      <text class="t-zone" x="28" y="36">ROM (EWRAM)</text>
+      <rect class="zone" x="355" y="10" width="290" height="310" rx="10"/>
+      <text class="t-zone" x="373" y="36">gCoopMailbox</text>
+      <rect class="zone" x="700" y="10" width="290" height="310" rx="10"/>
+      <text class="t-zone" x="718" y="36">mGBA LUA</text>
+      <g class="step" style="--i:0">
+        <rect class="box" x="30" y="56" width="250" height="56" rx="6"/>
+        <text class="t-mono" x="46" y="80">presence / remote players</text>
+        <text class="t-sub" x="46" y="100">single-slot PRESENCE, LEAVE</text>
+        <rect class="box" x="720" y="56" width="250" height="56" rx="6"/>
+        <text class="t-mono" x="736" y="80">mailboxbridge.lua</text>
+        <text class="t-sub" x="736" y="100">presence, slots, onMessage</text>
+      </g>
+      <g class="step" style="--i:1">
+        <rect class="box pub" x="30" y="150" width="250" height="70" rx="6"/>
+        <text class="t-mono t-em" x="46" y="174">mailbox.c fragments</text>
+        <text class="t-sub" x="46" y="194">SendMessage, PumpOutbound</text>
+        <text class="t-sub" x="46" y="211">Receive, DiscardInbound</text>
+        <rect class="box pub" x="720" y="150" width="250" height="70" rx="6"/>
+        <text class="t-mono t-em" x="736" y="174">fragments.lua</text>
+        <text class="t-sub" x="736" y="194">split, Sender, Reassembler</text>
+        <text class="t-sub" x="736" y="211">pure, tested in CI</text>
+      </g>
+      <g class="step" style="--i:2">
+        <rect class="box" x="375" y="130" width="250" height="44" rx="6"/>
+        <text class="t-mono" x="391" y="157">outbound ring 16 x 32</text>
+        <rect class="box" x="375" y="206" width="250" height="44" rx="6"/>
+        <text class="t-mono" x="391" y="233">inbound ring 16 x 32</text>
+        <text class="t-sub" x="375" y="282">same bytes as v1; layoutVersion = 2</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge em flow" d="M280 170H371" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M625 152H716" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M716 220H629" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M371 228H284" marker-end="url(#m-ae)"/>
+        <path class="edge" d="M155 112V146" marker-end="url(#m-a)"/>
+        <path class="edge" d="M845 146V116" marker-end="url(#m-a)"/>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added or changed by this PR</span><span><i class="m"></i>unchanged</span><span><i class="flow"></i>fragment path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>Streaming 600 bytes through a 15-slot ring</h2>
+    <p>A 600-byte message becomes 24 fragments of 26 data bytes (the last has 2). The sender pushes fragments until the ring is full and tries the same fragment again next frame; it never drops one. Each frame, presence goes out first, so it keeps flowing between fragments. The receiver copies each fragment into a 1024-byte buffer and delivers the message when the last byte arrives.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">ROM to Lua, one frame per row</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 400" role="img" aria-label="Sequence: the ROM pushes presence and fragments until the ring is full, Lua drains them, and later frames continue up to fragment 23; Lua then delivers the 600-byte message.">
+      <defs>
+        <marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="s-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="box" x="60" y="20" width="200" height="44" rx="6"/>
+      <text class="t-mono" x="76" y="47">ROM (CB1_Overworld)</text>
+      <rect class="box" x="400" y="20" width="200" height="44" rx="6"/>
+      <text class="t-mono" x="416" y="47">outbound ring</text>
+      <rect class="box" x="740" y="20" width="200" height="44" rx="6"/>
+      <text class="t-mono" x="756" y="47">Lua (frame callback)</text>
+      <path class="life" d="M160 64V390"/>
+      <path class="life" d="M500 64V390"/>
+      <path class="life" d="M840 64V390"/>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="30" cy="100" r="12"/><text class="badge-t" x="26" y="105">1</text>
+        <path class="edge em" d="M160 100H496" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="176" y="92">PRESENCE, then SendMessage: fragments 0, 1, 2 ... until the ring is full</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge" d="M500 140H836" marker-end="url(#s-a)"/>
+        <text class="t-sub" x="516" y="132">pop up to 15 slots: presence and the first fragments</text>
+      </g>
+      <g class="step" style="--i:2">
+        <circle class="badge" cx="30" cy="200" r="12"/><text class="badge-t" x="26" y="205">2</text>
+        <path class="edge em" d="M160 200H496" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="176" y="192">next frames: PRESENCE, then PumpOutbound: the next fragments, up to 23</text>
+      </g>
+      <g class="step" style="--i:3">
+        <path class="edge" d="M500 240H836" marker-end="url(#s-a)"/>
+        <text class="t-sub" x="516" y="232">pop: presence and the remaining fragments</text>
+      </g>
+      <g class="step" style="--i:4">
+        <rect class="box pub" x="700" y="280" width="280" height="56" rx="6"/>
+        <text class="t-mono t-em" x="716" y="304">done == totalLength</text>
+        <text class="t-sub" x="716" y="324">onMessage(type, 600 bytes)</text>
+      </g>
+      <g class="step" style="--i:5">
+        <text class="t-sub" x="60" y="372">Lua to ROM is the mirror image: mailboxbridge.sendMessage queues it, flushInbound pumps after LEAVE and presence.</text>
+      </g>
+    </svg>
+    </div>
+    <p class="small">How many fragments go out per frame depends on how much room the ring has; it holds at most 15 slots.</p>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>The fragment slot, byte by byte</h2>
+    <p>This is the first slot of a 600-byte <code>COOP_MSG_DEBUG_ECHO</code> message, as the tests build it. Click a part. The layout is in <code>docs/memory-map.md</code> under "Multi-slot messages" and <code>include/coop/mailbox.h</code>.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-title="Slot type" data-value="03 = COOP_MSG_FRAGMENT" data-text="The slot header is unchanged from v1. Type 3 tells the reader this slot is part of a larger message. PRESENCE (1) and LEAVE (2) slots can sit between fragments and are read as before."><small>slot type</small>03</button>
+      <button class="seg" type="button" data-title="Slot length" data-value="1E = 30" data-text="4 header bytes plus 26 data bytes. Every fragment but the last is full, so the receiver knows the exact size to expect and rejects anything else."><small>slot length</small>1E</button>
+      <button class="seg crc" type="button" data-selected data-title="Message type" data-value="04 = COOP_MSG_DEBUG_ECHO" data-text="The type of the whole message, repeated in every fragment. Never 0 or FRAGMENT. A continuation with another type drops the message in progress."><small>type</small>04</button>
+      <button class="seg" type="button" data-title="Fragment index" data-value="00" data-text="0 starts a new message and always drops an incomplete one. Later fragments must carry exactly the next index; a gap drops the message, and following fragments are ignored until the next index 0."><small>index</small>00</button>
+      <button class="seg" type="button" data-title="Total length" data-value="58 02 = 600, little-endian u16" data-text="The whole message length, 1 to 1024, the same in every fragment. 1024 bytes need 40 fragments, so the index always fits in one byte."><small>total length</small>58 02</button>
+      <button class="seg wide" type="button" data-title="Data" data-value="26 bytes: message bytes 0..25" data-text="Fragment i carries message bytes i x 26 onward. The ROM zero-fills the rest of a short last slot, as for any outbound slot."><small>data</small>26 bytes</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Simple rules that let each side recover on its own</h2>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>The header repeats in every fragment</h3>
+      <div class="term">
+        <div>else if (!sInMessage.active || type != sInMessage.type</div>
+        <div>      || length != sInMessage.length</div>
+        <div>      || index != sInMessage.nextIndex)</div>
+        <div><span class="c">// drop the incomplete message</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>It costs 4 of 30 bytes per slot, but each continuation can be checked on its own. A fragment from an abandoned message can never be glued onto a new one.</p></div>
+    </div>
+    <div class="decision">
+      <h3>No message ID and no timeout</h3>
+      <div class="term">
+        <div>if (index == 0)</div>
+        <div>    sInMessage.active = FALSE; <span class="c">// start over</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>Each ring has one writer, so fragments arrive in order. A sender that gives up just stops, and the next message's fragment 0 drops the leftover. A disconnect resets both sides: the ROM abandons its outbound message when <code>lua_connected</code> is clear, and Lua clears its queue and reassembler on disconnect, reset and <code>welcome</code>.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Pumped from the overworld hook, for now</h3>
+      <div class="term">
+        <div>CoopPresence_Update();</div>
+        <div>...</div>
+        <div>CoopMailbox_PumpOutbound();</div>
+      </div>
+      <div class="why"><b>Why</b><p>Presence goes first, so a large message never delays it. Inbound messages are still read only while the overworld runs, as in v1. The trade screens (#80/#81) run outside the overworld and will need to call the pump and <code>CoopMailbox_Receive</code> themselves; the memory map says so.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Unit tests on both sides, CI for the ROM</h2>
+    <p>Lua tests ran locally. The C host tests and the ROM build ran only in CI, since this machine has no Docker or C compiler. The output below is copied from those runs.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> lua client/tests/run.lua</div>
+    <div style="--i:1" class="ok">222 passed, 0 failed (15 suites)</div>
+    <div style="--i:2"><span class="c"># CI, ROM job, "Test ROM co-op publishing" (ASan/UBSan)</span></div>
+    <div style="--i:3" class="ok">PASS coop presence: 7 test groups (ASan/UBSan)</div>
+    <div style="--i:4" class="ok">PASS coop mailbox: 6 test groups (ASan/UBSan)</div>
+    <div style="--i:5"><span class="c"># client/debug/echo.lua against a Lua model of the ROM (not mGBA)</span></div>
+    <div style="--i:6" class="ok">[echo] round 1 PASS: 600 bytes match byte-for-byte after 4 frames; 4 presence messages arrived meanwhile</div>
+    <div style="--i:7" class="ok">[echo] round 2 PASS: 1024 bytes match byte-for-byte after 6 frames; 6 presence messages arrived meanwhile</div>
+  </div>
+  <p class="small">Not done yet: the mGBA run of <code>client/debug/echo.lua</code> on the real ROM. The steps are in the PR body.</p>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with <code>rom/src/coop/mailbox.c</code> (<code>AddFragment</code> and <code>CoopMailbox_PumpOutbound</code>), then <code>client/lib/fragments.lua</code>, which mirrors it, then the "Multi-slot messages" section of <code>docs/memory-map.md</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Is a 1024-byte maximum (two 1 KiB EWRAM buffers in the ROM) enough for trading and PvP, or should it be larger now?</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is it fine for the debug echo (<code>COOP_MSG_DEBUG_ECHO</code>) to stay in release ROMs? It only answers a Lua script that sends it.</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Do the drop rules (fragment 0 restarts; any out-of-sequence fragment drops) match what the virtual link (#81) will need?</span></label>
+    <label class="check"><input type="checkbox" id="c4"><span>Did someone run <code>client/debug/echo.lua</code> in mGBA and see both rounds pass?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#78</b><span>Protocol v2 trade messages. No protocol change here; the bridge only logs complete ROM messages.</span></div>
+    <div class="limit"><b>#80 / #81</b><span>The virtual link: pumping and receiving outside the overworld, and real message types.</span></div>
+    <div class="limit"><b>mGBA test</b><span>Emulator run of the echo script still needed before merge.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#90 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #77 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
