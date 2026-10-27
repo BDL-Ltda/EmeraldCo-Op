@@ -45,6 +45,37 @@ func TestPresenceUsesConnectionIdentityAndDoesNotEcho(t *testing.T) {
 	}
 }
 
+func TestTradeMessagesAreBroadcastWithSenderID(t *testing.T) {
+	_, addr, _ := testServer(t, 5, nil)
+	a, _ := enter(t, addr, "a")
+	b, _ := enter(t, addr, "b")
+	want(t, a, protocol.Join{PlayerID: "b", TrainerID: 12345})
+	c, _ := enter(t, addr, "c")
+	want(t, a, protocol.Join{PlayerID: "c", TrainerID: 12345})
+	want(t, b, protocol.Join{PlayerID: "c", TrainerID: 12345})
+	// A forges playerId "c"; every message targets b, yet c also receives it:
+	// the server does not route, and receivers filter by targetId.
+	sent := []protocol.Relayed{
+		protocol.TradeAvailable{PlayerID: "c", Available: true},
+		protocol.TradeInvite{PlayerID: "c", TargetID: "b"},
+		protocol.TradeAccept{PlayerID: "c", TargetID: "b"},
+		protocol.TradeDecline{PlayerID: "c", TargetID: "b", Reason: protocol.DeclineTimeout},
+		protocol.TradeCancel{PlayerID: "c", TargetID: "b", Reason: protocol.CancelDisconnected},
+		protocol.TradeLink{PlayerID: "c", TargetID: "b", Seq: 3, Data: strings.Repeat("ab", protocol.MaxTradeLinkBytes)},
+		protocol.TradeConfirm{PlayerID: "c", TargetID: "b", Pokemon: strings.Repeat("5a", protocol.PokemonBytes)},
+		// A target that is not in the room is relayed all the same.
+		protocol.TradeInvite{PlayerID: "c", TargetID: "nobody"},
+	}
+	for _, msg := range sent {
+		a.send(t, msg)
+		expected := msg.WithPlayerID("a")
+		want(t, b, expected)
+		want(t, c, expected)
+	}
+	a.send(t, protocol.Ping{T: 7})
+	want(t, a, protocol.Pong{T: 7}) // Any trade message echoed to A would fail this.
+}
+
 func TestPingEchoesExactTimestamp(t *testing.T) {
 	_, addr, _ := testServer(t, 5, nil)
 	a, _ := enter(t, addr, "a")
@@ -124,7 +155,7 @@ func TestMessageFloodIsRejectedBeforeAndAfterHello(t *testing.T) {
 				_ = p.read(t)
 				want(t, observer, protocol.Join{PlayerID: "flood", TrainerID: 12345})
 			}
-			p.raw(t, strings.Repeat(`{"v":1,"type":"future"}`+"\n", s.rateLimit+1))
+			p.raw(t, strings.Repeat(`{"v":2,"type":"future"}`+"\n", s.rateLimit+1))
 			wantError(t, p, protocol.CodeBadMessage)
 			if authenticated {
 				want(t, observer, protocol.Leave{PlayerID: "flood", Reason: protocol.LeaveDisconnect})

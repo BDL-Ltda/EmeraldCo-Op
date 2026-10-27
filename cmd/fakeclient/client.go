@@ -28,7 +28,7 @@ type received struct {
 func run(ctx context.Context, args []string, getenv func(string) string, output io.Writer) (runErr error) {
 	cfg, err := parseConfig(args, getenv)
 	if errors.Is(err, flag.ErrHelp) {
-		_, err = fmt.Fprintln(output, "Usage: fakeclient -id PLAYER [-addr ADDRESS] [-key KEY] [-pattern square|idle|warp] [-steps-per-sec RATE]\nKey fallback: FAKECLIENT_JOIN_KEY. Defaults: addr=localhost:8765, pattern=square, steps-per-sec=4.\nRATE must be greater than 0 and at most 40. Ctrl+C disconnects; there is no automatic reconnect.")
+		_, err = fmt.Fprintln(output, "Usage: fakeclient -id PLAYER [-addr ADDRESS] [-key KEY] [-pattern square|idle|warp] [-steps-per-sec RATE] [-trade PLAYER]\nKey fallback: FAKECLIENT_JOIN_KEY. Defaults: addr=localhost:8765, pattern=square, steps-per-sec=4.\nRATE must be greater than 0 and at most 40. Ctrl+C disconnects; there is no automatic reconnect.")
 		return err
 	}
 	if err != nil {
@@ -95,6 +95,17 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 	if err := publish(last); err != nil {
 		return err
 	}
+	if cfg.tradeTarget != "" {
+		samples := tradeSamples(cfg.hello.PlayerID, cfg.tradeTarget)
+		for _, message := range samples {
+			if err := send(conn, message); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintf(output, "[trade] sent %d sample trade messages to %s\n", len(samples), cfg.tradeTarget); err != nil {
+			return err
+		}
+	}
 	steps := time.NewTicker(time.Duration(float64(time.Second) / cfg.stepsPerSec))
 	defer steps.Stop()
 	pings := time.NewTicker(pingInterval)
@@ -118,7 +129,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 				return err
 			}
 			switch message := result.message.(type) {
-			case protocol.Join, protocol.Presence, protocol.Leave, protocol.Pong, protocol.Unknown:
+			case protocol.Join, protocol.Presence, protocol.Leave, protocol.Pong, protocol.Unknown, protocol.Relayed:
 			case protocol.Ping:
 				if err := send(conn, protocol.Pong{T: message.T}); err != nil {
 					return err
@@ -246,11 +257,42 @@ func logMessage(output io.Writer, message protocol.Message, key string) error {
 		fmt.Fprintf(&text, "[error] %s %q\n", message.Code, redact(message.Message, key))
 	case protocol.Unknown:
 		fmt.Fprintf(&text, "[unknown] %q\n", redact(message.TypeName, key))
+	// Trade payloads are logged by size only, like other raw payloads.
+	case protocol.TradeAvailable:
+		fmt.Fprintf(&text, "[trade_available] %s available=%t\n", message.PlayerID, message.Available)
+	case protocol.TradeInvite:
+		fmt.Fprintf(&text, "[trade_invite] %s -> %s\n", message.PlayerID, message.TargetID)
+	case protocol.TradeAccept:
+		fmt.Fprintf(&text, "[trade_accept] %s -> %s\n", message.PlayerID, message.TargetID)
+	case protocol.TradeDecline:
+		fmt.Fprintf(&text, "[trade_decline] %s -> %s reason=%s\n", message.PlayerID, message.TargetID, message.Reason)
+	case protocol.TradeCancel:
+		fmt.Fprintf(&text, "[trade_cancel] %s -> %s reason=%s\n", message.PlayerID, message.TargetID, message.Reason)
+	case protocol.TradeLink:
+		fmt.Fprintf(&text, "[trade_link] %s -> %s seq=%d bytes=%d\n", message.PlayerID, message.TargetID, message.Seq, len(message.Data)/2)
+	case protocol.TradeConfirm:
+		fmt.Fprintf(&text, "[trade_confirm] %s -> %s bytes=%d\n", message.PlayerID, message.TargetID, len(message.Pokemon)/2)
 	default:
 		fmt.Fprintf(&text, "[unexpected] %q\n", message.Type())
 	}
 	_, err := io.WriteString(output, redact(text.String(), key))
 	return err
+}
+
+// tradeSamples returns one of each trade message, from id to target, so a
+// developer can watch the relay without an emulator. The payloads are
+// synthetic test bytes, not game data.
+func tradeSamples(id, target string) []protocol.Message {
+	return []protocol.Message{
+		protocol.TradeAvailable{PlayerID: id, Available: true},
+		protocol.TradeInvite{PlayerID: id, TargetID: target},
+		protocol.TradeAccept{PlayerID: id, TargetID: target},
+		protocol.TradeDecline{PlayerID: id, TargetID: target, Reason: protocol.DeclineDeclined},
+		protocol.TradeCancel{PlayerID: id, TargetID: target, Reason: protocol.CancelCanceled},
+		protocol.TradeLink{PlayerID: id, TargetID: target, Seq: 0, Data: "00010203"},
+		protocol.TradeConfirm{PlayerID: id, TargetID: target, Pokemon: strings.Repeat("00", protocol.PokemonBytes)},
+		protocol.TradeAvailable{PlayerID: id, Available: false},
+	}
 }
 
 func facingName(facing int) string {

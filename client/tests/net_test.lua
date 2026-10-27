@@ -93,7 +93,7 @@ end
 local function joined(config)
 	local w = setup(config)
 	w.step(0, state())
-	w.sock().deliver('{"v":1,"type":"welcome","players":[]}\n')
+	w.sock().deliver('{"v":2,"type":"welcome","players":[]}\n')
 	w.step(16)
 	w.sock().take()
 	return w
@@ -136,7 +136,7 @@ tests["connect sends hello with the save's identity"] = function()
 	w.step(0, state())
 	local sent = w.sock().take()
 	h.eq(#sent, 1)
-	h.same(sent[1], json.object({ v = 1, type = "hello", playerId = "bernardo", joinKey = KEY,
+	h.same(sent[1], json.object({ v = 2, type = "hello", playerId = "bernardo", joinKey = KEY,
 		trainerId = 12345, gender = 1, clientVersion = net.CLIENT_VERSION }))
 	-- Nothing else until welcome arrives.
 	w.step(5000)
@@ -147,7 +147,7 @@ tests["welcome starts presence and ping"] = function()
 	local w = setup()
 	w.step(0, state())
 	w.sock().take()
-	w.sock().deliver('{"v":1,"type":"welcome","players":[{"playerId":"leo","trainerId":7,"gender":1,'
+	w.sock().deliver('{"v":2,"type":"welcome","players":[{"playerId":"leo","trainerId":7,"gender":1,'
 		.. '"presence":{"mapGroup":0,"mapNum":9,"x":7,"y":5,"facing":3,"visible":true}},'
 		.. '{"playerId":"davi","trainerId":9,"gender":0}]}\n')
 	assert(w.logged("[net] joined as bernardo; 2 other player(s) online"))
@@ -158,7 +158,7 @@ tests["welcome starts presence and ping"] = function()
 	h.eq(#sent, 2)
 	h.eq(sent[1].type, "ping")
 	h.eq(sent[2].type, "presence")
-	h.same(sent[2], json.object({ v = 1, type = "presence", playerId = "bernardo", mapGroup = 0, mapNum = 9,
+	h.same(sent[2], json.object({ v = 2, type = "presence", playerId = "bernardo", mapGroup = 0, mapNum = 9,
 		x = 5, y = 3, facing = 1, visible = true }))
 	assert(w.client:isConnected())
 end
@@ -208,15 +208,15 @@ tests["ping every 5 s and latency from pong"] = function()
 	h.eq(sent[1].type, "ping")
 	h.eq(sent[1].t, 5016)
 	w.step(42)
-	w.sock().deliver('{"v":1,"type":"pong","t":5016}\n')
+	w.sock().deliver('{"v":2,"type":"pong","t":5016}\n')
 	assert(w.logged("[net] latency 42 ms"))
 end
 
 tests["remote players are logged from split chunks"] = function()
 	local w = joined()
-	local stream = '{"v":1,"type":"join","playerId":"davi","trainerId":54321,"gender":0}\n'
-		.. '{"v":1,"type":"presence","playerId":"joao","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
-		.. '{"v":1,"type":"leave","playerId":"davi","reason":"disconnect"}\n'
+	local stream = '{"v":2,"type":"join","playerId":"davi","trainerId":54321,"gender":0}\n'
+		.. '{"v":2,"type":"presence","playerId":"joao","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
+		.. '{"v":2,"type":"leave","playerId":"davi","reason":"disconnect"}\n'
 	local chunks = {}
 	for pos = 1, #stream, 7 do chunks[#chunks + 1] = stream:sub(pos, pos + 6) end
 	w.sock().deliver(table.unpack(chunks))
@@ -227,8 +227,8 @@ end
 
 tests["invalid and unknown messages are ignored without logging their text"] = function()
 	local w = joined()
-	w.sock().deliver('{"v":1,"type":"presence","playerId":"' .. KEY .. '","mapGroup":0}\n',
-		'{"v":1,"type":"emote","name":"wave"}\n')
+	w.sock().deliver('{"v":2,"type":"presence","playerId":"' .. KEY .. '","mapGroup":0}\n',
+		'{"v":2,"type":"emote","name":"wave"}\n')
 	assert(w.logged("ignoring an invalid message from the server"))
 	assert(not w.logged(KEY))
 	assert(w.client:isConnected())
@@ -238,7 +238,7 @@ end
 tests["a wrong join key stops retrying with a readable error"] = function()
 	local w = setup()
 	w.step(0, state())
-	w.sock().deliver('{"v":1,"type":"error","code":"bad_key","message":"wrong join key"}\n',
+	w.sock().deliver('{"v":2,"type":"error","code":"bad_key","message":"wrong join key"}\n',
 		{ err = "disconnected" })
 	assert(w.logged("the server rejected this client: bad_key (wrong join key)"))
 	assert(w.logged("Check JOIN_KEY in client/config.lua"))
@@ -253,7 +253,7 @@ end
 tests["a full room is retried"] = function()
 	local w = setup()
 	w.step(0, state())
-	w.sock().deliver('{"v":1,"type":"error","code":"room_full","message":"the room is full"}\n')
+	w.sock().deliver('{"v":2,"type":"error","code":"room_full","message":"the room is full"}\n')
 	assert(w.sock().closed)
 	w.step(4999)
 	h.eq(#w.sockets, 1)
@@ -264,7 +264,7 @@ end
 tests["another protocol version stops retrying"] = function()
 	local w = setup()
 	w.step(0, state())
-	w.sock().deliver('{"v":2,"type":"welcome","players":[]}\n')
+	w.sock().deliver('{"v":1,"type":"welcome","players":[]}\n')
 	assert(w.logged("another protocol version"))
 	assert(w.sock().closed)
 	w.step(60000)
@@ -465,7 +465,7 @@ tests["fast-forward stays below the server's rate limit"] = function()
 			frame = frame + 1
 			w.client:setPlayerState(state(frame // 8 % 200))
 			w.client:update(clock:tick(1000 + second))
-			if frame == 1 then w.sock().deliver('{"v":1,"type":"welcome","players":[]}\n') end
+			if frame == 1 then w.sock().deliver('{"v":2,"type":"welcome","players":[]}\n') end
 			count = count + #w.sock().take()
 		end
 		perSecond[#perSecond + 1] = count
@@ -481,10 +481,10 @@ end
 tests["quiet mode still publishes validated panel events"] = function()
 	local w = joined({ DEBUG = false })
 	w.step(42)
-	w.sock().deliver('{"v":1,"type":"join","playerId":"davi","trainerId":7,"gender":0}\n'
-		.. '{"v":1,"type":"presence","playerId":"davi","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
-		.. '{"v":1,"type":"pong","t":16}\n'
-		.. '{"v":1,"type":"leave","playerId":"davi","reason":"disconnect"}\n')
+	w.sock().deliver('{"v":2,"type":"join","playerId":"davi","trainerId":7,"gender":0}\n'
+		.. '{"v":2,"type":"presence","playerId":"davi","mapGroup":0,"mapNum":9,"x":7,"y":3,"facing":3,"visible":true}\n'
+		.. '{"v":2,"type":"pong","t":16}\n'
+		.. '{"v":2,"type":"leave","playerId":"davi","reason":"disconnect"}\n')
 	assert(not w.logged("[remote]"))
 	local types = {}
 	for _, event in ipairs(w.events) do
@@ -494,8 +494,8 @@ tests["quiet mode still publishes validated panel events"] = function()
 	h.eq(table.concat(types, ","), "welcome,join,presence,pong,leave")
 	h.eq(w.events[#w.events].now, w.now)
 	local count = #w.events
-	w.sock().deliver('{"v":1,"type":"presence","playerId":"invalid"}\n'
-		.. '{"v":1,"type":"future"}\n')
+	w.sock().deliver('{"v":2,"type":"presence","playerId":"invalid"}\n'
+		.. '{"v":2,"type":"future"}\n')
 	h.eq(#w.events, count)
 	w.sock().deliver({ err = "disconnected" })
 	h.eq(w.events[#w.events].data, "Retrying")
@@ -529,7 +529,7 @@ tests["two idle clients remain in each others panels beyond 45 seconds"] = funct
 		w.step(0, state())
 		w.sock().take() -- hello
 		local peerId = i == 1 and "bob" or "alice"
-		w.sock().deliver('{"v":1,"type":"welcome","players":[{"playerId":"' .. peerId
+		w.sock().deliver('{"v":2,"type":"welcome","players":[{"playerId":"' .. peerId
 			.. '","trainerId":12345,"gender":1}]}\n')
 		views[i]:setPlayerState(state())
 	end
@@ -542,7 +542,7 @@ tests["two idle clients remain in each others panels beyond 45 seconds"] = funct
 					local other = worlds[i == 1 and 2 or 1]
 					other.sock().deliver(assert(json.encode(m)) .. "\n")
 				elseif m.type == "ping" then
-					w.sock().deliver(assert(json.encode({ v = 1, type = "pong", t = m.t })) .. "\n")
+					w.sock().deliver(assert(json.encode({ v = 2, type = "pong", t = m.t })) .. "\n")
 				end
 			end
 		end
@@ -620,7 +620,7 @@ tests["late callbacks from a closed socket cannot affect the replacement"] = fun
 	w.client:close("ROM reset")
 	w.step(16, state())
 	local current = w.sock()
-	current.deliver('{"v":1,"type":"welcome","players":[]}\n')
+	current.deliver('{"v":2,"type":"welcome","players":[]}\n')
 	w.step(16)
 	old.handlers.error(old, "late old error")
 	old.handlers.received(old)

@@ -4,14 +4,14 @@
 // Every line is a JSON object with a protocol version "v", a "type" and the
 // fields of that type, all at the top level:
 //
-//	{"v":1,"type":"ping","t":1712345678901}
+//	{"v":2,"type":"ping","t":1712345678901}
 package protocol
 
 import "encoding/json"
 
 // Version is the protocol version this package speaks. A peer that sends any
 // other value gets ErrVersionMismatch.
-const Version = 1
+const Version = 2
 
 // MaxLineLength is the longest line, in bytes and excluding the trailing
 // newline, that Encode produces and Decoder accepts.
@@ -31,6 +31,28 @@ const (
 	TypePing     = "ping"
 	TypePong     = "pong"
 	TypeError    = "error"
+
+	TypeTradeAvailable = "trade_available"
+	TypeTradeInvite    = "trade_invite"
+	TypeTradeAccept    = "trade_accept"
+	TypeTradeDecline   = "trade_decline"
+	TypeTradeCancel    = "trade_cancel"
+	TypeTradeLink      = "trade_link"
+	TypeTradeConfirm   = "trade_confirm"
+)
+
+// Trade decline reasons.
+const (
+	DeclineDeclined = "declined"
+	DeclineTimeout  = "timeout"
+	DeclineBusy     = "busy"
+)
+
+// Trade cancel reasons.
+const (
+	CancelCanceled     = "canceled"
+	CancelTimeout      = "timeout"
+	CancelDisconnected = "disconnected"
 )
 
 // Gender values, matching MALE and FEMALE in the pokeemerald decomp.
@@ -159,6 +181,75 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Relayed is implemented by the client messages that the server stamps with
+// the sender's player ID and relays unchanged to every other player: all the
+// trade messages. The server keeps no state for them.
+type Relayed interface {
+	Message
+	// WithPlayerID returns a copy of the message with playerId set to id.
+	WithPlayerID(id string) Message
+}
+
+// TradeAvailable says whether a player is waiting to trade at a Cable Club
+// attendant. The server does not remember it; see docs/protocol.md.
+type TradeAvailable struct {
+	PlayerID  string `json:"playerId"`
+	Available bool   `json:"available"`
+}
+
+// TradeInvite asks TargetID to trade with PlayerID.
+type TradeInvite struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+}
+
+// TradeAccept answers a TradeInvite from TargetID with yes.
+type TradeAccept struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+}
+
+// TradeDecline answers a TradeInvite from TargetID with no.
+type TradeDecline struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+	Reason   string `json:"reason"`
+}
+
+// TradeCancel ends a pending invite or a running trade session with TargetID.
+type TradeCancel struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+	Reason   string `json:"reason"`
+}
+
+// TradeLink carries opaque virtual-link bytes to the trade partner.
+type TradeLink struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+	Seq      uint32 `json:"seq"`
+	// Data is the payload as lowercase hex, at most MaxTradeLinkBytes bytes.
+	Data string `json:"data"`
+}
+
+// TradeConfirm is sent when a player confirms the trade, with the Pokémon
+// they are giving away.
+type TradeConfirm struct {
+	PlayerID string `json:"playerId"`
+	TargetID string `json:"targetId"`
+	// Pokemon is the outgoing struct Pokemon as lowercase hex, exactly
+	// PokemonBytes bytes.
+	Pokemon string `json:"pokemon"`
+}
+
+func (m TradeAvailable) WithPlayerID(id string) Message { m.PlayerID = id; return m }
+func (m TradeInvite) WithPlayerID(id string) Message    { m.PlayerID = id; return m }
+func (m TradeAccept) WithPlayerID(id string) Message    { m.PlayerID = id; return m }
+func (m TradeDecline) WithPlayerID(id string) Message   { m.PlayerID = id; return m }
+func (m TradeCancel) WithPlayerID(id string) Message    { m.PlayerID = id; return m }
+func (m TradeLink) WithPlayerID(id string) Message      { m.PlayerID = id; return m }
+func (m TradeConfirm) WithPlayerID(id string) Message   { m.PlayerID = id; return m }
+
 // Unknown is what Decoder returns for a well-formed line whose type this
 // version does not know. Callers should log it and ignore it.
 type Unknown struct {
@@ -176,6 +267,14 @@ func (Ping) Type() string      { return TypePing }
 func (Pong) Type() string      { return TypePong }
 func (Error) Type() string     { return TypeError }
 func (u Unknown) Type() string { return u.TypeName }
+
+func (TradeAvailable) Type() string { return TypeTradeAvailable }
+func (TradeInvite) Type() string    { return TypeTradeInvite }
+func (TradeAccept) Type() string    { return TypeTradeAccept }
+func (TradeDecline) Type() string   { return TypeTradeDecline }
+func (TradeCancel) Type() string    { return TypeTradeCancel }
+func (TradeLink) Type() string      { return TypeTradeLink }
+func (TradeConfirm) Type() string   { return TypeTradeConfirm }
 
 // newMessage returns a pointer to a zero message of the given type, or nil if
 // the type is unknown.
@@ -197,6 +296,20 @@ func newMessage(typeName string) Message {
 		return &Pong{}
 	case TypeError:
 		return &Error{}
+	case TypeTradeAvailable:
+		return &TradeAvailable{}
+	case TypeTradeInvite:
+		return &TradeInvite{}
+	case TypeTradeAccept:
+		return &TradeAccept{}
+	case TypeTradeDecline:
+		return &TradeDecline{}
+	case TypeTradeCancel:
+		return &TradeCancel{}
+	case TypeTradeLink:
+		return &TradeLink{}
+	case TypeTradeConfirm:
+		return &TradeConfirm{}
 	}
 	return nil
 }

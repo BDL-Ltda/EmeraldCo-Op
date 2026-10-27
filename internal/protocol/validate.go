@@ -17,6 +17,13 @@ const (
 	MaxMapIndex            = 255
 	MinCoordinate          = math.MinInt16
 	MaxCoordinate          = math.MaxInt16
+	// MaxTradeLinkBytes bounds one trade_link payload. It is four of the
+	// game's 256-byte link blocks (BLOCK_BUFFER_SIZE), and its hex form keeps
+	// the line well under MaxLineLength.
+	MaxTradeLinkBytes = 1024
+	// PokemonBytes is sizeof(struct Pokemon) in the decomp: an 80-byte
+	// BoxPokemon plus 20 bytes of party stats.
+	PokemonBytes = 100
 )
 
 // ErrInvalid is wrapped by every *ValidationError.
@@ -136,6 +143,78 @@ func (m Error) Validate() error {
 		return invalid(TypeError, "code", fmt.Sprintf("%q is not a known code", m.Code))
 	}
 	return validateText(TypeError, "message", m.Message, 0, MaxErrorMessageLength)
+}
+
+func (m TradeAvailable) Validate() error {
+	return validatePlayerID(TypeTradeAvailable, "playerId", m.PlayerID)
+}
+
+func (m TradeInvite) Validate() error {
+	return validateTradePair(TypeTradeInvite, m.PlayerID, m.TargetID)
+}
+
+func (m TradeAccept) Validate() error {
+	return validateTradePair(TypeTradeAccept, m.PlayerID, m.TargetID)
+}
+
+func (m TradeDecline) Validate() error {
+	if err := validateTradePair(TypeTradeDecline, m.PlayerID, m.TargetID); err != nil {
+		return err
+	}
+	switch m.Reason {
+	case DeclineDeclined, DeclineTimeout, DeclineBusy:
+		return nil
+	}
+	return invalid(TypeTradeDecline, "reason", fmt.Sprintf("%q is not a known reason", m.Reason))
+}
+
+func (m TradeCancel) Validate() error {
+	if err := validateTradePair(TypeTradeCancel, m.PlayerID, m.TargetID); err != nil {
+		return err
+	}
+	switch m.Reason {
+	case CancelCanceled, CancelTimeout, CancelDisconnected:
+		return nil
+	}
+	return invalid(TypeTradeCancel, "reason", fmt.Sprintf("%q is not a known reason", m.Reason))
+}
+
+func (m TradeLink) Validate() error {
+	if err := validateTradePair(TypeTradeLink, m.PlayerID, m.TargetID); err != nil {
+		return err
+	}
+	return validateHex(TypeTradeLink, "data", m.Data, 0, MaxTradeLinkBytes)
+}
+
+func (m TradeConfirm) Validate() error {
+	if err := validateTradePair(TypeTradeConfirm, m.PlayerID, m.TargetID); err != nil {
+		return err
+	}
+	return validateHex(TypeTradeConfirm, "pokemon", m.Pokemon, PokemonBytes, PokemonBytes)
+}
+
+func validateTradePair(typeName, playerID, targetID string) error {
+	if err := validatePlayerID(typeName, "playerId", playerID); err != nil {
+		return err
+	}
+	return validatePlayerID(typeName, "targetId", targetID)
+}
+
+// validateHex checks for lowercase hex of min-max bytes (twice as many
+// characters).
+func validateHex(typeName, field, value string, min, max int) error {
+	if len(value)%2 != 0 || len(value) < 2*min || len(value) > 2*max {
+		if min == max {
+			return invalid(typeName, field, fmt.Sprintf("must be %d bytes of hex", min))
+		}
+		return invalid(typeName, field, fmt.Sprintf("must be %d-%d bytes of hex", min, max))
+	}
+	for i := 0; i < len(value); i++ {
+		if c := value[i]; (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return invalid(typeName, field, "may only contain 0-9 and a-f")
+		}
+	}
+	return nil
 }
 
 // Validate always succeeds: an unknown message has no rules to check.
