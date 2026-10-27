@@ -19,7 +19,8 @@ local function presence(x)
 end
 
 local function fixture()
-	local outbound, inbound, states, errors = {}, {}, {}, {}
+	local outbound, inbound, states, errors, messages = {}, {}, {}, {}, {}
+	-- room: slots left this frame, or nil for unlimited.
 	local box = { connected = false, full = false, empty = true }
 	function box:isInboundEmpty() return self.empty end
 	function box.pop(_)
@@ -27,17 +28,19 @@ local function fixture()
 		return table.remove(outbound, 1)
 	end
 	function box:push(kind, payload)
-		if self.full then return false, "mailbox inbound ring full" end
+		if self.full or self.room == 0 then return false, "mailbox inbound ring full" end
 		assert(self.connected, "new messages require lua_connected")
+		if self.room then self.room = self.room - 1 end
 		inbound[#inbound + 1] = { type = kind, payload = payload }
 		return true
 	end
 	function box:setLuaConnected(value) self.connected = value end
 	local client = { setPlayerState = function(_, state) states[#states + 1] = state end }
 	local view = { setPlayerState = function(_, state) states[#states + 1] = state end }
-	local pipe = bridge.new(box, client, view, function(err) errors[#errors + 1] = err end)
+	local pipe = bridge.new(box, client, view, function(err) errors[#errors + 1] = err end,
+		function(msgType, data) messages[#messages + 1] = { type = msgType, data = data } end)
 	return { box = box, outbound = outbound, inbound = inbound, states = states,
-		errors = errors, pipe = pipe }
+		errors = errors, messages = messages, pipe = pipe }
 end
 
 tests["outbound mailbox presence reaches network and panel without struct reads"] = function()
@@ -196,6 +199,124 @@ tests["reset forgets pending work without writing an invalid mailbox"] = functio
 	f.pipe.flushInbound()
 	h.eq(f.pipe.isConnected(), false)
 	h.eq(#f.inbound, 4)
+end
+
+local fragments = require("fragments")
+local function bytes(length, seed)
+	local out = {}
+	for i = 0, length - 1 do out[#out + 1] = string.char((i * seed + 3) & 0xFF) end
+	return table.concat(out)
+end
+
+tests["outbound multi-slot message is reassembled while presence keeps flowing"] = function()
+	local f = fixture()
+	local list = assert(fragments.split(mailbox.MSG.DEBUG_ECHO, bytes(600, 7)))
+	for i, payload in ipairs(list) do
+		f.outbound[#f.outbound + 1] = { type = mailbox.MSG.FRAGMENT, payload = payload }
+		if i % 5 == 0 then
+			f.outbound[#f.outbound + 1] = { type = mailbox.MSG.PRESENCE,
+				payload = assert(mailbox.encodePresence(presence(i))) }
+		end
+	end
+	for _ = 1, 3 do f.pipe.drainOutbound() end
+	h.eq(#f.outbound, 0)
+	h.eq(#f.errors, 0)
+	h.eq(#f.messages, 1)
+	h.eq(f.messages[1].type, mailbox.MSG.DEBUG_ECHO)
+	h.eq(f.messages[1].data, bytes(600, 7))
+	h.eq(#f.states, 8) -- 4 presences, each to the network and the panel
+end
+
+tests["incomplete outbound message is dropped and logged, the next one delivered"] = function()
+	local f = fixture()
+	local first = assert(fragments.split(mailbox.MSG.DEBUG_ECHO, bytes(600, 31)))
+	for i = 1, 5 do f.outbound[i] = { type = mailbox.MSG.FRAGMENT, payload = first[i] } end
+	f.pipe.drainOutbound()
+	h.eq(#f.messages, 0)
+	for _, payload in ipairs(assert(fragments.split(mailbox.MSG.DEBUG_ECHO, bytes(100, 7)))) do
+		f.outbound[#f.outbound + 1] = { type = mailbox.MSG.FRAGMENT, payload = payload }
+	end
+	f.pipe.drainOutbound()
+	h.eq(#f.messages, 1)
+	h.eq(f.messages[1].data, bytes(100, 7))
+	h.eq(#f.errors, 1)
+	assert(f.errors[1]:find("incomplete message dropped", 1, true), f.errors[1])
+end
+
+local function inboundFragments(f, from)
+	local list = {}
+	for i = from or 1, #f.inbound do
+		if f.inbound[i].type == mailbox.MSG.FRAGMENT then list[#list + 1] = f.inbound[i].payload end
+	end
+	return list
+end
+
+tests["inbound multi-slot message streams after presence over several frames"] = function()
+	local f = fixture()
+	h.eq((f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, "x")), false) -- no session yet
+	f.pipe:onEvent("message", { type = "welcome", players = {
+		{ playerId = "amy", trainerId = 7, gender = 1, presence = presence(6) },
+	} })
+	assert(f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, bytes(600, 7)))
+	local frames = 0
+	repeat
+		frames = frames + 1
+		f.box.room = 15
+		f.pipe:onEvent("message", { type = "presence", playerId = "amy", mapGroup = 0,
+			mapNum = 9, x = frames, y = 3, facing = 1, visible = true })
+		f.pipe.flushInbound()
+	until #inboundFragments(f) == 24 or frames == 10
+	h.eq(#inboundFragments(f), 24)
+	assert(frames > 1)
+	-- Every frame's presence went out before that frame's fragments.
+	h.eq(f.inbound[5].type, mailbox.MSG.PRESENCE)
+	h.eq(f.inbound[16].type, mailbox.MSG.PRESENCE)
+	h.eq(assert(mailbox.decodePresence(f.inbound[16].payload)).x, 2)
+	local reassembler = fragments.newReassembler()
+	local got
+	for _, payload in ipairs(inboundFragments(f)) do
+		local msgType, data = reassembler:feed(payload)
+		if msgType then got = data end
+	end
+	h.eq(got, bytes(600, 7))
+	h.eq(#f.errors, 0)
+end
+
+tests["disconnect drops the queued and partly sent inbound messages"] = function()
+	local f = fixture()
+	f.pipe:onEvent("message", { type = "welcome", players = {} })
+	assert(f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, bytes(600, 7)))
+	assert(f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, bytes(10, 7)))
+	f.box.room = 10
+	f.pipe.flushInbound()
+	h.eq(#inboundFragments(f), 6) -- after the four LEAVEs
+	f.pipe:onEvent("status", "Retrying")
+	h.eq((f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, "x")), false)
+	f.pipe:onEvent("message", { type = "welcome", players = {} })
+	local before = #f.inbound
+	f.box.room = nil
+	f.pipe.flushInbound()
+	h.eq(#inboundFragments(f, before + 1), 0)
+	-- A new message starts at fragment 0, so the ROM drops the partial one.
+	assert(f.pipe.sendMessage(mailbox.MSG.DEBUG_ECHO, bytes(30, 7)))
+	f.pipe.flushInbound()
+	local list = inboundFragments(f, before + 1)
+	h.eq(#list, 2)
+	h.eq(list[1]:byte(2), 0)
+end
+
+tests["outbound partial message from before a reset is dropped"] = function()
+	local f = fixture()
+	local list = assert(fragments.split(mailbox.MSG.DEBUG_ECHO, bytes(100, 7)))
+	f.outbound[1] = { type = mailbox.MSG.FRAGMENT, payload = list[1] }
+	f.outbound[2] = { type = mailbox.MSG.FRAGMENT, payload = list[2] }
+	f.pipe.drainOutbound()
+	f.pipe.reset()
+	f.outbound[1] = { type = mailbox.MSG.FRAGMENT, payload = list[3] }
+	f.outbound[2] = { type = mailbox.MSG.FRAGMENT, payload = list[4] }
+	f.pipe.drainOutbound()
+	h.eq(#f.messages, 0)
+	h.eq(#f.errors, 2)
 end
 
 return tests

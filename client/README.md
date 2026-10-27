@@ -13,6 +13,12 @@ For the #24 ROM publisher test, load `debug/presence.lua` **instead of**
 See [local presence testing](../docs/local-presence.md#manual-mgba-test-no-server-or-second-player).
 The regular bridge reads the same mailbox and connects it to the server.
 
+For the #77 multi-slot message test, load `debug/echo.lua` **instead of**
+`bridge.lua`, with the game in the overworld. It sends 600-byte and 1024-byte
+patterns to the ROM (the first after an incomplete message), the ROM sends
+them back, and it logs `round N PASS` when the bytes match. See
+[multi-slot messages](../docs/memory-map.md#multi-slot-messages).
+
 ## Running it
 
 1. Put the Emerald Co-Op folder in a path with **only ASCII characters**, e.g.
@@ -34,7 +40,7 @@ on the first problem. The game itself keeps running.
 | The loaded ROM's CRC32 equals `romCrc32` | `ROM mismatch: expected <x>, got <y>. Apply the matching .bps patch.` |
 | `gCoopMailbox` exists and its header has the expected magic, version and `rom_ready` bit | The bridge waits for initialization or reports the mismatch; no socket or game-struct read occurs. |
 
-On success it logs `ROM verified (<crc32>)` and `mailbox ready (layout v1)`.
+On success it logs `ROM verified (<crc32>)` and `mailbox ready (layout v2)`.
 The checks run again whenever another game is loaded with the script still
 running; the mailbox header is also checked each frame to catch soft resets.
 A reset marker in Lua's next unpublished inbound slot additionally detects a

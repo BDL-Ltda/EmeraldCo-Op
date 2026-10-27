@@ -313,7 +313,7 @@ Offsets are from `gCoopMailbox`.
 | Offset | Size | Field | Written by | Meaning |
 | --- | --- | --- | --- | --- |
 | `0x000` | 4 | `magic` | ROM | ASCII `C` `O` `O` `P` (`43 4F 4F 50`), no terminator. Written last by `CoopMailbox_Init`, so a valid magic means the header is ready. |
-| `0x004` | 1 | `layoutVersion` | ROM | `1`. Lua must refuse to use a mailbox with another version. |
+| `0x004` | 1 | `layoutVersion` | ROM | `2` (v1.5 onward; `1` in v1.0). Lua must refuse to use a mailbox with another version. |
 | `0x005` | 1 | `flags` | both, see below | Bit 0 `lua_connected`, bit 1 `rom_ready`, bits 2–7 reserved (0). |
 | `0x006` | 1 | `outbound.head` | ROM | Next outbound slot the ROM fills (0–15). |
 | `0x007` | 1 | `outbound.tail` | Lua | Next outbound slot Lua reads (0–15). |
@@ -342,7 +342,8 @@ Each slot is 32 bytes (`0x20`). Offsets are from the start of the slot.
 | `0x01` | 1 | `length` | Number of valid payload bytes, 0–30. |
 | `0x02` | 30 | `payload` | Message bytes. The ROM zero-fills the bytes after `length` in outbound slots. |
 
-Every message fits in one slot. Multi-slot messages are deferred to layout v2.
+A single-slot message carries up to 30 bytes. Larger messages are split into
+several `COOP_MSG_FRAGMENT` slots; see [Multi-slot messages](#multi-slot-messages).
 
 ### Message types
 
@@ -354,6 +355,8 @@ client mirrors these values; never renumber one.
 | `0` | `COOP_MSG_NONE` | none | Reserved: never sent. |
 | `1` | `COOP_MSG_PRESENCE` | both | See [Presence payload](#presence-payload). |
 | `2` | `COOP_MSG_LEAVE` | inbound | 1 byte: the remote slot (`0`–`3`) to free. See [Remote slots](#remote-slots). |
+| `3` | `COOP_MSG_FRAGMENT` | both | One slot of a multi-slot message (layout v2). See [Multi-slot messages](#multi-slot-messages). |
+| `4` | `COOP_MSG_DEBUG_ECHO` | both | Debug, sent as a multi-slot message: the ROM sends a received one back unchanged. Used by `client/debug/echo.lua`. |
 
 ### Presence payload
 
@@ -472,16 +475,82 @@ the bridge waits for a fresh ROM tuple before rejoining. This uses only
 existing Lua-owned slot storage: no struct/flag/layout/version or ROM change.
 Only one Lua writer/reader may attach to each ring, as before.
 
+### Multi-slot messages
+
+Layout **v2** ([issue #77](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/77))
+adds messages longer than one slot, such as a 600-byte party for trading. The
+header, rings and slot bytes are the same as in v1; v2 adds the fragment
+format below, and the version bump makes a v1 client and a v2 ROM refuse each
+other in `check()` (`mailbox layout version mismatch: ROM has 1, client
+expects 2`).
+
+A message of **1 to 1024 bytes** (`COOP_MAILBOX_MESSAGE_MAX`) travels as
+consecutive `COOP_MSG_FRAGMENT` slots. Each fragment's payload is a 4-byte
+header and up to **26** data bytes (`COOP_FRAGMENT_DATA_SIZE`). Offsets are
+from the start of `payload` (slot offset `0x02`):
+
+| Offset | Size, type | Field | Meaning |
+| --- | --- | --- | --- |
+| `0x00` | 1, `u8` | `type` | Type of the whole message, `COOP_MSG_*`. Never `0` or `COOP_MSG_FRAGMENT`. |
+| `0x01` | 1, `u8` | `index` | Fragment index, `0` for the first. Fragment `i` carries message bytes `i × 26` onward. |
+| `0x02` | 2, `u16` | `totalLength` | Length of the whole message, little-endian, `1`–`1024`. The same in every fragment. |
+| `0x04` | 1–26 | `data` | Message bytes. Every fragment but the last carries exactly 26. |
+
+The slot `length` is `4 +` the data size. A message of `n` bytes takes
+`ceil(n / 26)` fragments: 600 bytes take 24, more than the 15 slots a ring
+holds. Example: a 2-byte `COOP_MSG_DEBUG_ECHO` message `41 42` is one slot
+with type `03`, length `06` and payload `04 00 02 00 41 42`.
+
+**Sender** (one multi-slot message in flight per ring):
+
+- Push fragments in index order, with the normal ring rules. When the ring is
+  full, stop and push the **same** fragment again on a later frame: never drop
+  a fragment. This streams a message larger than the ring while the reader
+  drains it.
+- Single-slot messages (`PRESENCE`, `LEAVE`) may be pushed between two
+  fragments; they are unchanged from v1. Both sides push presence before the
+  frame's fragments.
+- To abandon a message, just stop. The ROM abandons the outbound message when
+  `lua_connected` is clear; Lua drops its queue on disconnect, reset and
+  `welcome`.
+
+**Receiver:**
+
+- Fragment `0` always starts a new message, dropping any incomplete one.
+- A later fragment is accepted only if it continues the message in progress:
+  the next `index`, the same `type` and `totalLength`, and the expected size.
+  Anything else drops the incomplete message, and following fragments are
+  dropped until the next fragment `0`.
+- When the collected bytes reach `totalLength`, the message is delivered. An
+  incomplete message is never delivered and never blocks later messages.
+- A disconnect (ROM: `lua_connected` clear; Lua: disconnect or reset) and
+  `CoopMailbox_Init` drop the incomplete message.
+
+ROM side ([`src/coop/mailbox.c`][mailbox_c]): `CoopMailbox_SendMessage` copies
+the message and pushes its first fragments; `CoopMailbox_PumpOutbound`, called
+from `CoopOverworld_Update` after presence on every `CB1_Overworld` frame,
+pushes the rest. `CoopMailbox_Receive` returns single-slot and reassembled
+messages; `CoopRemote_Update` reads the inbound ring with it, so inbound
+messages are read only while the overworld runs, as before. Code that
+exchanges multi-slot messages outside the overworld (trading, #80/#81) must
+call the pump and the receiver itself. The ROM keeps one 1024-byte buffer per
+direction in EWRAM. Lua side: [`client/lib/fragments.lua`](../client/lib/fragments.lua).
+
 ### C API
 
 Declared in [`include/coop/mailbox.h`][mailbox_h]:
 
 | Function | Ring | Behavior |
 | --- | --- | --- |
-| `void CoopMailbox_Init(void)` | both | Zeroes the mailbox, sets `layoutVersion`, `rom_ready` and the magic. |
+| `void CoopMailbox_Init(void)` | both | Zeroes the mailbox, sets `layoutVersion`, `rom_ready` and the magic, and forgets any multi-slot message. |
 | `bool8 CoopMailbox_Push(u8 type, const void *payload, u8 len)` | outbound | Queues one message. Returns `FALSE` and writes nothing if the ring is full or `len > 30`. |
-| `bool8 CoopMailbox_Pop(struct CoopMailboxSlot *msg)` | inbound | Copies the oldest message to `*msg` and frees its slot. Returns `FALSE` if the ring is empty. |
+| `bool8 CoopMailbox_Pop(struct CoopMailboxSlot *msg)` | inbound | Copies the oldest slot to `*msg` and frees it. Returns `FALSE` if the ring is empty. |
 | `bool8 CoopMailbox_IsLuaConnected(void)` | header | `TRUE` while `lua_connected` is set. |
+| `bool8 CoopMailbox_SendMessage(u8 type, const void *data, u16 len)` | outbound | Starts a [multi-slot message](#multi-slot-messages) of 1–1024 bytes: copies it and pushes the first fragments. `FALSE` if one is still being sent, Lua isn't connected, or the type or length is invalid. |
+| `void CoopMailbox_PumpOutbound(void)` | outbound | Pushes more fragments while the ring has room. Abandons the message if `lua_connected` is clear. Call once per frame. |
+| `bool8 CoopMailbox_IsSending(void)` | outbound | `TRUE` while a multi-slot message is still being sent. |
+| `bool8 CoopMailbox_Receive(struct CoopMessage *msg)` | inbound | Returns the next complete message, single-slot or reassembled, as `type`, `length` and a `data` pointer valid until the next call. Pops at most 16 slots per call; `FALSE` when no complete message is waiting. |
+| `void CoopMailbox_DiscardInbound(void)` | inbound | Pops every waiting slot and drops the incomplete multi-slot message. |
 
 ### Lua API
 
@@ -507,8 +576,22 @@ Both ring calls read `head` and `tail` from memory every time and return an
 error if either is above 15, so a reset mailbox is never read with stale
 indices.
 
-[mailbox_h]: https://github.com/BDL-Ltda/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/include/coop/mailbox.h
-[mailbox_c]: https://github.com/BDL-Ltda/pokeemerald/blob/8503233002f1e70787c56095349628f7e250a08d/src/coop/mailbox.c
-[coop_constants_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
+[`client/lib/fragments.lua`](../client/lib/fragments.lua) splits and
+reassembles [multi-slot messages](#multi-slot-messages). It only builds and
+reads byte strings, so it is pure.
+
+| Function | Behavior |
+| --- | --- |
+| `split(type, data)` | Returns the list of fragment payloads for one message, or `nil, error` for a bad type or a length outside 1–1024. |
+| `newReassembler()` | `:feed(payload)` takes one `COOP_MSG_FRAGMENT` payload and returns `type, data` when it completes a message, `nil` when more are needed, and a third value, the reason, when it dropped an incomplete message or a bad fragment. `:reset()` drops the message in progress. |
+| `newSender()` | `:send(type, data)` queues a message (up to 16). `:pump(push)` calls `push(payload)` for the next fragments, in order, until it returns false (ring full; that fragment is retried next time). `:clear()` drops everything; `:isIdle()`. |
+
+The [mailbox bridge](mailbox-bridge.md) uses both: it reassembles outbound
+fragments and hands complete messages to its `onMessage` handler, and
+`sendMessage(type, data)` streams one to the ROM after the frame's presence.
+
+[mailbox_h]: https://github.com/BDL-Ltda/pokeemerald/blob/015a5a04b3fc3e0d74dff9c8e5fcdbc008d3c5e3/include/coop/mailbox.h
+[mailbox_c]: https://github.com/BDL-Ltda/pokeemerald/blob/015a5a04b3fc3e0d74dff9c8e5fcdbc008d3c5e3/src/coop/mailbox.c
+[coop_constants_h]: https://github.com/BDL-Ltda/pokeemerald/blob/015a5a04b3fc3e0d74dff9c8e5fcdbc008d3c5e3/include/constants/coop.h
 [remote_players_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
-[remote_players_c]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c
+[remote_players_c]: https://github.com/BDL-Ltda/pokeemerald/blob/015a5a04b3fc3e0d74dff9c8e5fcdbc008d3c5e3/src/coop/remote_players.c

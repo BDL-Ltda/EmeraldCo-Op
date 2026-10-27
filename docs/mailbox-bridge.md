@@ -41,6 +41,16 @@ The ROM, its pin and the mailbox layout are unchanged.
   cannot reconnect from later frame callbacks. Late events from an old socket
   cannot affect its replacement.
 
+- [Multi-slot messages](memory-map.md#multi-slot-messages) (mailbox layout
+  v2): outbound `COOP_MSG_FRAGMENT` slots are reassembled with
+  `client/lib/fragments.lua`, and each complete message goes to the pipe's
+  `onMessage` handler; `bridge.lua` only logs them for now, since no message
+  type is forwarded to the network yet (trading, #78/#81). `sendMessage(type,
+  data)` queues a message for the ROM during a session; `flushInbound` streams
+  its fragments after the frame's `LEAVE`s and presence, over as many frames as
+  the ring needs. Disconnect, reset and `welcome` drop incomplete messages in
+  both directions.
+
 The pure `client/lib/mailboxbridge.lua` owns conversion and slot bookkeeping.
 `bridge.lua` alone binds emulator, socket and panel APIs. The panel's 30-second
 display expiry remains independent of ROM slots and server membership.

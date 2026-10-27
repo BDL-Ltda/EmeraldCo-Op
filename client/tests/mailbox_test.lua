@@ -35,7 +35,7 @@ end
 local function booted()
 	local mem = newMem()
 	for i = 1, 4 do mem.bytes[BASE + i - 1] = ("COOP"):byte(i) end
-	mem.bytes[BASE + 0x004] = 1
+	mem.bytes[BASE + 0x004] = mailbox.LAYOUT_VERSION
 	mem.bytes[BASE + FLAGS] = mailbox.FLAG_ROM_READY
 	return mem, mailbox.new(mem, BASE)
 end
@@ -94,7 +94,7 @@ test("reset watch follows head wraps without changing published payloads", funct
 	eq(mem:read8(BASE + IN_TAIL), 0)
 	mem.bytes = {}
 	for i = 1, 4 do mem.bytes[BASE + i - 1] = ("COOP"):byte(i) end
-	mem.bytes[BASE + 4], mem.bytes[BASE + FLAGS] = 1, mailbox.FLAG_ROM_READY
+	mem.bytes[BASE + 4], mem.bytes[BASE + FLAGS] = mailbox.LAYOUT_VERSION, mailbox.FLAG_ROM_READY
 	eq(box:check(), true)
 	eq(box:wasReset(), true)
 	assert(box:watchReset())
@@ -159,7 +159,7 @@ test("check passes on a booted mailbox", function()
 	local _, box = booted()
 	local ok, msg = box:check()
 	eq(ok, true)
-	eq(msg, "mailbox ready (layout v1)")
+	eq(msg, "mailbox ready (layout v2)")
 end)
 
 test("check rejects a magic mismatch", function()
@@ -176,12 +176,12 @@ test("check rejects zeroed memory (ROM not booted or not the Co-Op ROM)", functi
 	assert(msg:find("magic mismatch", 1, true), msg)
 end)
 
-test("check rejects a layout version mismatch", function()
+test("check rejects a v1 ROM (layout version mismatch)", function()
 	local mem, box = booted()
-	mem.bytes[BASE + 0x004] = 2
+	mem.bytes[BASE + 0x004] = 1 -- a v1.0 ROM
 	local ok, msg = box:check()
 	eq(ok, false)
-	eq(msg, "mailbox layout version mismatch: ROM has 2, client expects 1. "
+	eq(msg, "mailbox layout version mismatch: ROM has 1, client expects 2. "
 		.. "Use a client and ROM from the same release.")
 end)
 
