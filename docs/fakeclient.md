@@ -17,6 +17,7 @@ Run commands from the repository root with the Go version pinned in `go.mod`.
 | `-pattern` | `square` | `square`, `idle` or `warp`. |
 | `-steps-per-sec` | `4` | Finite number greater than zero and at most 40. Controls walking speed. |
 | `-trade` | Empty (off) | A player ID. After the initial presence, send one of each [trade message](protocol.md#trade-messages) addressed to it, once. |
+| `-trade-confirm` | Empty (off) | Wait for the target player, then send one synthetic confirmation for the [audit test](#verify-the-trade-audit-log). Not a real trade partner. Mutually exclusive with `-trade`. |
 
 Prefer the environment fallback so the key does not appear in the command line
 or shell history. In PowerShell, enter it privately:
@@ -103,6 +104,36 @@ prints, in order, `[trade_available] bot2 available=true`, `[trade_invite]`,
 `[trade_cancel] ... reason=canceled`, `[trade_link] bot2 -> bot1 seq=0 bytes=4`,
 `[trade_confirm] bot2 -> bot1 bytes=100` and `[trade_available] bot2
 available=false`. B sees none of them echoed.
+
+### Verify the trade audit log
+
+For #79, use `-trade-confirm PLAYER` instead of `-trade`: this sends **one
+synthetic all-zero 100-byte Pokemon** after the target appears in `welcome` or
+`join`. It waits for the partner so either startup order works. It cannot be
+combined with `-trade`, targets another player, and never acts as a real trade
+partner (that is #84).
+
+Start the server with `-trade-log bin/trade-log-test.jsonl` (create `bin/` first).
+In two client terminals with the same private test key, run:
+
+```powershell
+go run ./cmd/fakeclient -id bot1 -pattern idle -trade-confirm bot2
+go run ./cmd/fakeclient -id bot2 -pattern idle -trade-confirm bot1
+```
+
+Each prints `[trade] sent synthetic confirmation to ...`. Inspect the audit
+file privately: one new JSON line, two IDs, trainer IDs `0`, species `NONE`,
+valid checksums and 200 zero hex characters per Pokemon. This tests the audit
+transport/format, not gameplay or saving. Ordinary `-trade` sends invite/cancel
+samples and can run before its target exists; it is not a deterministic paired
+confirmation test.
+
+For the single-confirm case, omit `-trade-confirm` from one client and use a
+fresh log path. No line should appear; disconnect the partner. For write failure,
+set `-trade-log` to an existing directory and repeat the reciprocal confirms:
+expect `event=trade_log_error reason=append_failed` while peer messages and
+pongs continue. Stop both clients and the server after each case. Do not publish
+their raw server logs or use actual saves as fixtures.
 
 Record joins, peer presence, map switches, heartbeat and leave results in the
 pull request, including the tested revision. Older lifecycle-only checkouts

@@ -512,3 +512,47 @@ indices.
 [coop_constants_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/constants/coop.h
 [remote_players_h]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/include/coop/remote_players.h
 [remote_players_c]: https://github.com/BDL-Ltda/pokeemerald/blob/ef2bb7b7808447af7536ef22d08acfbea1456a38/src/coop/remote_players.c
+
+## Pokemon bytes in the trade log
+
+The v2 `trade_confirm.pokemon` field is a hex-encoded, **100-byte**
+`struct Pokemon`, copied as stored in GBA memory. The server decodes only enough
+to label its [audit record](server.md#trade-confirmation-audit-log); it preserves
+the exact original string and does not change/reject gameplay data.
+
+Source revision: ROM pin `662300386fae6899c8f4fea4504f2d9d4303c94c`.
+The contract is defined by
+[`PokemonSubstruct0`, `BoxPokemon` and `Pokemon`](https://github.com/BDL-Ltda/pokeemerald/blob/662300386fae6899c8f4fea4504f2d9d4303c94c/include/pokemon.h#L110),
+[`DecryptBoxMon` and `GetSubstruct`](https://github.com/BDL-Ltda/pokeemerald/blob/662300386fae6899c8f4fea4504f2d9d4303c94c/src/pokemon.c#L3536).
+These are **offsets inside the supplied bytes**, not live global addresses:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| `0x00` | 4 | Personality, little-endian `u32`. |
+| `0x04` | 4 | Original trainer ID, little-endian `u32`. |
+| `0x1C` | 2 | Checksum, little-endian `u16`. |
+| `0x20` | 48 | Encrypted secure area: four 12-byte substructures. |
+| `0x50` | 20 | Party stats; not needed for species. |
+
+Decrypt every secure `u32` with XOR of personality and original trainer ID.
+Sum its 24 decrypted `u16`s modulo 65536 and compare to the checksum. The
+Growth substructure's physical block is selected by `GetSubstruct`'s first
+column for `personality % 24`:
+
+```text
+0 0 0 0 0 0 1 1 2 3 2 3 1 1 2 3 2 3 1 1 2 3 2 3
+```
+
+The species is the first little-endian `u16` of that decrypted block. Internal
+IDs are **not** national Pokedex numbers (Treecko is 277). The generated server
+name table comes from
+[`species.h`](https://github.com/BDL-Ltda/pokeemerald/blob/662300386fae6899c8f4fea4504f2d9d4303c94c/include/constants/species.h)
+and [`species_names.h`](https://github.com/BDL-Ltda/pokeemerald/blob/662300386fae6899c8f4fea4504f2d9d4303c94c/src/data/text/species_names.h).
+Placeholder names use their constant labels; `SPECIES_EGG` is labeled `EGG`.
+An actual egg's Growth species still names its underlying Pokemon.
+
+`internal/tradelog/generate.go` regenerates the static table from the pinned
+submodule (`go generate ./internal/tradelog`). The server binary needs no ROM,
+source checkout or external data files. Tests use synthetic encrypted records
+for all 24 permutations, never extracted saves. If this byte contract changes,
+update its documentation, decoder and generated names together.

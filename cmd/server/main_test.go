@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog"
 )
 
 func env(values map[string]string) func(string) string {
@@ -55,7 +57,7 @@ func TestConfigDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.addr != ":8765" || cfg.room.MaxPlayers != 5 || cfg.room.JoinKey != "test-key" {
+	if cfg.addr != ":8765" || cfg.room.MaxPlayers != 5 || cfg.room.JoinKey != "test-key" || cfg.tradeLogPath != tradelog.DefaultPath {
 		t.Fatalf("defaults: %#v", cfg)
 	}
 	values := map[string]string{"SERVER_ADDR": ":9000", "SERVER_JOIN_KEY": "env-key", "SERVER_MAX_PLAYERS": "3"}
@@ -67,11 +69,11 @@ func TestConfigDefaultsAndOverrides(t *testing.T) {
 		t.Fatal("environment fallback failed")
 	}
 	values["SERVER_MAX_PLAYERS"] = "invalid"
-	cfg, err = parseConfig([]string{"-addr", ":9001", "-join-key", "flag-key", "-max-players", "2"}, env(values))
+	cfg, err = parseConfig([]string{"-addr", ":9001", "-join-key", "flag-key", "-max-players", "2", "-trade-log", "custom.jsonl"}, env(values))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.addr != ":9001" || cfg.room.MaxPlayers != 2 || cfg.room.JoinKey != "flag-key" {
+	if cfg.addr != ":9001" || cfg.room.MaxPlayers != 2 || cfg.room.JoinKey != "flag-key" || cfg.tradeLogPath != "custom.jsonl" {
 		t.Fatal("flag overrides failed")
 	}
 }
@@ -84,6 +86,7 @@ func TestInvalidConfig(t *testing.T) {
 		{"-join-key", "test-key", "-max-players", "6"},
 		{"-join-key", "test-key", "-max-players", "invalid"},
 		{"-join-key", "test-key", "-addr", ""},
+		{"-join-key", "test-key", "-trade-log", ""},
 		{"-unknown"}, {"-join-key"}, {"unexpected"},
 	} {
 		if _, err := parseConfig(args, env(nil)); err == nil {

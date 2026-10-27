@@ -145,7 +145,7 @@ Integers must be JSON integers: `1.5` or `"1"` is rejected.
 Added in v2 for v1.5 trading ([#29](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/29)). Decisions from the re-planning:
 
 - **Broadcast, not routed.** The server relays every trade message to every other player, like `presence`. It replaces `playerId` with the sender's own ID, never echoes the message back, and does not look at `targetId`. Receivers ignore a message whose `targetId` is not their own `playerId` (`trade_available` has no target: everyone uses it).
-- **Trusted clients.** The server only checks the shape of each message against the field rules above and answers a malformed one with `error bad_message`. It keeps no trade state: it doesn't check that a target exists, that an invite came before an accept, or what `data` and `pokemon` contain. The order of the flow below is a contract between clients.
+- **Trusted clients.** The server checks message shape and answers malformed messages with `error bad_message`. It does not enforce a trade state machine or check that an invite preceded an accept. The order below is a client contract. Its only additional state is [audit pairing](server.md#trade-confirmation-audit-log) of reciprocal confirms from connected players; this changes neither routing nor gameplay validation. Unknown species/bad Pokemon checksums remain annotated evidence, not server-enforced gameplay rules.
 - **Shared limits.** Trade messages count toward the 50-messages-per-second budget and the 4096-byte line limit like any other message. The largest one, a `trade_link` with 1024 bytes of `data`, is under 2200 bytes.
 
 | type | Sent when |
