@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Protocol v2 trade walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body>
+<main>
+
+
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#89</span>
+  <h1>The wire can carry a trade</h1>
+  <p class="lede">Protocol v2 adds seven <code>trade_*</code> messages: availability at the Cable Club, invite, accept, decline, cancel, virtual-link bytes and the final confirm. The server relays them like presence, and Go and Lua both validate their shape.</p>
+  <div class="meta">
+    <span>closes <b>#78</b></span>
+    <span>branch <b>feat/78-protocol-v2-trade</b></span>
+    <span>files <b>21</b></span>
+    <span>lines <b>+908 / −182</b></span>
+    <span>milestone <b>v1.5 Trading</b></span>
+  </div>
+  <ul class="toc">
+    <li><a href="#big-picture">Big picture</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#detail">Under the hood</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#tested">Testing</a></li>
+    <li><a href="#review">Review</a></li>
+  </ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose">
+    <span class="eyebrow">Big picture</span>
+    <h2>Same relay, new vocabulary</h2>
+    <p>The v1.5 re-planning (#29) set three rules. Trade messages are <strong>broadcast</strong>, and each one names its target. Clients are <strong>trusted</strong>, so the server only checks message shape. The version goes to <strong>2</strong> with no negotiation. This PR covers the protocol layer only: the codec in <code>internal/protocol</code>, the relay in <code>internal/room</code>, <code>client/lib/protocol.lua</code> and <code>fakeclient</code>. Nothing in the ROM or the mailbox changes.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Where trade messages travel</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="A trade message goes from client A's Lua protocol module through the Go server's codec and relay to clients B and C; the ROM and mailbox are untouched.">
+      <defs>
+        <marker id="m-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="m-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="zone" x="10" y="10" width="300" height="280" rx="10"/>
+      <text class="t-zone" x="30" y="38">PLAYER A</text>
+      <rect class="zone" x="350" y="10" width="300" height="280" rx="10"/>
+      <text class="t-zone" x="370" y="38">GO SERVER</text>
+      <rect class="zone" x="690" y="10" width="300" height="280" rx="10"/>
+      <text class="t-zone" x="710" y="38">EVERY OTHER PLAYER</text>
+      <g class="step" style="--i:0">
+        <rect class="box dim" x="40" y="60" width="240" height="56" rx="6"/>
+        <text class="t-mono" x="56" y="84">ROM + mailbox</text>
+        <text class="t-sub" x="56" y="104">unchanged (#77, #81, #82)</text>
+        <rect class="box pub" x="40" y="170" width="240" height="56" rx="6"/>
+        <text class="t-mono t-em" x="56" y="194">protocol.lua</text>
+        <text class="t-sub" x="56" y="214">builders, check, toHex/fromHex</text>
+      </g>
+      <g class="step" style="--i:1">
+        <path class="edge em flow" d="M280 198H396" marker-end="url(#m-ae)"/>
+        <rect class="box pub" x="400" y="80" width="200" height="56" rx="6"/>
+        <text class="t-mono t-em" x="416" y="104">protocol (v2)</text>
+        <text class="t-sub" x="416" y="124">decode + field rules</text>
+        <rect class="box pub" x="400" y="170" width="200" height="56" rx="6"/>
+        <text class="t-mono t-em" x="416" y="194">room.relay</text>
+        <text class="t-sub" x="416" y="214">stamp playerId, broadcast</text>
+        <path class="edge" d="M500 136V166" marker-end="url(#m-a)"/>
+      </g>
+      <g class="step" style="--i:2">
+        <path class="edge em flow" d="M600 190L716 110" marker-end="url(#m-ae)"/>
+        <path class="edge em flow" d="M600 206L716 226" marker-end="url(#m-ae)"/>
+        <rect class="box" x="720" y="80" width="240" height="56" rx="6"/>
+        <text class="t-mono" x="736" y="104">B (targetId = B)</text>
+        <text class="t-sub" x="736" y="124">acts on it</text>
+        <rect class="box" x="720" y="200" width="240" height="56" rx="6"/>
+        <text class="t-mono" x="736" y="224">C (not the target)</text>
+        <text class="t-sub" x="736" y="244">receives it, ignores it</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i></i>added or changed by this PR</span><span><i class="m"></i>outside this PR</span><span><i class="flow"></i>new path</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose">
+    <span class="eyebrow">How it works</span>
+    <h2>The flow the messages are built for</h2>
+    <p>The order below is a contract between clients. The server enforces none of it: it doesn't check that an invite came before an accept, or that the target exists. A player who is waiting sends <code>trade_available</code> again when it sees a <code>join</code>, since the server doesn't remember it. The attendant UI (#82), the virtual link (#81) and the trade log (#79) build on these messages.</p>
+  </div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">Happy path (A = leo, B = davi)</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll">
+    <svg viewBox="0 0 1000 470" role="img" aria-label="Sequence: both players announce availability, A invites B, B accepts, they exchange trade_link messages, then both send trade_confirm, each relayed by the server.">
+      <defs>
+        <marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="s-ae" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <rect class="box" x="60" y="16" width="180" height="40" rx="6"/><text class="t-mono" x="80" y="42">Client A</text>
+      <rect class="box pub" x="410" y="16" width="180" height="40" rx="6"/><text class="t-mono t-em" x="440" y="42">Server</text>
+      <rect class="box" x="760" y="16" width="180" height="40" rx="6"/><text class="t-mono" x="780" y="42">Client B</text>
+      <path class="life" d="M150 56V460"/><path class="life" d="M500 56V460"/><path class="life" d="M850 56V460"/>
+      <g class="step" style="--i:0">
+        <circle class="badge" cx="30" cy="90" r="12"/><text class="badge-t" x="26" y="95">1</text>
+        <path class="edge" d="M150 90H496" marker-end="url(#s-a)"/><text class="t-mono" x="170" y="82">trade_available {available: true}</text>
+        <path class="edge em" d="M500 104H846" marker-end="url(#s-ae)"/><text class="t-sub" x="520" y="98">playerId stamped "leo"</text>
+      </g>
+      <g class="step" style="--i:1">
+        <circle class="badge" cx="30" cy="150" r="12"/><text class="badge-t" x="26" y="155">2</text>
+        <path class="edge" d="M150 150H496" marker-end="url(#s-a)"/><text class="t-mono" x="170" y="142">trade_invite {targetId: "davi"}</text>
+        <path class="edge em" d="M500 164H846" marker-end="url(#s-ae)"/>
+      </g>
+      <g class="step" style="--i:2">
+        <circle class="badge" cx="30" cy="210" r="12"/><text class="badge-t" x="26" y="215">3</text>
+        <path class="edge" d="M850 210H504" marker-end="url(#s-a)"/><text class="t-mono" x="560" y="202">trade_accept {targetId: "leo"}</text>
+        <path class="edge em" d="M500 224H154" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="170" y="246">or trade_decline (declined / timeout / busy)</text>
+      </g>
+      <g class="step" style="--i:3">
+        <circle class="badge" cx="30" cy="290" r="12"/><text class="badge-t" x="26" y="295">4</text>
+        <rect class="zone" x="140" y="266" width="720" height="70" rx="6"/>
+        <text class="t-zone" x="150" y="284">LOOP · TRADE SESSION</text>
+        <path class="edge em flow" d="M150 304H846" marker-end="url(#s-ae)"/><text class="t-mono" x="520" y="298">trade_link {seq, data}</text>
+        <path class="edge em flow" d="M850 324H154" marker-end="url(#s-ae)"/>
+      </g>
+      <g class="step" style="--i:4">
+        <circle class="badge" cx="30" cy="380" r="12"/><text class="badge-t" x="26" y="385">5</text>
+        <path class="edge" d="M150 380H496" marker-end="url(#s-a)"/><text class="t-mono" x="170" y="372">trade_confirm {pokemon}</text>
+        <path class="edge em" d="M500 394H846" marker-end="url(#s-ae)"/>
+        <path class="edge" d="M850 424H504" marker-end="url(#s-a)"/><text class="t-mono" x="560" y="416">trade_confirm {pokemon}</text>
+        <path class="edge em" d="M500 438H154" marker-end="url(#s-ae)"/>
+        <text class="t-sub" x="170" y="458">trade_cancel (canceled / timeout / disconnected) is allowed until the save</text>
+      </g>
+    </svg>
+    </div>
+  </figure>
+</section>
+
+<section id="detail">
+  <div class="prose">
+    <span class="eyebrow">Under the hood</span>
+    <h2>Seven messages, their fields and their rules</h2>
+    <p>Pick a message. The example lines come from <code>docs/protocol.md</code>, and both the Go and Lua tests decode and re-encode every one of them. Every message except <code>trade_available</code> has <code>playerId</code> and <code>targetId</code>, each 1–16 characters of <code>[a-zA-Z0-9_-]</code>.</p>
+  </div>
+  <div class="plate" style="display:grid;gap:14px">
+    <div class="bytes">
+      <button class="seg" type="button" data-title="trade_available" data-value='{"v":2,"type":"trade_available","playerId":"leo","available":true}' data-text="A player starts or stops waiting at a Cable Club attendant. There is no target: everyone uses it to build the list of waiting players. The server keeps no copy, so a waiting client sends it again on each join, and a leave counts as false."><small>availability</small>trade_available</button>
+      <button class="seg" type="button" data-title="trade_invite" data-value='{"v":2,"type":"trade_invite","playerId":"leo","targetId":"davi"}' data-text="A waiting player picks someone from the list. Only playerId and targetId. The server relays it even if the target is not in the room."><small>handshake</small>trade_invite</button>
+      <button class="seg" type="button" data-title="trade_accept" data-value='{"v":2,"type":"trade_accept","playerId":"davi","targetId":"leo"}' data-text="The invited player says yes. Both sides then enter the trade session."><small>handshake</small>trade_accept</button>
+      <button class="seg" type="button" data-title="trade_decline" data-value='{"v":2,"type":"trade_decline","playerId":"davi","targetId":"leo","reason":"timeout"}' data-text="reason is declined (said no), timeout (no answer in time; #82 uses 30 s) or busy (already inviting, invited or trading). Any other value gets bad_message."><small>handshake</small>trade_decline</button>
+      <button class="seg" type="button" data-title="trade_cancel" data-value='{"v":2,"type":"trade_cancel","playerId":"leo","targetId":"davi","reason":"disconnected"}' data-text="Ends a pending invite or a running session before the save. reason is canceled (backed out), timeout (the partner stopped answering) or disconnected (the partner left)."><small>handshake</small>trade_cancel</button>
+      <button class="seg crc" type="button" data-selected data-title="trade_link" data-value='{"v":2,"type":"trade_link","playerId":"leo","targetId":"davi","seq":0,"data":"0102a0ff"}' data-text="Opaque virtual-link bytes for #81. data is lowercase hex, even length, 0 to 1024 bytes (up to 2048 characters). seq is 0 to 4294967295. Odd length, uppercase, non-hex or 1025 bytes gets bad_message. The largest one still fits well under the 4096-byte line limit."><small>session</small>trade_link</button>
+      <button class="seg" type="button" data-title="trade_confirm" data-value='{"v":2,"type":"trade_confirm","playerId":"leo","targetId":"davi","pokemon":"00…00 (200 hex chars)"}' data-text="Sent when a player confirms. pokemon is exactly 100 bytes as hex, which is sizeof(struct Pokemon) in the pinned decomp: an 80-byte BoxPokemon plus 20 bytes of party stats. The #79 trade log pairs the two confirms."><small>session</small>trade_confirm</button>
+    </div>
+    <div class="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="prose">
+    <span class="eyebrow">Decisions in this PR</span>
+    <h2>Choices the issue left open</h2>
+    <p>Broadcast, trusted clients and the v2 bump were decided in the re-planning. The issue left the names and encodings to the implementer, so these choices are this PR's.</p>
+  </div>
+  <div class="decisions">
+    <div class="decision">
+      <h3>One relay path, chosen by an interface</h3>
+      <div class="term">
+        <div>case protocol.Relayed:</div>
+        <div>    s.relay(c, msg)</div>
+        <div><span class="c">// broadcast(msg.WithPlayerID(sender), except sender)</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>Each trade type has a <code>WithPlayerID</code> method, so the server uses one code path for all seven instead of seven switch arms. Presence keeps its own path because the server stores it for <code>welcome</code>. Trade messages are not stored.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Bytes as lowercase hex</h3>
+      <div class="term">
+        <div>validateHex(TypeTradeLink, "data", m.Data, 0, MaxTradeLinkBytes)</div>
+        <div><span class="c">// [0-9a-f], even length, min..max bytes</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>It has a single spelling, so the docs examples re-encode byte for byte. It's trivial to produce in Lua with <code>toHex</code>, and it matches the hex format #79 plans for its log. The cost is 2× size versus about 1.33× for base64. That still fits: 1024 bytes is four of the game's 256-byte link blocks.</p></div>
+    </div>
+    <div class="decision">
+      <h3>Availability is re-announced, not stored</h3>
+      <div class="term">
+        <div>join  <span class="c">→ waiting clients re-send trade_available:true</span></div>
+        <div>leave <span class="c">→ receivers treat that player as false</span></div>
+      </div>
+      <div class="why"><b>Why</b><p>The issue keeps the server a plain relay with no trade state. Without a re-announce rule, a player who joins late would never see who is already waiting. The rule is in <code>protocol.md</code> for #82 to implement.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tested">
+  <div class="prose">
+    <span class="eyebrow">How it was tested</span>
+    <h2>Unit tests, then two fakeclients through a real server</h2>
+    <p>Run on Windows from the PR branch. <code>-race</code> needs cgo, which this machine doesn't have, so CI runs it. luacheck also runs only in CI. The join key was a random throwaway kept in env vars, and it appears in none of the logs.</p>
+  </div>
+  <div class="term" data-anim>
+    <div style="--i:0"><span class="p">$</span> go test -count=1 ./...</div>
+    <div style="--i:1" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	6.197s</div>
+    <div style="--i:1" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	0.872s</div>
+    <div style="--i:1" class="ok">ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	3.869s</div>
+    <div style="--i:2"><span class="p">$</span> lua client/tests/run.lua</div>
+    <div style="--i:3" class="ok">221 passed, 0 failed (14 suites)</div>
+    <div style="--i:4"><span class="p">$</span> fakeclient -id bot2 -pattern idle -trade bot1   <span class="c"># bot1's log:</span></div>
+    <div style="--i:5">[trade_available] bot2 available=true</div>
+    <div style="--i:5">[trade_invite] bot2 -> bot1</div>
+    <div style="--i:5">[trade_accept] bot2 -> bot1</div>
+    <div style="--i:5">[trade_decline] bot2 -> bot1 reason=declined</div>
+    <div style="--i:5">[trade_cancel] bot2 -> bot1 reason=canceled</div>
+    <div style="--i:5">[trade_link] bot2 -> bot1 seq=0 bytes=4</div>
+    <div style="--i:5">[trade_confirm] bot2 -> bot1 bytes=100</div>
+    <div style="--i:5">[trade_available] bot2 available=false</div>
+    <div style="--i:6"><span class="c"># raw TCP, v1 hello to the v2 server:</span></div>
+    <div style="--i:7" class="bad">{"v":2,"type":"error","code":"version_mismatch","message":"version_mismatch"}</div>
+    <div style="--i:8"><span class="c"># v2 player, then a trade_link with 1025 bytes:</span></div>
+    <div style="--i:9" class="bad">{"v":2,"type":"error","code":"bad_message","message":"bad_message"}</div>
+  </div>
+</section>
+
+<section id="review">
+  <div class="prose">
+    <span class="eyebrow">For the reviewer</span>
+    <h2>Where to look</h2>
+    <p>Start with the Trade messages section of <code>docs/protocol.md</code>, then <code>internal/protocol/validate.go</code> and <code>relay</code> in <code>internal/room/server.go</code>. Most of the remaining diff is test fixtures changing <code>"v":1</code> to <code>"v":2</code>. Your ticks are saved in this browser only.</p>
+  </div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="c1"><span>Are the decline and cancel reason sets right for #82 and #81? Adding a value later is a breaking change.</span></label>
+    <label class="check"><input type="checkbox" id="c2"><span>Is 1024 bytes per <code>trade_link</code> enough, given the 50-messages-per-second budget that link data shares with presence and ping?</span></label>
+    <label class="check"><input type="checkbox" id="c3"><span>Should "re-send availability on join" live in the protocol doc, or only in #82?</span></label>
+    <label class="check"><input type="checkbox" id="c4"><span>Is a hex <code>struct Pokemon</code> exactly as stored in memory (encrypted substructs) what #79 needs to log species?</span></label>
+  </div>
+  <div class="limits">
+    <div class="limit"><b>#79</b><span>Trade log: pairs the two <code>trade_confirm</code>s on the server.</span></div>
+    <div class="limit"><b>#81</b><span>Virtual link: maps <code>trade_link</code> to the mailbox, sets the 10 s timeout, sends <code>trade_cancel</code>.</span></div>
+    <div class="limit"><b>#82</b><span>Attendant UI: availability, invite, accept, decline.</span></div>
+    <div class="limit"><b>Not tested</b><span>No emulator test: no client code sends trade messages yet.</span></div>
+  </div>
+</section>
+
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#89 by Claude Code with the pr-walkthrough skill. Based on the PR diff, issue #78 and the commands run for it.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
