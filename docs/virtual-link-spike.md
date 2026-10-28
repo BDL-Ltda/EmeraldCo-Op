@@ -208,7 +208,7 @@ the wrong transport.
 
 | Run | Screens reached A/B | Party bytes / summary / confirm | Evolution / save / reload | Return / presence | Error and elapsed time |
 | --- | --- | --- | --- | --- | --- |
-| No injected latency (prepared wrappers: 0 ms) | Both original trade menus, confirmation, animation, evolution, saving, field | Parties displayed reciprocally; Summary and return observed on B; both confirm screens | Both evolved; saving screens completed; reload pending | Both return to Littleroot; production bridge presence pending | No link-error screen or unresolved hang observed in the supplied 2m11s video; includes user input time |
+| No injected latency (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload pending | Both logs reach actual overworld callback; production bridge presence pending | No link-error screen or unresolved hang observed in the supplied 2m11s video and accompanying traces; includes user input time |
 | 50 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
@@ -260,6 +260,29 @@ every party byte or persistent data after reopening either ROM. The recording
 contains no restart/reload check and does not establish the delayed RTT cases.
 Reopen the copied ROMs **without loading the spike scripts** for the persistence
 check: fixture opt-in deliberately replaces the RAM parties on each new START.
+
+### Accompanying A/B traces
+
+`leomayca` also supplied both console traces for this run. Each verifies ROM
+CRC32 `17ed0965`; A uses role 0, B role 1, and both explicitly report injected
+one-way delay **0 ms**. The traces supplement what is visible in the video:
+
+| Milestone | A | B | Interpretation |
+| --- | --- | --- | --- |
+| Party exchange | Stage 1 state 0 at frame 925, state 21 at 1022 | Stage 1 state 0 at 32, state 21 at 127 | Both finish `BufferTradeParties`; local spans are 97 and 95 frames. |
+| Summary round trip | Stage 2 state 2 at 6651, state 0 at 6918 | Stage 2 state 2 at 6233, state 0 at 6452 | Both enter Summary and resume the trade menu. |
+| Evolution | Stage 8 value 68 | Stage 8 value 65 | `SPECIES_MACHAMP` and `SPECIES_ALAKAZAM`, confirmed against the pinned `species.h`. |
+| Initial save barrier | Stage 5 state 100 at 13075, state 2 at 13176 | Stage 5 state 100 at 12279, state 2 at 12280 | Observed local spans: 101 frames on A, 1 on B. |
+| Incremental writes | Fourteen entries into stage 5 state 52, then state 4 | Fourteen entries into stage 5 state 52, then state 4 | The repeated 51/52 alternation is the vanilla sector-delay/write loop, not a stuck screen. |
+| Pre-signature barrier | Stage 5 state 42 at 13569, state 5 at 13570 | Stage 5 state 42 at 12658, state 5 at 12679 | Both advance past `LinkFullSave_SetLastSectorSignature`; local spans are 1 and 21 frames. |
+| Return | Stage 6 state 1 at 13711, state 2 at 13720 | Stage 6 state 1 at 12817, state 2 at 12826 | Return callback runs and callback2 reaches `CB2_Overworld` in both instances. |
+
+Frame counters start when each script is loaded; do not subtract an A frame
+number from a B number or interpret these waits as measured network RTT.
+The differing barrier spans are consistent with waiting for the slower peer,
+including differing evolution-scene durations and the vanilla randomized
+leader delay before the second standby. This is evidence for the exercised
+synchronization path, not atomic saving or persistence after a restart.
 
 ### First manual attempt: wire rejection corrected
 
