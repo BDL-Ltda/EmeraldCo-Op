@@ -27,14 +27,16 @@ local LAYOUT = {
 }
 
 M.MAGIC = "COOP"
-M.LAYOUT_VERSION = 1
+-- Layout v2 adds multi-slot messages (lib/fragments.lua); the bytes of the
+-- header, rings and slots are unchanged from v1.
+M.LAYOUT_VERSION = 2
 
 -- flags bits (docs/memory-map.md#header-and-rings).
 M.FLAG_LUA_CONNECTED = 0x01
 M.FLAG_ROM_READY = 0x02
 
 -- Message types, mirroring include/constants/coop.h (docs/memory-map.md#message-types).
-M.MSG = { NONE = 0, PRESENCE = 1, LEAVE = 2 }
+M.MSG = { NONE = 0, PRESENCE = 1, LEAVE = 2, FRAGMENT = 3, DEBUG_ECHO = 4 }
 
 local Mailbox = {}
 Mailbox.__index = Mailbox

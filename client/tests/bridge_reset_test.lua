@@ -22,7 +22,7 @@ local function setup()
 		-- No reset callback is emitted (e.g. an in-ROM BIOS soft reset).
 		self.bytes = {}
 		for i = 1, 4 do self.bytes[BASE + i - 1] = ("COOP"):byte(i) end
-		self.bytes[BASE + 4], self.bytes[BASE + FLAGS] = 1, mailbox.FLAG_ROM_READY
+		self.bytes[BASE + 4], self.bytes[BASE + FLAGS] = mailbox.LAYOUT_VERSION, mailbox.FLAG_ROM_READY
 	end
 	w:resetRom()
 	local function newSocket()

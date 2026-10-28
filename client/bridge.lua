@@ -158,8 +158,13 @@ local function verifyRom()
 		lastMailboxError = reason
 		console:log("[bridge] waiting for mailbox: " .. reason)
 	end
+	-- Multi-slot messages (mailbox layout v2) are reassembled by the pipe. No
+	-- ROM message type is forwarded to the network yet (trading, #78/#81).
 	pipe = mailboxbridge.new(box, client or { setPlayerState = function() end }, view,
-		function(line) console:error(line) end)
+		function(line) console:error(line) end,
+		function(msgType, data)
+			console:log(string.format("[bridge] ignoring mailbox message type %d (%d bytes)", msgType, #data))
+		end)
 end
 
 -- The network clock advances one frame (about 16.7 ms) per frame but never

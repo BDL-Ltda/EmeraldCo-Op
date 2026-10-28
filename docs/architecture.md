@@ -51,7 +51,7 @@ ROM and Lua communicate through an EWRAM mailbox named **`gCoopMailbox`**. Its h
 | Outbound | ROM | Lua | ROM to Lua |
 | Inbound | Lua | ROM | Lua to ROM |
 
-Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a **dumb pipe between the mailbox and the socket**; the ROM owns the in-game co-op behavior. The ROM side lives in `rom/src/coop/mailbox.c` ([issue #22](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/22)). The exact byte layout, flag bits, message types, ring rules and C API are recorded in [memory-map.md](memory-map.md#mailbox); its address comes from `client/addresses.lua`.
+Each ring has exactly one writer and one reader. From 0.4 onward, Lua acts as a **dumb pipe between the mailbox and the socket**; the ROM owns the in-game co-op behavior. The ROM side lives in `rom/src/coop/mailbox.c` ([issue #22](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/22)). The exact byte layout, flag bits, message types, ring rules and C API are recorded in [memory-map.md](memory-map.md#mailbox); its address comes from `client/addresses.lua`. Mailbox layout v2 (v1.5, [issue #77](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/77)) adds generic [multi-slot messages](memory-map.md#multi-slot-messages) of up to 1024 bytes, streamed as fragments over the same rings, for trading and later PvP.
 
 The [mailbox bridge](mailbox-bridge.md) documents reset/reconnect handoff,
 slot allocation, the explicit ROM-to-v1 visibility mapping and the two-instance
