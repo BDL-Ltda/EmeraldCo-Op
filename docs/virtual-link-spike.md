@@ -66,7 +66,8 @@ until it returns to the field.
 ## Entering without Cable Club
 
 START is accepted only in the fully running, unlocked overworld with a nonempty
-party. The normal presence client cannot trigger it. The experiment:
+party (or explicit fixture opt-in, which creates a party). The normal presence
+client cannot trigger it. The experiment:
 
 1. Despawns remote field objects and selects the cable branch.
 2. Calls vanilla `LocalLinkPlayerToBlock` to populate the local trainer identity,
@@ -211,8 +212,8 @@ the wrong transport.
 
 ## Verification so far
 
-- Prototype fork revision: `a468cd12d741dc657bf8b7fbbbdca5634804091f`.
-  Built ROM SHA1: `453b14d4e30f1a4154841834da50384b3fc36ae6`.
+- Prototype fork revision: `397fa13cc3a30d21743f38dd741fcf11e3c2fb48`.
+  Built ROM SHA1: `f2af69d040327ef54630baefc04332077a53cb5c`.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
   packages on the parent base. Lua: 244 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
