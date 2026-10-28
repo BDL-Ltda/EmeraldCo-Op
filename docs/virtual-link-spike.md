@@ -12,9 +12,11 @@ without emulating the cable's serial interrupts over the internet?
 
 The source inspection and the initial two-instance video support continuing
 with the virtual link: the original screens exchanged parties, animated the
-trade, evolved both received Pokemon, displayed saving and returned to the field.
-**The final go/no-go decision is pending persistence-after-reload and the
-50–200 ms latency results below.** Host doubles cannot establish those results.
+trade, evolved both received Pokemon, displayed saving and redrew the field.
+The tester subsequently reported that movement remained blocked after the trade.
+**The final go/no-go decision is pending a functional field-return retest,
+persistence-after-reload and the 50–200 ms latency results below.** Host doubles
+cannot establish those results.
 If the experiment fails, record the failing screen and reason before deciding
 whether to change the adapter or re-plan #81/#83 around a separate trade flow.
 
@@ -128,7 +130,9 @@ Static path to verify:
    would destroy the intended synchronization.
 5. The spike's callback returns directly to the local field, rather than the
    Cable Club's multiplayer field scripts. It clears the virtual session and
-   emits a trace when callback2 actually reaches `CB2_Overworld`.
+   restores `CB1_Overworld` to process player input. The completion trace now
+   requires both overworld callbacks and unlocked field controls. Still verify
+   movement and the Start menu manually, not just the map or callback trace.
 
 The save functions in `save.c` perform local flash operations; they are not
 network functions themselves. The screen supplies the synchronization around
@@ -147,7 +151,7 @@ Type `5`, `COOP_MSG_LINK_SPIKE`, is reassembled as an ordinary v2 message:
 
 | First byte | Remaining bytes | Direction |
 | --- | --- | --- |
-| `0` START | One role byte, 0 or 1 | Lua to ROM only; not relayed. |
+| `0` START | Role byte (0 or 1), then fixture opt-in byte (0 or 1) | Lua to ROM only; not relayed. |
 | `1` HELLO | `sizeof(struct LinkPlayer)` bytes, from `include/link.h` | Both ways through `trade_link`. |
 | `2` BLOCK | 1–256 original block bytes | Both ways; implicit sender is the other role. |
 | `3` REQUEST | Leader's block bytes; byte length requests the same size from `gBlockSendBuffer` | Role 0 to role 1; response is BLOCK. |
@@ -165,7 +169,7 @@ the network. Only state changes are emitted; a full ring may drop a trace.
 | 3 | `CB2_LinkTrade` setup state. |
 | 4 | Trade evolution callback state. |
 | 5 | Save callback state; 42 waits for the pre-signature barrier, 5 follows signature commit. |
-| 6 | 1 return callback invoked, 2 callback2 reached the overworld. |
+| 6 | 1 return callback invoked, 2 both overworld callbacks restored and field controls unlocked. The initial `17ed0965` build checked only callback2. |
 | 8 | Evolution target species ID, or 0 for none. |
 
 ## Reproducible emulator test
@@ -182,8 +186,10 @@ the wrong transport.
    To avoid preparing a party manually, the fifth argument in each wrapper can
    be set to `true` **only for disposable saves**: the ROM replaces the RAM party
    with Kadabra + Zigzagoon for role 0 and Machoke + Zigzagoon for role 1. The
-   normal trade/evolution/save path then writes those fixture parties to the
-   copied saves. The committed wrappers default to `false`.
+   fixture opt-in also sets `FLAG_SYS_POKEMON_GET` so early-game copies have
+   the normal Pokemon menu. The trade/evolution/save path writes both the party
+   and flag to the copied saves. It does not advance the rest of the story.
+   The committed wrappers default to `false`; normal START does not change flags.
 2. Start the local server. Configure `client/config.lua` privately with its
    loopback endpoint/key. The same configuration works for both scripts because
    they override the player IDs. Do not share keys or raw server logs.
@@ -197,10 +203,12 @@ the wrong transport.
    menu. Record the last `[link-spike] frame ... stage ... state ...` lines and
    the actual screen on **both** instances. Confirm all party icons/names match
    the other party, then open and leave Summary and reach confirmation.
-6. First cancel on both sides and verify return to the original field. Restart
-   both instances/scripts between runs. Then use only disposable copies for
+6. First cancel on both sides and verify return to the original field: walk in
+   each game, then open and close the Start menu. Restart both instances/scripts
+   between runs. Then use only disposable copies for
    the full animation/evolution/save path. Reload both copied ROMs afterward
-   and verify the received Pokemon and position persisted.
+   and verify the received Pokemon and position persisted. Check walking and
+   the Start menu on both sides after the full trade as well.
 7. Repeat with the wrapper delays above. Note hangs or native link errors,
    rather than interpreting a lack of an error as successful transfer.
 8. After returning, reset Scripting and load `bridge.lua`; verify local and
@@ -208,15 +216,20 @@ the wrong transport.
 
 | Run | Screens reached A/B | Party bytes / summary / confirm | Evolution / save / reload | Return / presence | Error and elapsed time |
 | --- | --- | --- | --- | --- | --- |
-| No injected latency (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload pending | Both logs reach actual overworld callback; production bridge presence pending | No link-error screen or unresolved hang observed in the supplied 2m11s video and accompanying traces; includes user input time |
+| No injected latency (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field drawn | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload pending | **Failed on initial build:** tester reported blocked movement after trade; corrected build needs retest. Production bridge presence pending | No native link-error screen in the 2m11s video and traces; post-trade input regression reported afterward. Recording includes user input time |
 | 50 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 
 ## Verification so far
 
-- Prototype fork revision: `397fa13cc3a30d21743f38dd741fcf11e3c2fb48`.
-  Built ROM SHA1: `f2af69d040327ef54630baefc04332077a53cb5c`.
+- Initial manual-test fork revision: `397fa13cc3a30d21743f38dd741fcf11e3c2fb48`.
+  That ROM's SHA1 is `f2af69d040327ef54630baefc04332077a53cb5c`.
+- Corrected fork revision: `04f4610d52f6045f5f4d59fb6c959c46564b4ee6`.
+  Built ROM SHA1: `10235a0df17fd71bb987ac58882a612194a14b78`, CRC32 `fac06040`.
+  It restores input after trade/cancel and enables the saved Pokemon menu only
+  for explicit fixtures. ARM build, regenerated addresses and host checks pass;
+  the corrected build's manual emulator retest is pending.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
   packages on the parent base. Lua: 246 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
@@ -226,7 +239,8 @@ the wrong transport.
   peers/targets, raw-byte preservation, injected delay and sequence failure.
 - C host tests exercise the real experimental adapter with mailbox/game doubles:
   guarded entry, identity, refused sends, streaming backpressure, self echo,
-  requests, barriers, close/reopen, return callback and queue/size bounds.
+  requests, barriers, close/reopen, restored input after animation/cancel,
+  return tracing only after controls unlock, and queue/size bounds.
   The complete local suite passed with ASan/UBSan using `CC="cc -no-pie"`.
   Default-PIE suite runs here repeatedly emitted `AddressSanitizer:DEADLYSIGNAL`
   before the first presence result; isolated tests also passed. The local
@@ -234,10 +248,11 @@ the wrong transport.
   and the runner's default compiler flags were not changed. CI's default run
   remains to be checked separately.
 - **Initial two-instance trade flow recorded:** see the video observations below.
-  Persistence after reload, latency rows and post-trade production-bridge
-  presence still need evidence. Only disposable ROM/save copies are used.
+  Functional field return, persistence after reload, latency rows and post-trade
+  production-bridge presence still need evidence. Only disposable ROM/save copies
+  are used.
 
-### Initial successful flow: user-supplied video
+### Initial two-instance flow: user-supplied video
 
 `leomayca` supplied a private 2m11s recording on 2026-10-28 using two mGBA
 0.10.5 instances and the disposable fixture parties. The prepared client was
@@ -252,10 +267,11 @@ Observed offsets are approximate:
 | About 0:58–1:28 | Both proceed through the cable-style animation and show the received Pokemon. |
 | About 1:32–1:54 | A's received Machoke evolves into Machamp; B's received Kadabra evolves into Alakazam. Both completion messages are visible. |
 | About 1:57–2:04 | Both display "SAVING... DON'T TURN OFF THE POWER." |
-| About 2:07–2:11 | Both return to the Littleroot overworld. |
+| About 2:07–2:11 | Both display the Littleroot overworld; the recording does not establish working player input. |
 
 This demonstrates the original party/confirmation/animation/evolution/save-screen
-path and successful field return for this run. It does not independently prove
+path and field rendering for this run. The tester subsequently reported blocked
+movement; functional field return did not pass. The video also does not prove
 every party byte or persistent data after reopening either ROM. The recording
 contains no restart/reload check and does not establish the delayed RTT cases.
 Reopen the copied ROMs **without loading the spike scripts** for the persistence
@@ -275,7 +291,7 @@ one-way delay **0 ms**. The traces supplement what is visible in the video:
 | Initial save barrier | Stage 5 state 100 at 13075, state 2 at 13176 | Stage 5 state 100 at 12279, state 2 at 12280 | Observed local spans: 101 frames on A, 1 on B. |
 | Incremental writes | Fourteen entries into stage 5 state 52, then state 4 | Fourteen entries into stage 5 state 52, then state 4 | The repeated 51/52 alternation is the vanilla sector-delay/write loop, not a stuck screen. |
 | Pre-signature barrier | Stage 5 state 42 at 13569, state 5 at 13570 | Stage 5 state 42 at 12658, state 5 at 12679 | Both advance past `LinkFullSave_SetLastSectorSignature`; local spans are 1 and 21 frames. |
-| Return | Stage 6 state 1 at 13711, state 2 at 13720 | Stage 6 state 1 at 12817, state 2 at 12826 | Return callback runs and callback2 reaches `CB2_Overworld` in both instances. |
+| Return | Stage 6 state 1 at 13711, state 2 at 13720 | Stage 6 state 1 at 12817, state 2 at 12826 | Return callback runs and callback2 reaches `CB2_Overworld` in both instances. This initial trace did not check callback1 or input controls. |
 
 Frame counters start when each script is loaded; do not subtract an A frame
 number from a B number or interpret these waits as measured network RTT.
@@ -283,6 +299,42 @@ The differing barrier spans are consistent with waiting for the slower peer,
 including differing evolution-scene durations and the vanilla randomized
 leader delay before the second standby. This is evidence for the exercised
 synchronization path, not atomic saving or persistence after a restart.
+
+### Post-trade input regression
+
+After reviewing the recording and traces, `leomayca` reported that the character
+could not move after the trade. `CoopLinkSpike_ReturnToField` had cleared
+`gMain.callback1`, while vanilla `ReturnToFieldLocal` only rebuilds the field and
+restores callback2. With no `CB1_Overworld`, player input was never processed.
+The same return callback also needed to replace the link callback left by cancel.
+
+The adapter now explicitly installs `CB1_Overworld` before returning locally.
+Stage 6 state 2 additionally waits for both overworld callbacks and unlocked
+field controls, so rendering the field alone no longer produces that trace.
+A regression against the real adapter fails on the old code and passes after
+the fix for both the animation's null callback and cancel's link callback.
+The complete host suite passes with ASan/UBSan using `CC="cc -no-pie"`.
+
+The corrected ROM still needs a two-instance manual retest: finish the trade,
+walk and use the Start menu in both games, then reload the disposable saves
+without the spike scripts to check received Pokemon and normal movement.
+Do not count the original video or host regression as that acceptance result.
+
+### Missing Pokemon menu on early-game fixture saves
+
+The tester also reported that the Start menu had no Pokemon option, preventing
+the party check after closing and reopening the games. `BuildNormalStartMenu`
+checks `FLAG_SYS_POKEMON_GET`, not the party count. The original fixture setup
+created Pokemon before the save's starter event without setting that flag.
+The missing menu alone is not evidence that the trade failed to save.
+
+Explicit fixture opt-in now also sets `FLAG_SYS_POKEMON_GET` through vanilla
+`FlagSet`. The full trade save includes that flag along with the received party.
+Normal START leaves flags unchanged. The host regression fails before this fix
+and passes afterward, including the guard against flag changes without opt-in.
+After another full trade on the corrected build, close and reopen both copied
+ROMs without loading the spike scripts. Open Start > Pokemon and inspect the
+received species on both sides. This manual persistence check remains pending.
 
 ### First manual attempt: wire rejection corrected
 
