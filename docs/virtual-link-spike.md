@@ -190,6 +190,8 @@ the wrong transport.
    emulators must keep running when unfocused.
 4. Reset Scripting in each instance. Load `client/spike/link-a.lua` in A and
    `client/spike/link-b.lua` in B. Do not also load `bridge.lua` or echo.lua.
+   If it waits for a fresh overworld position after Reset, move or turn once in
+   each game. Presence is change-driven; standing still may produce no new tuple.
 5. The scripts announce readiness to each other and enter the original trade
    menu. Record the last `[link-spike] frame ... stage ... state ...` lines and
    the actual screen on **both** instances. Confirm all party icons/names match
@@ -215,7 +217,7 @@ the wrong transport.
 - Prototype fork revision: `397fa13cc3a30d21743f38dd741fcf11e3c2fb48`.
   Built ROM SHA1: `f2af69d040327ef54630baefc04332077a53cb5c`.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
-  packages on the parent base. Lua: 245 tests pass; luacheck: no warnings/errors
+  packages on the parent base. Lua: 246 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
 - The instrumented ARM build succeeds; `client/addresses.lua` is regenerated
   from that exact ELF/ROM. Build identity will be recorded with emulator results.
@@ -230,9 +232,9 @@ the wrong transport.
   difference remains unexplained. No sanitizer was disabled
   and the runner's default compiler flags were not changed. CI's default run
   remains to be checked separately.
-- **No real two-instance success is recorded yet.** The local UI automation
-  attempt could not operate mGBA's modal file chooser. It did not open the
-  copied ROM or establish any acceptance evidence. No production save was used.
+- **No successful two-instance trade is recorded yet.** UI-driven attempts and
+  the user's manual attempts have not established trade-screen acceptance.
+  Only disposable ROM/save copies are used for these experiments.
 
 ### First manual attempt: wire rejection corrected
 
@@ -249,6 +251,21 @@ also sent through an actual isolated server: availability and exact link bytes
 relayed both ways, and both clients continued receiving pongs. This verifies
 wire compatibility, not the pending vanilla trade-screen acceptance. The user
 must reset/reload both scripting instances to exercise the corrected harness.
+
+### Fresh-position wait and readiness race
+
+A later screenshot stopped at ROM verification, before either client joined.
+The harness intentionally waits for a fresh visible presence tuple to obtain
+the game identity. The ROM publishes only changed tuples, so a Scripting Reset
+while standing still may wait until the player moves or turns. The script now
+prints that instruction explicitly.
+
+Inspection also found a readiness race: a player could join after the first
+availability broadcast and never receive another one once its partner started.
+The harness now re-announces readiness before START. A delayed-peer regression
+failed before the correction and passes afterward. Restart both copied ROMs
+and reload the scripts after updating an attempted session: this throwaway
+adapter does not reset/reconnect an already active virtual link in place.
 
 Before recommending go, fill in the emulator matrix and record the tested
 parent/fork revisions and sanitized logs. Production #81 still needs bounded

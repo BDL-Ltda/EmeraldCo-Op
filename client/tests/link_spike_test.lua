@@ -94,6 +94,25 @@ tests["spike waits for overworld identity and starts the selected role only afte
 	t.tick(); h.eq(t.inbound()[1], string.char(0, 0, 0))
 end
 
+tests["a peer joining after the initial broadcast receives readiness before START"] = function()
+	local t = harness(true)
+	t.presence(); t.tick()
+	t.receive({ v = 2, type = "welcome", players = json.array() })
+	t.tick() -- The initial broadcast happens before the second peer exists.
+	local function offers()
+		local count = 0
+		for _, message in ipairs(t.wire()) do
+			if message.type == "trade_available" then count = count + 1 end
+		end
+		return count
+	end
+	h.eq(offers(), 1)
+	t.receive({ v = 2, type = "trade_available", playerId = "spike_b", available = true })
+	t.tick() -- Less than the periodic one-second interval has elapsed.
+	h.eq(offers(), 2)
+	h.eq(t.inbound()[1], string.char(0, 0, 0))
+end
+
 tests["spike filters unrelated peers and targets before feeding the ROM"] = function()
 	local t = harness(true); t.ready()
 	for _, pair in ipairs({ { "stranger", "spike_a" }, { "spike_b", "stranger" } }) do

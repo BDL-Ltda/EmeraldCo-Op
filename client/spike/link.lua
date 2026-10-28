@@ -120,6 +120,11 @@ return function(id, peer, role, delayMs, fixtureParty)
 				lastOffer = now
 			end
 			if peerReady and not started then
+				-- Availability is not stored by the server. The peer may have
+				-- joined after our last broadcast; acknowledge it before START.
+				send(protocol.tradeAvailable(id, true))
+				lastOffer = now
+				if stopped then return end
 				assert(sender:send(5, string.char(0, role, fixtureParty and 1 or 0)))
 				started = true
 				log(string.format("start role %d; injected one-way delay %d ms", role, delayMs))
@@ -145,6 +150,7 @@ return function(id, peer, role, delayMs, fixtureParty)
 	if not ok then console:error("[link-spike] " .. reason); return end
 	box = mailbox.new(emu, addresses.symbols.gCoopMailbox.addr)
 	log(reason .. "; experimental trade, disposable saves only")
+	log("waiting for a fresh overworld position; move or turn once after Scripting Reset")
 	callbacks:add("frame", poll)
 	-- A new ROM may already occupy RAM: never clear a flag at the old address.
 	callbacks:add("start", function() stop("a game was loaded; reload the spike script", true) end)
