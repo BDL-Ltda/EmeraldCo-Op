@@ -183,7 +183,8 @@ type Error struct {
 
 // Relayed is implemented by the client messages that the server stamps with
 // the sender's player ID and relays unchanged to every other player: all the
-// trade messages. The server keeps no state for them.
+// trade messages. Only reciprocal confirms have minimal audit-pairing state;
+// this does not affect routing or enforce a gameplay state machine.
 type Relayed interface {
 	Message
 	// WithPlayerID returns a copy of the message with playerId set to id.

@@ -13,12 +13,19 @@ import (
 	"time"
 
 	"github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol"
+	"github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog"
 )
+
+// TradeLogger receives completed confirmation pairs outside the room mutex.
+type TradeLogger interface {
+	Append(tradelog.Record) error
+}
 
 // Config contains listener-independent settings. Never log JoinKey.
 type Config struct {
 	JoinKey    string
 	MaxPlayers int
+	TradeLog   TradeLogger
 }
 
 func (c Config) Validate() error {
@@ -69,8 +76,9 @@ type Server struct {
 	// observer always sees leave(replaced) before join for a replacement.
 	// Only non-blocking queue operations run under the lock. Each authenticated
 	// connection has its own writer, so socket backpressure never locks the room.
-	mu      sync.Mutex
-	players map[string]*client
+	mu       sync.Mutex
+	players  map[string]*client
+	confirms map[tradePair]pendingConfirm
 }
 
 // maxPendingHandshakes bounds connections that have not yet sent a hello with
@@ -89,7 +97,7 @@ func New(cfg Config, logger *log.Logger) (*Server, error) {
 	return &Server{cfg: cfg, logger: logger, helloTimeout: 5 * time.Second,
 		writeTimeout: 5 * time.Second, idleTimeout: 15 * time.Second,
 		rateLimit: 50, sendQueueSize: 64, pending: make(chan struct{}, maxPendingHandshakes),
-		players: make(map[string]*client)}, nil
+		players: make(map[string]*client), confirms: make(map[tradePair]pendingConfirm)}, nil
 }
 
 // Serve owns listener and all accepted connections. Cancellation closes even
@@ -420,6 +428,7 @@ func (s *Server) join(c *client) bool {
 	}
 	defer s.mu.Unlock()
 	if old != nil {
+		s.clearConfirmsLocked(old.player.PlayerID)
 		delete(s.players, old.player.PlayerID)
 		old.close()
 		s.event(old, "leave", protocol.LeaveReplaced)
@@ -459,6 +468,7 @@ func (s *Server) forgetLocked(c *client, reason string) {
 		return
 	}
 	delete(s.players, c.player.PlayerID)
+	s.clearConfirmsLocked(c.player.PlayerID)
 	s.event(c, "leave", reason)
 	s.broadcast(protocol.Leave{PlayerID: c.player.PlayerID, Reason: reason}, nil)
 }
@@ -476,14 +486,30 @@ func (s *Server) presence(c *client, msg protocol.Presence) {
 }
 
 // relay sends a trade message to every other player, stamped with the
-// sender's ID. The server neither routes by targetId nor keeps trade state.
+// sender's ID. It does not route; only audit confirmation pairing has state.
 func (s *Server) relay(c *client, msg protocol.Relayed) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.players[c.player.PlayerID] != c {
+		s.mu.Unlock()
 		return
 	}
-	s.broadcast(msg.WithPlayerID(c.player.PlayerID), c)
+	stamped := msg.WithPlayerID(c.player.PlayerID)
+	// Snapshot both confirmations before broadcast can remove a slow peer.
+	// The append still happens afterward, outside the membership lock.
+	record := s.confirmLocked(c, stamped)
+	s.broadcast(stamped, c)
+	s.mu.Unlock()
+	// A slow or failed disk must never lock membership, pongs or other relays.
+	if record != nil {
+		if err := s.cfg.TradeLog.Append(*record); err != nil {
+			// Raw errors can contain a private path or data. Do not log them.
+			reason := "append_failed"
+			if errors.Is(err, tradelog.ErrIncompleteTail) {
+				reason = "incomplete_tail"
+			}
+			s.logger.Printf("event=trade_log_error reason=%s", reason)
+		}
+	}
 }
 
 func (s *Server) pong(c *client, msg protocol.Ping) {

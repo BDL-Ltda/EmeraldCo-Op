@@ -81,6 +81,9 @@ func TestParseConfigRejectsInvalidInputWithoutKeyDisclosure(t *testing.T) {
 		{"positional argument", []string{"-id", "bot1", "extra"}, fixtureEnvironment},
 		{"invalid trade target", []string{"-id", "bot1", "-trade", "bad id"}, fixtureEnvironment},
 		{"long trade target", []string{"-id", "bot1", "-trade", strings.Repeat("a", 17)}, fixtureEnvironment},
+		{"invalid confirm target", []string{"-id", "bot1", "-trade-confirm", "bad id"}, fixtureEnvironment},
+		{"self confirm target", []string{"-id", "bot1", "-trade-confirm", "bot1"}, fixtureEnvironment},
+		{"both trade modes", []string{"-id", "bot1", "-trade", "bot2", "-trade-confirm", "bot2"}, fixtureEnvironment},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := parseConfig(test.args, test.env)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -393,5 +394,42 @@ func TestSessionWarpAndPeriodicPing(t *testing.T) {
 	peer.cancel()
 	if err := peer.wait(t, 2*time.Second); err != nil {
 		t.Fatalf("cancel after periodic activity: %v", err)
+	}
+}
+
+func TestAuditConfirmWaitsForPartnerAndSendsOnce(t *testing.T) {
+	for _, online := range []bool{false, true} {
+		t.Run(fmt.Sprint(online), func(t *testing.T) {
+			peer := startScriptedPeer(t, "-pattern", "idle", "-trade-confirm", "bot2")
+			expectHello(t, peer)
+			players := []protocol.Player{}
+			if online {
+				players = append(players, protocol.Player{PlayerID: "bot2"})
+			}
+			peer.send(t, protocol.Welcome{Players: players})
+			expectInitialPresence(t, peer)
+			if !online {
+				// No confirmation before the partner's join: pong must be next.
+				peer.send(t, protocol.Ping{T: 1})
+				if got := peer.read(t, time.Second); got != (protocol.Pong{T: 1}) {
+					t.Fatalf("premature confirm: %#v", got)
+				}
+				peer.send(t, protocol.Join{PlayerID: "bot2"})
+			}
+			got, ok := peer.read(t, time.Second).(protocol.TradeConfirm)
+			if !ok || got.PlayerID != "bot1" || got.TargetID != "bot2" || got.Pokemon != strings.Repeat("00", 100) {
+				t.Fatalf("wrong synthetic confirm: %#v", got)
+			}
+			peer.send(t, protocol.Join{PlayerID: "bot2"})
+			peer.send(t, protocol.Ping{T: 2})
+			if got := peer.read(t, time.Second); got != (protocol.Pong{T: 2}) {
+				t.Fatalf("duplicate confirm: %#v", got)
+			}
+			peer.cancel()
+			if err := peer.wait(t, time.Second); err != nil {
+				t.Fatal(err)
+			}
+			peer.assertNoKeyDisclosure(t, nil)
+		})
 	}
 }

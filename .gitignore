@@ -15,3 +15,6 @@ gba_bios.bin
 
 # Local Go command outputs
 /bin/
+
+# Local trade-confirmation audit log (custom paths must also stay private)
+trade-log.jsonl

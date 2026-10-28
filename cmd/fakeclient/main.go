@@ -17,11 +17,12 @@ import (
 )
 
 type config struct {
-	addr        string
-	hello       protocol.Hello
-	pattern     string
-	stepsPerSec float64
-	tradeTarget string
+	addr          string
+	hello         protocol.Hello
+	pattern       string
+	stepsPerSec   float64
+	tradeTarget   string
+	confirmTarget string
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
@@ -35,6 +36,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.pattern, "pattern", "square", "square, idle or warp")
 	flags.Float64Var(&cfg.stepsPerSec, "steps-per-sec", 4, "steps per second (greater than 0, at most 40)")
 	flags.StringVar(&cfg.tradeTarget, "trade", "", "optional player ID to send one of each trade message to after welcome")
+	flags.StringVar(&cfg.confirmTarget, "trade-confirm", "", "send one synthetic confirm when this player is online (audit test only)")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return config{}, err
@@ -58,10 +60,18 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	if float64(time.Second)/cfg.stepsPerSec >= float64(math.MaxInt64) {
 		return config{}, errors.New("steps-per-sec is too small for a timer interval")
 	}
-	if cfg.tradeTarget != "" {
-		if err := (protocol.TradeInvite{PlayerID: "x", TargetID: cfg.tradeTarget}).Validate(); err != nil {
-			return config{}, errors.New("trade must be a valid player ID")
+	if cfg.tradeTarget != "" && cfg.confirmTarget != "" {
+		return config{}, errors.New("trade and trade-confirm are mutually exclusive")
+	}
+	for _, target := range []string{cfg.tradeTarget, cfg.confirmTarget} {
+		if target != "" {
+			if err := (protocol.TradeInvite{PlayerID: "x", TargetID: target}).Validate(); err != nil {
+				return config{}, errors.New("trade target must be a valid player ID")
+			}
 		}
+	}
+	if cfg.confirmTarget == cfg.hello.PlayerID && cfg.confirmTarget != "" {
+		return config{}, errors.New("trade-confirm must target another player")
 	}
 	cfg.hello.TrainerID = 0
 	cfg.hello.Gender = protocol.GenderMale

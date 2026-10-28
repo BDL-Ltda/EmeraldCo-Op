@@ -12,6 +12,7 @@ standard library and the existing [protocol](protocol.md). There is one room.
 | `-addr` | `SERVER_ADDR` | `:8765` |
 | `-join-key` | `SERVER_JOIN_KEY` | Required; no default |
 | `-max-players` | `SERVER_MAX_PLAYERS` | 5; allowed range 1–5 |
+| `-trade-log` | None | `trade-log.jsonl`, relative to the working directory |
 
 An explicit flag overrides its environment variable. The capacity cannot exceed
 five because a protocol welcome can contain at most four other players.
@@ -142,12 +143,75 @@ logged: these could contain secrets. The join key is never logged.
   room-wide cap.
 - Protocol line-size, configured room-capacity and
   [pending-handshake](#pending-handshakes) limits still apply. The send queue,
-  timeouts and pending cap are server constants; only address, key and capacity
-  have CLI configuration.
+  timeouts and pending cap are server constants. Address, key, capacity and the
+  audit-file path have CLI configuration.
 
 Use the [fake client](fakeclient.md) to exercise the relay without an emulator.
 The mGBA client connects with [`client/net.lua`](../client/README.md#networking).
 Interpolation and ROM rendering remain separate work. The relay does not synchronize saves or battles.
+
+## Trade confirmation audit log
+
+The server CLI enables the local log by default ([#79](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/79)).
+Use `-trade-log PATH` to choose another file. The default `trade-log.jsonl` is
+next to the server's working files, **not** Go's temporary executable, so
+`go run` does not lose it on exit. Use an absolute path for a service whose
+working directory may change. The path must be nonempty and its parent must
+already exist. The file is created lazily when the first pair is logged.
+
+When two connected, distinct players send `trade_confirm` targeting each other,
+the second confirmation is broadcast as usual, then one JSON line is appended:
+
+| Field | Meaning |
+| --- | --- |
+| `time` | Pair completion time, RFC3339 with UTC `Z`. |
+| `players` | Two participants, ordered by authenticated player ID, not arrival order. |
+| `players[].playerId` | Connection ID; a forged wire ID is overwritten. |
+| `players[].trainerId` | Trainer ID from that connection's accepted hello, not the Pokemon's original trainer. |
+| `players[].speciesId`, `species` | Internal Emerald species ID and readable name, decoded from the encrypted bytes. |
+| `players[].checksumValid` | Whether the decrypted Pokemon checksum matches; invalid data is retained for diagnosis, not declared valid gameplay. |
+| `players[].pokemon` | Exact outgoing 100-byte `struct Pokemon`, lowercase hex (200 characters). |
+
+Names come from the pinned decomp, not national Pokedex numbering. An egg
+retains its underlying species. Unknown IDs are labeled `UNKNOWN`, preserving
+the numeric ID and raw bytes. See [the byte contract](memory-map.md#pokemon-bytes-in-the-trade-log).
+
+A single confirmation produces no line. Same-side repeats replace the pending
+offer. New invites, declines and cancels clear that pair; disconnects, timeouts,
+queue drops and duplicate-ID replacement clear all pairs involving that player.
+Self/nonexistent targets are still relayed but create no audit state. There are
+at most ten pending pairs in a five-player room. A completed pair is forgotten
+so a later trade can be logged. There is no trade/session ID on the wire:
+replaying **both** confirms after completion is indistinguishable from another
+trade and creates another line.
+
+File operations run **outside the room mutex**. A slow disk does not block
+other players' relays, joins or pongs. Each record is appended, synced and
+closed. Existing files are never truncated or rotated, including after restart.
+New files request owner-only permissions where supported by the OS. Back up
+the log and retain it; apply host filesystem permissions as appropriate.
+Errors produce `event=trade_log_error reason=append_failed` in server diagnostics,
+without raw paths/data. Relaying continues, with no automatic replay of failed
+writes. Fix the path/disk and subsequent pairs retry if the file ends in a
+newline. A partial write or crash can leave an incomplete final line. Before
+every append, including after restart, the logger checks the last byte and
+refuses an unterminated tail with `event=trade_log_error reason=incomplete_tail`.
+It leaves all existing bytes untouched and relaying continues. Back up the
+file, inspect and preserve the incomplete fragment, then repair its line
+boundary explicitly before appends resume. Adding a newline isolates the
+fragment but does not make it a valid trade record; treat it as failed-write
+evidence. No fragment is automatically completed, truncated or replayed. The
+logger needs read and write access to inspect the tail and append new records.
+
+The audit file has no join key or IP-address fields. It contains only the
+explicit trade record, unlike ordinary connection diagnostics. It still has
+trainer/Pokemon data: keep it private. The default filename is gitignored;
+custom paths must also be outside Git or explicitly ignored. Never attach raw
+audit logs publicly. Inspect a private copy when diagnosing a trade by hand.
+
+**Two confirms are not proof of successful saves.** Confirmations precede the
+vanilla lockstep save; a crash can still duplicate/lose a Pokemon. This records
+the offers, not escrow, a transaction or automatic recovery.
 
 ## Verify with two TCP sessions
 

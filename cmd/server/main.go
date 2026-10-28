@@ -15,11 +15,13 @@ import (
 	"syscall"
 
 	"github.com/DaviAlencastro/EmeraldCo-Op/internal/room"
+	"github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog"
 )
 
 type config struct {
-	addr string
-	room room.Config
+	addr         string
+	room         room.Config
+	tradeLogPath string
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
@@ -36,6 +38,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.addr, "addr", fallback("SERVER_ADDR", ":8765"), "listen address")
 	flags.StringVar(&cfg.room.JoinKey, "join-key", getenv("SERVER_JOIN_KEY"), "required shared key")
 	max := flags.String("max-players", fallback("SERVER_MAX_PLAYERS", "5"), "room capacity (1-5)")
+	flags.StringVar(&cfg.tradeLogPath, "trade-log", tradelog.DefaultPath, "append-only trade log path")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return config{}, err
@@ -53,6 +56,9 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	if cfg.addr == "" {
 		return config{}, errors.New("addr must not be empty")
 	}
+	if cfg.tradeLogPath == "" {
+		return config{}, errors.New("trade-log must not be empty")
+	}
 	if err := cfg.room.Validate(); err != nil {
 		return config{}, err
 	}
@@ -62,13 +68,14 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 func run(ctx context.Context, args []string, getenv func(string) string, output io.Writer) error {
 	cfg, err := parseConfig(args, getenv)
 	if errors.Is(err, flag.ErrHelp) {
-		_, err = fmt.Fprintln(output, "Usage: server [-addr ADDRESS] [-join-key KEY] [-max-players 1-5]\nEnvironment fallbacks: SERVER_ADDR, SERVER_JOIN_KEY, SERVER_MAX_PLAYERS.\nDefaults: addr=:8765, max-players=5. A join key is required.")
+		_, err = fmt.Fprintln(output, "Usage: server [-addr ADDRESS] [-join-key KEY] [-max-players 1-5] [-trade-log PATH]\nEnvironment fallbacks: SERVER_ADDR, SERVER_JOIN_KEY, SERVER_MAX_PLAYERS.\nDefaults: addr=:8765, max-players=5, trade-log=trade-log.jsonl (working directory). A join key is required.")
 		return err
 	}
 	if err != nil {
 		return err
 	}
 	logger := log.New(output, "", log.LstdFlags)
+	cfg.room.TradeLog = tradelog.NewFile(cfg.tradeLogPath)
 	server, err := room.New(cfg.room, logger)
 	if err != nil {
 		return err

@@ -28,7 +28,7 @@ type received struct {
 func run(ctx context.Context, args []string, getenv func(string) string, output io.Writer) (runErr error) {
 	cfg, err := parseConfig(args, getenv)
 	if errors.Is(err, flag.ErrHelp) {
-		_, err = fmt.Fprintln(output, "Usage: fakeclient -id PLAYER [-addr ADDRESS] [-key KEY] [-pattern square|idle|warp] [-steps-per-sec RATE] [-trade PLAYER]\nKey fallback: FAKECLIENT_JOIN_KEY. Defaults: addr=localhost:8765, pattern=square, steps-per-sec=4.\nRATE must be greater than 0 and at most 40. Ctrl+C disconnects; there is no automatic reconnect.")
+		_, err = fmt.Fprintln(output, "Usage: fakeclient -id PLAYER [-addr ADDRESS] [-key KEY] [-pattern square|idle|warp] [-steps-per-sec RATE] [-trade PLAYER | -trade-confirm PLAYER]\nKey fallback: FAKECLIENT_JOIN_KEY. Defaults: addr=localhost:8765, pattern=square, steps-per-sec=4.\ntrade-confirm sends synthetic bytes for audit tests, not a playable trade. RATE must be greater than 0 and at most 40. Ctrl+C disconnects; there is no automatic reconnect.")
 		return err
 	}
 	if err != nil {
@@ -80,7 +80,8 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 		_ = conn.Close()
 		<-readerDone
 	}()
-	if err := awaitWelcome(ctx, results, output, cfg.hello.JoinKey); err != nil {
+	welcome, err := awaitWelcome(ctx, results, output, cfg.hello.JoinKey)
+	if err != nil {
 		return err
 	}
 	if ctx.Err() != nil {
@@ -103,6 +104,25 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 			}
 		}
 		if _, err := fmt.Fprintf(output, "[trade] sent %d sample trade messages to %s\n", len(samples), cfg.tradeTarget); err != nil {
+			return err
+		}
+	}
+	confirmed := false
+	confirmIfPartner := func(id string) error {
+		if confirmed || cfg.confirmTarget == "" || id != cfg.confirmTarget {
+			return nil
+		}
+		message := protocol.TradeConfirm{PlayerID: cfg.hello.PlayerID, TargetID: id,
+			Pokemon: strings.Repeat("00", protocol.PokemonBytes)}
+		if err := send(conn, message); err != nil {
+			return err
+		}
+		confirmed = true
+		_, err := fmt.Fprintln(output, redact("[trade] sent synthetic confirmation to "+id, cfg.hello.JoinKey))
+		return err
+	}
+	for _, player := range welcome.Players {
+		if err := confirmIfPartner(player.PlayerID); err != nil {
 			return err
 		}
 	}
@@ -129,7 +149,11 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 				return err
 			}
 			switch message := result.message.(type) {
-			case protocol.Join, protocol.Presence, protocol.Leave, protocol.Pong, protocol.Unknown, protocol.Relayed:
+			case protocol.Join:
+				if err := confirmIfPartner(message.PlayerID); err != nil {
+					return err
+				}
+			case protocol.Presence, protocol.Leave, protocol.Pong, protocol.Unknown, protocol.Relayed:
 			case protocol.Ping:
 				if err := send(conn, protocol.Pong{T: message.T}); err != nil {
 					return err
@@ -160,31 +184,31 @@ func run(ctx context.Context, args []string, getenv func(string) string, output 
 	}
 }
 
-func awaitWelcome(ctx context.Context, results <-chan received, output io.Writer, key string) error {
+func awaitWelcome(ctx context.Context, results <-chan received, output io.Writer, key string) (protocol.Welcome, error) {
 	timer := time.NewTimer(handshakeTimeout)
 	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return protocol.Welcome{}, nil
 		case <-timer.C:
-			return errors.New("timed out waiting for welcome")
+			return protocol.Welcome{}, errors.New("timed out waiting for welcome")
 		case result := <-results:
 			if result.err != nil {
-				return receiveError(result.err)
+				return protocol.Welcome{}, receiveError(result.err)
 			}
 			if err := logMessage(output, result.message, key); err != nil {
-				return err
+				return protocol.Welcome{}, err
 			}
 			switch message := result.message.(type) {
 			case protocol.Welcome:
-				return nil
+				return message, nil
 			case protocol.Unknown:
 				// Unknown extensions do not reset the handshake deadline.
 			case protocol.Error:
-				return fmt.Errorf("server rejected connection (%s)", message.Code)
+				return protocol.Welcome{}, fmt.Errorf("server rejected connection (%s)", message.Code)
 			default:
-				return errors.New("expected welcome from server")
+				return protocol.Welcome{}, errors.New("expected welcome from server")
 			}
 		}
 	}
