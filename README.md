@@ -269,6 +269,7 @@ See the [client README](client/README.md) for configuration and networking.
 - [Architecture](docs/architecture.md): agreed design and communication flow.
 - [Roadmap](docs/ROADMAP.md): foundations, v1 presence and future versions.
 - [Protocol](docs/protocol.md): the JSON-lines wire protocol between client and server.
+- [Trade attendant](docs/trade-attendant.md): v1.5 invitation flow, session boundary and multiplayer test checklist (#82).
 - [Fake client](docs/fakeclient.md): simulated walking, warp and idle players for terminal tests.
 - [Memory map](docs/memory-map.md): generated globals, historical offsets and the ROM mailbox.
 - [mGBA scripting](docs/mgba-scripting.md): pinned mGBA version, Lua API and gotchas.

@@ -359,6 +359,19 @@ function M.new(config, env)
 		return sock ~= nil and joined
 	end
 
+	-- Attendant controls share the ping/presence budget without a second socket
+	-- backlog. The pure trade state machine retries after backpressure.
+	function client.sendTrade(_, message)
+		local allowed = { trade_available = true, trade_invite = true, trade_accept = true,
+			trade_decline = true, trade_cancel = true }
+		if not allowed[message.type] or message.playerId ~= config.PLAYER_ID or protocol.check(message) then
+			return false, "invalid trade control"
+		end
+		if not joined or not readyToSend() then return false end
+		send(message)
+		return sock ~= nil
+	end
+
 	return client
 end
 
