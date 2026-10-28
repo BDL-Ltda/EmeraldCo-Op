@@ -215,7 +215,7 @@ the wrong transport.
 - Prototype fork revision: `397fa13cc3a30d21743f38dd741fcf11e3c2fb48`.
   Built ROM SHA1: `f2af69d040327ef54630baefc04332077a53cb5c`.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
-  packages on the parent base. Lua: 244 tests pass; luacheck: no warnings/errors
+  packages on the parent base. Lua: 245 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
 - The instrumented ARM build succeeds; `client/addresses.lua` is regenerated
   from that exact ELF/ROM. Build identity will be recorded with emulator results.
@@ -233,6 +233,22 @@ the wrong transport.
 - **No real two-instance success is recorded yet.** The local UI automation
   attempt could not operate mGBA's modal file chooser. It did not open the
   copied ROM or establish any acceptance evidence. No production save was used.
+
+### First manual attempt: wire rejection corrected
+
+The user's two-instance attempt verified ROM CRC32 `17ed0965` and authenticated
+both `spike_a` and `spike_b`, but the server immediately rejected their first
+post-welcome message with `bad_message`. The harness omitted required `playerId`
+on `trade_available` and `trade_link`. The server validates the field before
+replacing it with the authenticated sender ID.
+
+Both sends now use the existing protocol builders, and the harness validates
+trade fields before encoding. A regression on the real entry script failed
+before the fix and passes afterward. Messages captured from that script were
+also sent through an actual isolated server: availability and exact link bytes
+relayed both ways, and both clients continued receiving pongs. This verifies
+wire compatibility, not the pending vanilla trade-screen acceptance. The user
+must reset/reload both scripting instances to exercise the corrected harness.
 
 Before recommending go, fill in the emulator matrix and record the tested
 parent/fork revisions and sanitized logs. Production #81 still needs bounded

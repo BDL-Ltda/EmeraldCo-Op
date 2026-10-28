@@ -120,6 +120,20 @@ tests["spike preserves ROM bytes and injects outbound latency without blocking"]
 	h.eq(links()[1].seq, 1)
 end
 
+tests["all outgoing trade messages include the required sender and pass the protocol contract"] = function()
+	local t = harness(true); t.ready()
+	t.rom(string.char(2) .. string.rep("a", 200)); t.tick()
+	local seen = {}
+	for _, message in ipairs(t.wire()) do
+		if message.type:match("^trade_") then
+			h.eq(message.playerId, "spike_a")
+			h.eq(require("protocol").check(message), nil)
+			seen[message.type] = true
+		end
+	end
+	assert(seen.trade_available and seen.trade_link)
+end
+
 tests["spike stops on a partner sequence gap without logging private settings"] = function()
 	local t = harness(true); t.ready()
 	t.receive({ v = 2, type = "trade_link", playerId = "spike_b", targetId = "spike_a", seq = 2, data = "01" })

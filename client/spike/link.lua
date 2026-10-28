@@ -30,6 +30,10 @@ return function(id, peer, role, delayMs, fixtureParty)
 		console:error("[link-spike] stopped: " .. reason .. "; restart both test instances")
 	end
 	local function send(message)
+		if message.type:match("^trade_") then
+			local reason = protocol.check(message)
+			if reason then stop(reason); return end
+		end
 		local line, err = json.encode(message)
 		if not line then stop(err); return end
 		if #outbox + #line > 32768 then stop("send queue full"); return end
@@ -112,7 +116,7 @@ return function(id, peer, role, delayMs, fixtureParty)
 		if not sock or stopped then return end
 		if joined then
 			if not started and now - lastOffer >= 1000 then
-				send({ v = protocol.VERSION, type = "trade_available", available = true })
+				send(protocol.tradeAvailable(id, true))
 				lastOffer = now
 			end
 			if peerReady and not started then
@@ -129,8 +133,7 @@ return function(id, peer, role, delayMs, fixtureParty)
 			end
 			while delayed[1] and delayed[1].at <= now do
 				seq = seq + 1
-				send({ v = protocol.VERSION, type = "trade_link", targetId = peer,
-					seq = seq, data = protocol.toHex(table.remove(delayed, 1).data) })
+				send(protocol.tradeLink(id, peer, seq, protocol.toHex(table.remove(delayed, 1).data)))
 			end
 			if now - lastPing >= 5000 then send(protocol.ping(now)); lastPing = now end
 		end
