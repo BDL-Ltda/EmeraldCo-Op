@@ -177,33 +177,44 @@ func TestTradeLogMissingAndSelfTargetRemainStateless(t *testing.T) {
 }
 
 func TestTradeLogFailureDoesNotStopRelay(t *testing.T) {
-	records := make(chan tradelog.Record, 1)
-	logs := make(chan string, 32)
-	_, addr, _ := testServer(t, 5, func(s *Server) {
-		s.cfg.TradeLog = tradeLogFunc(func(r tradelog.Record) error { records <- r; return errors.New("private-path test-key") })
-		s.logger = log.New(logChannel(logs), "", 0)
-	})
-	a, _ := enter(t, addr, "a")
-	b, _ := enter(t, addr, "b")
-	_ = a.read(t)
-	confirm(t, a, b, "b", "a", 65)
-	confirm(t, b, a, "a", "b", 277)
-	waitTradeRecord(t, records)
-	b.send(t, protocol.Ping{T: 9})
-	want(t, b, protocol.Pong{T: 9})
-	presence := protocol.Presence{PlayerID: "a", PresenceState: protocol.PresenceState{Facing: 1}}
-	a.send(t, presence)
-	want(t, b, presence)
-	found := false
-	for len(logs) > 0 {
-		line := <-logs
-		if strings.Contains(line, "private-path") || strings.Contains(line, "test-key") {
-			t.Fatal("raw audit error leaked")
-		}
-		found = found || strings.Contains(line, "event=trade_log_error")
-	}
-	if !found {
-		t.Fatal("audit failure was not reported as a server error")
+	for _, tc := range []struct {
+		name   string
+		err    error
+		reason string
+	}{
+		{"storage_error", errors.New("private-path test-key"), "append_failed"},
+		{"incomplete_tail", errors.Join(errors.New("private-path test-key"), tradelog.ErrIncompleteTail), "incomplete_tail"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			records := make(chan tradelog.Record, 1)
+			logs := make(chan string, 32)
+			_, addr, _ := testServer(t, 5, func(s *Server) {
+				s.cfg.TradeLog = tradeLogFunc(func(r tradelog.Record) error { records <- r; return tc.err })
+				s.logger = log.New(logChannel(logs), "", 0)
+			})
+			a, _ := enter(t, addr, "a")
+			b, _ := enter(t, addr, "b")
+			_ = a.read(t)
+			confirm(t, a, b, "b", "a", 65)
+			confirm(t, b, a, "a", "b", 277)
+			waitTradeRecord(t, records)
+			b.send(t, protocol.Ping{T: 9})
+			want(t, b, protocol.Pong{T: 9})
+			presence := protocol.Presence{PlayerID: "a", PresenceState: protocol.PresenceState{Facing: 1}}
+			a.send(t, presence)
+			want(t, b, presence)
+			found := false
+			for len(logs) > 0 {
+				line := <-logs
+				if strings.Contains(line, "private-path") || strings.Contains(line, "test-key") {
+					t.Fatal("raw audit error leaked")
+				}
+				found = found || strings.Contains(line, "event=trade_log_error reason="+tc.reason)
+			}
+			if !found {
+				t.Fatal("audit failure was not reported as a server error")
+			}
+		})
 	}
 }
 

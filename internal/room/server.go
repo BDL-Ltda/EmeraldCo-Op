@@ -503,7 +503,11 @@ func (s *Server) relay(c *client, msg protocol.Relayed) {
 	if record != nil {
 		if err := s.cfg.TradeLog.Append(*record); err != nil {
 			// Raw errors can contain a private path or data. Do not log them.
-			s.logger.Print("event=trade_log_error reason=append_failed")
+			reason := "append_failed"
+			if errors.Is(err, tradelog.ErrIncompleteTail) {
+				reason = "incomplete_tail"
+			}
+			s.logger.Printf("event=trade_log_error reason=%s", reason)
 		}
 	}
 }

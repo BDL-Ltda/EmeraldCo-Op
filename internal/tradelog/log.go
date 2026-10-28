@@ -13,6 +13,10 @@ import (
 // DefaultPath is relative to the server's working directory, including go run.
 const DefaultPath = "trade-log.jsonl"
 
+// ErrIncompleteTail preserves a failed write for inspection instead of joining
+// the next record to it. An operator must repair the tail before appends resume.
+var ErrIncompleteTail = errors.New("trade log has an incomplete trailing record")
+
 // Player is one authenticated sender and the exact Pokemon it offered.
 type Player struct {
 	PlayerID      string `json:"playerId"`
@@ -56,11 +60,24 @@ func (f *File) Append(record Record) (err error) {
 	line = append(line, '\n')
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	output, err := os.OpenFile(f.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	output, err := os.OpenFile(f.path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, output.Close()) }()
+	info, err := output.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() != 0 {
+		var last [1]byte
+		if _, err := output.ReadAt(last[:], info.Size()-1); err != nil {
+			return err
+		}
+		if last[0] != '\n' {
+			return ErrIncompleteTail
+		}
+	}
 	n, err := output.Write(line)
 	if err != nil {
 		return err

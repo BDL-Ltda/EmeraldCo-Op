@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,5 +158,39 @@ func TestFileFailureAndRecovery(t *testing.T) {
 	}
 	if err := NewFile(dir).Append(Record{Time: time.Now()}); err == nil {
 		t.Fatal("directory must fail as a file")
+	}
+}
+
+func TestFileIncompleteTailIsPreservedAcrossReopen(t *testing.T) {
+	for _, reopen := range []bool{false, true} {
+		t.Run(map[bool]string{false: "same_writer", true: "reopened_writer"}[reopen], func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), DefaultPath)
+			sink := NewFile(path)
+			record := Record{Time: time.Now().UTC()}
+			if err := sink.Append(record); err != nil {
+				t.Fatal(err)
+			}
+			complete, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// A previous failed write left a partial record after a valid line.
+			original := append(append([]byte(nil), complete...), []byte(`{"time":"incomplete`)...)
+			if err := os.WriteFile(path, original, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if reopen {
+				sink = NewFile(path)
+			}
+			for range 2 {
+				if err := sink.Append(record); !errors.Is(err, ErrIncompleteTail) {
+					t.Fatalf("wanted incomplete-tail error, got %v", err)
+				}
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != string(original) {
+				t.Fatalf("refusal changed existing evidence: %v", err)
+			}
+		})
 	}
 }

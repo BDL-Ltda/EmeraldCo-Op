@@ -192,7 +192,16 @@ New files request owner-only permissions where supported by the OS. Back up
 the log and retain it; apply host filesystem permissions as appropriate.
 Errors produce `event=trade_log_error reason=append_failed` in server diagnostics,
 without raw paths/data. Relaying continues, with no automatic replay of failed
-writes. Fix the path/disk and subsequent pairs retry.
+writes. Fix the path/disk and subsequent pairs retry if the file ends in a
+newline. A partial write or crash can leave an incomplete final line. Before
+every append, including after restart, the logger checks the last byte and
+refuses an unterminated tail with `event=trade_log_error reason=incomplete_tail`.
+It leaves all existing bytes untouched and relaying continues. Back up the
+file, inspect and preserve the incomplete fragment, then repair its line
+boundary explicitly before appends resume. Adding a newline isolates the
+fragment but does not make it a valid trade record; treat it as failed-write
+evidence. No fragment is automatically completed, truncated or replayed. The
+logger needs read and write access to inspect the tail and append new records.
 
 The audit file has no join key or IP-address fields. It contains only the
 explicit trade record, unlike ordinary connection diagnostics. It still has
