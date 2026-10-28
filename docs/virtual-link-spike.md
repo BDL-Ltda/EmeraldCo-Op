@@ -10,10 +10,11 @@ The initial time box is three working days, as suggested in the ticket.
 Can the vanilla `rom/src/trade.c` screens work through a block-level adapter,
 without emulating the cable's serial interrupts over the internet?
 
-The source inspection supports trying the virtual link: the screen already
-waits asynchronously for received flags and link-task completion. **The go/no-go
-decision is pending the two-instance results below.** A build and host doubles
-cannot prove frame callbacks, rendering, flash saves or trade evolution.
+The source inspection and the initial two-instance video support continuing
+with the virtual link: the original screens exchanged parties, animated the
+trade, evolved both received Pokemon, displayed saving and returned to the field.
+**The final go/no-go decision is pending persistence-after-reload and the
+50–200 ms latency results below.** Host doubles cannot establish those results.
 If the experiment fails, record the failing screen and reason before deciding
 whether to change the adapter or re-plan #81/#83 around a separate trade flow.
 
@@ -207,7 +208,7 @@ the wrong transport.
 
 | Run | Screens reached A/B | Party bytes / summary / confirm | Evolution / save / reload | Return / presence | Error and elapsed time |
 | --- | --- | --- | --- | --- | --- |
-| No injected latency | Pending | Pending | Pending | Pending | Pending |
+| No injected latency (prepared wrappers: 0 ms) | Both original trade menus, confirmation, animation, evolution, saving, field | Parties displayed reciprocally; Summary and return observed on B; both confirm screens | Both evolved; saving screens completed; reload pending | Both return to Littleroot; production bridge presence pending | No link-error screen or unresolved hang observed in the supplied 2m11s video; includes user input time |
 | 50 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
@@ -232,9 +233,33 @@ the wrong transport.
   difference remains unexplained. No sanitizer was disabled
   and the runner's default compiler flags were not changed. CI's default run
   remains to be checked separately.
-- **No successful two-instance trade is recorded yet.** UI-driven attempts and
-  the user's manual attempts have not established trade-screen acceptance.
-  Only disposable ROM/save copies are used for these experiments.
+- **Initial two-instance trade flow recorded:** see the video observations below.
+  Persistence after reload, latency rows and post-trade production-bridge
+  presence still need evidence. Only disposable ROM/save copies are used.
+
+### Initial successful flow: user-supplied video
+
+`leomayca` supplied a private 2m11s recording on 2026-10-28 using two mGBA
+0.10.5 instances and the disposable fixture parties. The prepared client was
+`a0158c4`, ROM revision/hash are listed above, and both local wrapper files
+were checked with zero added delay. The raw desktop recording is not published.
+Observed offsets are approximate:
+
+| Video offset | Observation |
+| --- | --- |
+| 0:00–0:50 | A displays Kadabra + Zigzagoon locally and Machoke + Zigzagoon remotely; B shows the inverse. A Summary screen for Machoke is opened on B and returns to the trade menu. |
+| About 0:52 | Both instances reach the vanilla "Is this trade okay?" screen. |
+| About 0:58–1:28 | Both proceed through the cable-style animation and show the received Pokemon. |
+| About 1:32–1:54 | A's received Machoke evolves into Machamp; B's received Kadabra evolves into Alakazam. Both completion messages are visible. |
+| About 1:57–2:04 | Both display "SAVING... DON'T TURN OFF THE POWER." |
+| About 2:07–2:11 | Both return to the Littleroot overworld. |
+
+This demonstrates the original party/confirmation/animation/evolution/save-screen
+path and successful field return for this run. It does not independently prove
+every party byte or persistent data after reopening either ROM. The recording
+contains no restart/reload check and does not establish the delayed RTT cases.
+Reopen the copied ROMs **without loading the spike scripts** for the persistence
+check: fixture opt-in deliberately replaces the RAM parties on each new START.
 
 ### First manual attempt: wire rejection corrected
 
