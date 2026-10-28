@@ -176,7 +176,7 @@ svg .pulse { fill: var(--emerald); }
 .limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
 
 footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
-</style>
+pre{margin:8px 0 14px;font:inherit;white-space:pre}</style>
 </head>
 <body>
 <main>
@@ -189,8 +189,8 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="meta">
     <span>closes <b>#79</b></span>
     <span>branch <b>feat/79-server-trade-log</b></span>
-    <span>files <b>21</b></span>
-    <span>lines <b>+1385 / −35</b></span>
+    <span>files <b>22</b></span>
+    <span>lines <b>+1540 / −35</b></span>
     <span>milestone <b>v1.5 Trading</b></span>
   </div>
   <ul class="toc">
@@ -302,7 +302,7 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
       <div class="why"><b>Why</b><p><code>go run</code> uses a temporary executable. A persistent log must not follow that temporary path. Existing files are never truncated or rotated.</p></div>
     </div>
     <div class="decision"><h3>Minimum pairing state</h3><p>One offer per unordered pair of connected players; at most ten pairs in the five-player room. Same-side repeats replace, rather than complete, an offer.</p><div class="why"><b>Why</b><p>The server remains a broadcast relay, not a trade state machine. The wire has no trade ID: replaying both confirms after completion logs another pair.</p></div></div>
-    <div class="decision"><h3>A narrow synthetic test mode</h3><p><code>fakeclient -trade-confirm PLAYER</code> waits for the partner and sends one all-zero fixture.</p><div class="why"><b>Why</b><p>It makes the required two-client audit check deterministic without implementing the full trade partner from #84 or using actual saves.</p></div></div>
+<div class="decision"><h3>Refuse incomplete file tails</h3><code>last byte != newline → ErrIncompleteTail</code><div class="why"><b>Why</b><p>A partial write can leave a JSON fragment. Every append checks the tail, including after restart, and refuses to concatenate a new record to it. Existing bytes stay untouched. The server reports incomplete_tail and continues relaying; an operator must preserve and explicitly repair the tail before appends resume.</p></div></div>
   </div>
 </section>
 
@@ -311,14 +311,17 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="prose">
     <span class="eyebrow">How it was tested</span>
     <h2>Automation plus the actual command-line processes</h2>
-    <p>Go vet and uncached race tests passed all seven packages in an isolated Go 1.27.2 container. Lua passed 221 tests; luacheck reported no warnings/errors. ARM compile-only assertions checked Pokemon sizes/offsets. No ROM code or generated addresses changed.</p>
+    <p>At 49c847d, Go vet and uncached race tests passed all seven packages in an isolated Go 1.27.2 container. Lua passed 238 tests; luacheck reported no warnings/errors. New tests exercise actual partial writes using a temporary Linux file-size limit, same/reopened writers, evidence preservation and explicit operator repair. Relay tests cover both ordinary storage failures and the classified incomplete-tail error. No ROM code, pin or generated addresses changed in this follow-up.</p>
   </div>
-  <div class="term" data-anim>
-    <div style="--i:0"><span class="p">$</span> go test -race -count=1 ./...</div>
-    <div style="--i:1" class="ok">ok  github.com/DaviAlencastro/EmeraldCo-Op/internal/room 4.206s</div>
-    <div style="--i:2" class="ok">ok  github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog 1.063s</div>
-  </div>
-  <p class="small">The smoke test launched the real server and two fakeclients with a throwaway environment key. Only these sanitized summaries are public:</p>
+<div class="term"><div>$ go vet ./... &amp;&amp; go test -race -count=1 ./...</div><pre>ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/echoserver	1.020s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	6.221s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	2.034s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	1.058s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	1.058s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	4.236s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog	1.071s</pre><div>$ lua5.4 client/tests/run.lua &amp;&amp; luacheck client/</div><pre>238 passed, 0 failed (15 suites)
+Total: 0 warnings / 0 errors in 33 files</pre></div>
+<p class="small">The original smoke test launched the real server and two fakeclients with a throwaway environment key. Only these sanitized summaries are public:</p>
   <div class="term"><div>PASS manual CLI: server + two fakeclients -&gt; exactly one complete JSON line; no key/IP</div><div>PASS manual CLI: one-sided confirm + partner disconnect -&gt; no audit line</div><div>PASS manual CLI: invalid log path -&gt; server error; reciprocal relay and pongs continue</div></div>
   <p class="small">A regression test first reproduced a lost pair when the second broadcast dropped a full recipient queue; capturing before broadcast fixes it. Other tests cover all 24 species permutations, lifecycle cleanup, append/restart, bad storage and storage outside the room mutex.</p>
 </section>
@@ -338,11 +341,11 @@ footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--ru
   <div class="limits">
     <div class="limit"><b>#29 · save risk</b><span>A paired confirmation is not proof of saved data. No escrow or automatic recovery.</span></div>
     <div class="limit"><b>#84 · fake partner</b><span>The new CLI flag sends synthetic audit data only; playable trading is still future work.</span></div>
-    <div class="limit"><b>Storage limits</b><span>A slow disk can delay the confirming handler, not the room lock. Failed writes are reported and not automatically replayed.</span></div>
+    <div class="limit"><b>Storage limits</b><span>A slow disk can delay the confirming handler, not the room lock. Failed writes are not replayed. An incomplete tail blocks appends until explicit operator repair; existing bytes are preserved.</span></div>
   </div>
 </section>
 
-<footer>Generated for <a href="https://github.com/BDL-Ltda/EmeraldCo-Op/pull/91">BDL-Ltda/EmeraldCo-Op#91</a> by Codex with the pr-walkthrough skill. Based on commit 49582df, issue #79 and the commands run for it. No merge or gameplay acceptance is claimed.</footer>
+<footer>Generated for <a href="https://github.com/BDL-Ltda/EmeraldCo-Op/pull/91">BDL-Ltda/EmeraldCo-Op#91</a> by Codex with the pr-walkthrough skill. Original CLI evidence comes from 49582df; the partial-write fix and latest automated evidence come from 49c847d. Based on issue #79 and recorded command output. No merge or gameplay acceptance is claimed.</footer>
 </main>
 
 <script>
