@@ -4,7 +4,7 @@ local mailbox = require("mailbox")
 local tests = {}
 
 local function bridge(validRom)
-	local handlers, lines, logs, outbound, states = {}, {}, {}, {}, {}
+	local handlers, lines, logs, outbound, states, inbound, wire = {}, {}, {}, {}, {}, {}, {}
 	local buffer = {}
 	function buffer.clear() lines[#lines + 1] = "" end
 	function buffer.setSize(_, cols, rows) assert(cols >= 80 and rows >= 4) end
@@ -33,10 +33,14 @@ local function bridge(validRom)
 		if #outbound == 0 then return nil end
 		return table.remove(outbound, 1)
 	end
-	function box.push(_) return true end
+	function box.push(_, kind, payload)
+		inbound[#inbound + 1] = { type = kind, payload = payload }
+		return true
+	end
 	local client = {}
 	function client.setPlayerState(_, state) states[#states + 1] = state end
 	function client.update(_) client.updates = (client.updates or 0) + 1 end
+	function client.sendTrade(_, message) wire[#wire + 1] = message; return true end
 	function client.close(_)
 		client.closes = (client.closes or 0) + 1
 		if client.adapter then client.adapter.onEvent("status", "Waiting for game", 0) end
@@ -70,7 +74,7 @@ local function bridge(validRom)
 	}, { __index = _G })
 	assert(loadfile("client/bridge.lua", "t", env))()
 	return { handlers = handlers, lines = lines, logs = logs, box = box,
-		outbound = outbound, client = client, states = states }
+		outbound = outbound, client = client, states = states, inbound = inbound, wire = wire }
 end
 
 tests["the bridge reads the mailbox every frame and updates its panel"] = function()
@@ -149,6 +153,45 @@ tests["a mismatched ROM never opens the mailbox"] = function()
 	h.eq(b.box.connected, true)
 	b.handlers.frame()
 	assert(b.lines[#b.lines]:find("ROM not verified", 1, true))
+end
+
+tests["attendant commands and targeted replies cross the real bridge, including reset"] = function()
+	local b = bridge(true)
+	local trade = require("trade")
+	local function welcome()
+		b.client.adapter.onEvent("message", { type = "welcome", players = {
+			{ playerId = "bob", trainerId = 7, gender = 1 },
+		} }, 0)
+		b.handlers.frame()
+	end
+	local function command(kind, token, id)
+		b.outbound[#b.outbound + 1] = { type = mailbox.MSG.TRADE_COMMAND,
+			payload = string.pack("<BI2", kind, token) .. (id or "") }
+		b.handlers.frame()
+	end
+	welcome()
+	command(trade.COMMAND.OPEN, 1)
+	h.eq(b.wire[#b.wire].available, true)
+	b.client.adapter.onEvent("message", { type = "trade_available", playerId = "bob", available = true }, 0)
+	command(trade.COMMAND.INVITE, 1, "bob")
+	h.eq(b.wire[#b.wire].type, "trade_invite")
+	h.eq(b.wire[#b.wire].targetId, "bob")
+	b.client.adapter.onEvent("message", { type = "trade_accept", playerId = "bob", targetId = "me" }, 0)
+	b.handlers.frame()
+	local assembler, latest = require("fragments").newReassembler(), nil
+	for _, message in ipairs(b.inbound) do
+		if message.type == mailbox.MSG.FRAGMENT then
+			local kind, bytes = assembler:feed(message.payload)
+			if kind == mailbox.MSG.TRADE_STATE then latest = bytes end
+		end
+	end
+	assert(latest)
+	h.eq(latest:byte(3), trade.STATE.READY)
+	b.box.connected = false
+	b.handlers.frame()
+	welcome()
+	command(trade.COMMAND.OPEN, 1) -- ROM token restarts at one after soft reset.
+	h.eq(b.wire[#b.wire].available, true)
 end
 
 return tests

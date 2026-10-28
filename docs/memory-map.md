@@ -357,6 +357,45 @@ client mirrors these values; never renumber one.
 | `2` | `COOP_MSG_LEAVE` | inbound | 1 byte: the remote slot (`0`–`3`) to free. See [Remote slots](#remote-slots). |
 | `3` | `COOP_MSG_FRAGMENT` | both | One slot of a multi-slot message (layout v2). See [Multi-slot messages](#multi-slot-messages). |
 | `4` | `COOP_MSG_DEBUG_ECHO` | both | Debug, sent as a multi-slot message: the ROM sends a received one back unchanged. Used by `client/debug/echo.lua`. |
+| `5` | `COOP_MSG_TRADE_COMMAND` | outbound | Single-slot attendant command, 3–19 bytes. See below. |
+| `6` | `COOP_MSG_TRADE_STATE` | inbound | Complete attendant snapshot, 21–85 bytes, sent through fragments. See below. |
+
+### Trade attendant payloads
+
+These append message types without changing mailbox layout v2. Source:
+`rom/src/coop/trade.c` and `client/lib/trade.lua`. All multi-byte values are
+little-endian; these offsets are relative to the complete message payload,
+after reassembly for `TRADE_STATE`. No new global address is exported.
+
+`TRADE_COMMAND`:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| `0x00` | 1 | Command: `1` open, `2` invite, `3` accept, `4` decline, `5` cancel. |
+| `0x01` | 2 | Attendant visit token. The ROM increments a `u16` on each entry, skipping zero. |
+| `0x03` | 1–16, invite only | Selected ASCII `playerId`, without padding or terminator. |
+
+Only invite has trailing bytes; all other commands are exactly three bytes.
+Lua ignores commands for an old visit, unavailable targets and invalid IDs.
+
+`TRADE_STATE`:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| `0x00` | 2 | Visit token, echoed from the open command. |
+| `0x02` | 1 | State: `0` closed, `1` waiting, `2` inviting, `3` invited, `4` ready. |
+| `0x03` | 1 | Notice: `0` none, `1` declined, `2` timeout, `3` busy, `4` canceled, `5` disconnected. |
+| `0x04` | 1 | Number of selectable peers, `0`–`4`; zero outside waiting. |
+| `0x05` | 16 | Partner ASCII ID, zero-padded; all zero outside an invitation/ready handoff. |
+| `0x15` | count × 16 | Sorted selectable ASCII IDs, each zero-padded to 16 bytes. |
+
+Length is exactly `21 + 16 * count`. IDs follow the protocol's 1–16 ASCII
+letter/digit/underscore/hyphen rule. The ROM rejects invalid lengths, tokens,
+counts, states, notices and IDs before copying, then converts IDs to native
+glyphs for display. It preserves the selected identity across list refreshes.
+Socket loss closes the native task via `lua_connected`; reconnect/reset drops
+the Lua state and requires a fresh open command. Full behavior and test steps:
+[trade-attendant.md](trade-attendant.md).
 
 ### Presence payload
 

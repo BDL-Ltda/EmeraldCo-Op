@@ -43,6 +43,14 @@ local function fixture()
 		errors = errors, messages = messages, pipe = pipe }
 end
 
+tests["single-slot attendant controls reach the dispatcher unchanged"] = function()
+	local f = fixture()
+	local bytes = string.pack("<BI2", 2, 7) .. "alice"
+	f.outbound[1] = { type = mailbox.MSG.TRADE_COMMAND, payload = bytes }
+	f.pipe.drainOutbound()
+	h.same(f.messages, { { type = mailbox.MSG.TRADE_COMMAND, data = bytes } })
+end
+
 tests["outbound mailbox presence reaches network and panel without struct reads"] = function()
 	local f = fixture()
 	f.outbound[1] = { type = mailbox.MSG.PRESENCE, payload = assert(mailbox.encodePresence(presence())) }

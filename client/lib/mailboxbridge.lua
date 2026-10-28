@@ -71,6 +71,8 @@ function M.new(box, client, view, logError, onMessage)
 				local msgType, data, dropped = reassembler:feed(message.payload)
 				if dropped then logError("[bridge] mailbox: " .. dropped) end
 				if msgType and onMessage then onMessage(msgType, data) end
+			elseif message.type == mailbox.MSG.TRADE_COMMAND and onMessage then
+				onMessage(message.type, message.payload)
 			end
 		end
 	end

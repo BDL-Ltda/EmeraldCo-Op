@@ -628,4 +628,34 @@ tests["late callbacks from a closed socket cannot affect the replacement"] = fun
 	h.eq(w.client.isConnected(), true)
 end
 
+tests["trade controls share the connection budget and socket backpressure"] = function()
+	local w = joined()
+	local protocol = require("protocol")
+	local invite = protocol.tradeInvite("bernardo", "davi")
+	for _ = 1, 50 do w.client:sendTrade(invite) end
+	local sent = w.sock().take()
+	-- hello, ping and presence already used part of this second's budget.
+	assert(#sent > 0 and #sent < net.MAX_MESSAGES_PER_SECOND)
+	for _, m in ipairs(sent) do h.eq(m.type, "trade_invite") end
+	h.eq(w.client:sendTrade(invite), false)
+	w.step(1000)
+	w.sock().accept = 0
+	assert(w.client:sendTrade(invite)) -- One held partial line, no backlog.
+	for _ = 1, 50 do h.eq(w.client:sendTrade(invite), false) end
+	w.sock().accept = nil
+	w.step(16)
+	h.eq(#w.sock().take(), 1)
+	w.client:close("test reset")
+	h.eq(w.client:sendTrade(invite), false)
+end
+
+tests["trade sender rejects wrong identity and session data"] = function()
+	local w = joined()
+	local protocol = require("protocol")
+	h.eq(w.client:sendTrade(protocol.tradeInvite("someone", "davi")), false)
+	h.eq(w.client:sendTrade(protocol.tradeInvite("bernardo", "bad id")), false)
+	h.eq(w.client:sendTrade(protocol.tradeLink("bernardo", "davi", 0, "00")), false)
+	h.eq(#w.sock().take(), 0)
+end
+
 return tests

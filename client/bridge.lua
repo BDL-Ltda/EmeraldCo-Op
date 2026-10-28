@@ -35,6 +35,7 @@ local mailboxbridge = require("mailboxbridge")
 local net = require("net")
 local netclock = require("netclock")
 local debugview = require("debugview")
+local trade = require("trade")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -85,7 +86,8 @@ local function drawPanel(text)
 	end
 end
 
-local pipe
+local pipe, attendant
+local tradeClock = netclock.new()
 -- The network client, or nil when config.lua's network settings are invalid.
 local client, nerr = net.new(config, {
 	-- mGBA's connect blocks the emulator until it succeeds or fails.
@@ -104,6 +106,7 @@ local client, nerr = net.new(config, {
 	onEvent = function(kind, data, now)
 		view:onEvent(kind, data, now)
 		if pipe then pipe:onEvent(kind, data) end
+		if attendant then attendant.onEvent(kind, data, tradeClock:tick(os.time())) end
 	end,
 })
 if not client then
@@ -129,6 +132,7 @@ end
 local function verifyRom()
 	-- A different ROM may already occupy RAM here; never write the old address.
 	if pipe then pipe.reset() end
+	if attendant then attendant.reset() end
 	pipe, box, ready, lastMailboxError = nil, nil, false, nil
 	view:setPlayerState(nil)
 	if client then
@@ -158,12 +162,19 @@ local function verifyRom()
 		lastMailboxError = reason
 		console:log("[bridge] waiting for mailbox: " .. reason)
 	end
-	-- Multi-slot messages (mailbox layout v2) are reassembled by the pipe. No
-	-- ROM message type is forwarded to the network yet (trading, #78/#81).
+	-- Trade controls and snapshots use the existing mailbox; no extra RAM
+	-- address or dependency on the remote sprite slots is needed.
+	attendant = client and trade.new(config.PLAYER_ID, {
+		send = function(message) return client and client:sendTrade(message) end,
+		disconnect = function() if client then client:close("trade control queue full") end end,
+		publish = function(bytes) return pipe and pipe.sendMessage(mailbox.MSG.TRADE_STATE, bytes) end,
+	})
 	pipe = mailboxbridge.new(box, client or { setPlayerState = function() end }, view,
 		function(line) console:error(line) end,
 		function(msgType, data)
-			console:log(string.format("[bridge] ignoring mailbox message type %d (%d bytes)", msgType, #data))
+			if attendant and msgType == mailbox.MSG.TRADE_COMMAND then
+				attendant.command(data, tradeClock:tick(os.time()))
+			end
 		end)
 end
 
@@ -206,6 +217,7 @@ local function updateNet()
 	if pipe and ready then
 		pipe.drainOutbound()
 		if client then client:update(now) end
+		if attendant then attendant.update(tradeClock:tick(os.time())) end
 		pipe.flushInbound()
 	end
 	local text = view:update(now)
