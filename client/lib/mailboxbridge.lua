@@ -1,15 +1,24 @@
--- Moves validated presence between the ROM mailbox and the network client.
+-- Moves validated presence between the ROM mailbox and the network client,
+-- and multi-slot messages (mailbox layout v2, lib/fragments.lua) both ways.
 -- The mailbox and network client are injected so this module stays pure.
 local mailbox = require("mailbox")
+local fragments = require("fragments")
 
 local M = { MAX_OUTBOUND_PER_FRAME = 15 }
 
-function M.new(box, client, view, logError)
+-- onMessage(type, data), optional: called with each complete multi-slot
+-- message from the ROM. Without it those messages are dropped.
+function M.new(box, client, view, logError, onMessage)
 	local connected, active = false, false
 	local players, slots, leaving = {}, {}, {}
+	local sender, reassembler = fragments.newSender(), fragments.newReassembler()
 
+	-- Both directions drop an incomplete multi-slot message: the other side
+	-- drops its part when the next message starts with fragment 0.
 	local function forget()
 		players, slots, leaving = {}, {}, {}
+		sender:clear()
+		reassembler:reset()
 	end
 
 	local bridge = {}
@@ -58,8 +67,20 @@ function M.new(box, client, view, logError)
 				else
 					logError("[bridge] invalid outbound presence: " .. (decodeError or "unexpected length"))
 				end
+			elseif message.type == mailbox.MSG.FRAGMENT then
+				local msgType, data, dropped = reassembler:feed(message.payload)
+				if dropped then logError("[bridge] mailbox: " .. dropped) end
+				if msgType and onMessage then onMessage(msgType, data) end
 			end
 		end
+	end
+
+	-- Queues a multi-slot message for the ROM, sent in order after presence
+	-- over as many frames as it needs. Returns true, or false and a reason.
+	-- Only during a session: a disconnect drops what is still queued.
+	function bridge.sendMessage(msgType, data)
+		if not connected then return false, "not connected" end
+		return sender:send(msgType, data)
 	end
 
 	local function remove(id)
@@ -160,6 +181,8 @@ function M.new(box, client, view, logError)
 				end
 			end
 		end
+		local _, pushError = sender:pump(function(payload) return box:push(mailbox.MSG.FRAGMENT, payload) end)
+		if pushError and pushError ~= "mailbox inbound ring full" then logError("[bridge] " .. pushError) end
 	end
 
 	return bridge

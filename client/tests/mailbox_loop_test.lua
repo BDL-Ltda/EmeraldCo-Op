@@ -73,7 +73,7 @@ local function world()
 			self.bytes[address] = value
 		end
 		for i = 1, 4 do p.mem.bytes[BASE + i - 1] = ("COOP"):byte(i) end
-		p.mem.bytes[BASE + 4], p.mem.bytes[BASE + FLAGS] = 1, mailbox.FLAG_ROM_READY
+		p.mem.bytes[BASE + 4], p.mem.bytes[BASE + FLAGS] = mailbox.LAYOUT_VERSION, mailbox.FLAG_ROM_READY
 		p.box = mailbox.new(p.mem, BASE)
 		p.view = debugview.new("localhost", id)
 		p.client = assert(net.new({ SERVER_HOST = "localhost", SERVER_PORT = 8765, PLAYER_ID = id,

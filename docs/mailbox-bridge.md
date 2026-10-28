@@ -41,6 +41,16 @@ The ROM, its pin and the mailbox layout are unchanged.
   cannot reconnect from later frame callbacks. Late events from an old socket
   cannot affect its replacement.
 
+- [Multi-slot messages](memory-map.md#multi-slot-messages) (mailbox layout
+  v2): outbound `COOP_MSG_FRAGMENT` slots are reassembled with
+  `client/lib/fragments.lua`, and each complete message goes to the pipe's
+  `onMessage` handler; `bridge.lua` only logs them for now, since no message
+  type is forwarded to the network yet (trading, #78/#81). `sendMessage(type,
+  data)` queues a message for the ROM during a session; `flushInbound` streams
+  its fragments after the frame's `LEAVE`s and presence, over as many frames as
+  the ring needs. Disconnect, reset and `welcome` drop incomplete messages in
+  both directions.
+
 The pure `client/lib/mailboxbridge.lua` owns conversion and slot bookkeeping.
 `bridge.lua` alone binds emulator, socket and panel APIs. The panel's 30-second
 display expiry remains independent of ROM slots and server membership.
@@ -63,10 +73,11 @@ test below is still required; do not mark it done from simulated tests.
 ## Manual acceptance: two mGBA instances
 
 Use mGBA **0.10.5** and the client from this branch for both players. Use the
-ROM matching `client/addresses.lua` (CRC **97387731**, SHA1
-`ab60e843b809acf58943b8e90b156a3554deaade`). ROM source pin:
-`e4ccbcf592850b8199af0ccf22b84cfdf227aca5`. Build as described in the root
-README if needed. No ROM or save may be committed or uploaded as evidence.
+ROM matching `client/addresses.lua` (its `romCrc32` and `romSha1`), built
+from the `rom` submodule pin of the same commit. The #26 acceptance used CRC
+**97387731**, SHA1 `ab60e843b809acf58943b8e90b156a3554deaade` and ROM pin
+`e4ccbcf592850b8199af0ccf22b84cfdf227aca5`; mailbox layout v2 (#77) changed
+the ROM. Build as described in the root README if needed. No ROM or save may be committed or uploaded as evidence.
 
 1. Start the server. For a localhost-only test in PowerShell:
 
