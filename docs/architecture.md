@@ -10,6 +10,7 @@ This document records the design agreed in [issue #2](https://github.com/BDL-Ltd
 | `cmd/server/` | Go relay server entry point. |
 | `cmd/fakeclient/` | Go client that simulates square, idle and warp patterns without an emulator; see [fakeclient.md](fakeclient.md). |
 | `cmd/echoserver/` | Line echo server for testing client sockets ([mgba-scripting.md](mgba-scripting.md)); not the relay. |
+| `cmd/joybusprobe/` | Disposable probe for mGBA's Dolphin JOY Bus link ([connection-options.md](connection-options.md)); not part of the client or relay. |
 | `cmd/symgen/` | Go tool that generates Lua global addresses from the ROM build's ELF. |
 | `internal/` | Shared Go implementation packages. |
 | `client/` | mGBA Lua scripts, local configuration and generated addresses. |
