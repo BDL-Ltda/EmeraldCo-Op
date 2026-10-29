@@ -272,8 +272,9 @@ the wrong transport.
   Default-PIE suite runs here repeatedly emitted `AddressSanitizer:DEADLYSIGNAL`
   before the first presence result; isolated tests also passed. The local
   difference remains unexplained. No sanitizer was disabled
-  and the runner's default compiler flags were not changed. CI's default run
-  remains to be checked separately.
+  and the runner's default compiler flags were not changed. The unmodified
+  default C runner, ARM build and generated-address check passed in PR #94's
+  Linux CI run `40895584490`, together with Go and Lua.
 - **Two-instance trade and reload recorded:** see the observations below. The
   initial input regression was corrected and retested. Functional field return
   and persistence passed on the corrected build at baseline and nominal 50,
