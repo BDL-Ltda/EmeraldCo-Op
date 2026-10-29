@@ -10,13 +10,13 @@ The initial time box is three working days, as suggested in the ticket.
 Can the vanilla `rom/src/trade.c` screens work through a block-level adapter,
 without emulating the cable's serial interrupts over the internet?
 
-The source inspection and the initial two-instance video support continuing
-with the virtual link: the original screens exchanged parties, animated the
-trade, evolved both received Pokemon, displayed saving and redrew the field.
-The tester subsequently reported that movement remained blocked after the trade.
-**The final go/no-go decision is pending a functional field-return retest,
-persistence-after-reload and the 50–200 ms latency results below.** Host doubles
-cannot establish those results.
+The source inspection and two-instance recordings support continuing with the
+virtual link: the original screens exchanged parties, animated the trade,
+evolved both received Pokemon and saved them. The initial build redrew the map
+without restoring player input; the corrected build's 2026-10-29 retest confirms
+movement, working menus and the received parties after restarting both games.
+**The final go/no-go decision is pending the 50–200 ms latency results below.**
+Host doubles cannot establish those results.
 If the experiment fails, record the failing screen and reason before deciding
 whether to change the adapter or re-plan #81/#83 around a separate trade flow.
 
@@ -216,7 +216,8 @@ the wrong transport.
 
 | Run | Screens reached A/B | Party bytes / summary / confirm | Evolution / save / reload | Return / presence | Error and elapsed time |
 | --- | --- | --- | --- | --- | --- |
-| No injected latency (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field drawn | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload pending | **Failed on initial build:** tester reported blocked movement after trade; corrected build needs retest. Production bridge presence pending | No native link-error screen in the 2m11s video and traces; post-trade input regression reported afterward. Recording includes user input time |
+| No injected latency, initial build (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field drawn | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload was not recorded in this run | **Failed on initial build:** tester reported blocked movement after trade. Superseded by corrected-build retest below | No native link-error screen in the 2m11s video and traces; post-trade input regression reported afterward. Recording includes user input time |
+| No injected latency, corrected build (2026-10-29; both local wrappers set to 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties, B Summary, both confirmations; post-trade party menus work | A receives Machamp, B receives Alakazam; both retain them after boot/title and Continue. Disk save inspection agrees | Menus respond on both sides; tester confirms walking in both games after trade. Production bridge presence not exercised | No native link-error screen in the supplied 2m01s trade video or 29s restart video; durations include user input time |
 | 50 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
@@ -229,7 +230,8 @@ the wrong transport.
   Built ROM SHA1: `10235a0df17fd71bb987ac58882a612194a14b78`, CRC32 `fac06040`.
   It restores input after trade/cancel and enables the saved Pokemon menu only
   for explicit fixtures. ARM build, regenerated addresses and host checks pass;
-  the corrected build's manual emulator retest is pending.
+  the corrected build's manual trade, evolution, field-input and reload checks
+  passed on 2026-10-29. The latency rows remain pending.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
   packages on the parent base. Lua: 246 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
@@ -247,10 +249,47 @@ the wrong transport.
   difference remains unexplained. No sanitizer was disabled
   and the runner's default compiler flags were not changed. CI's default run
   remains to be checked separately.
-- **Initial two-instance trade flow recorded:** see the video observations below.
-  Functional field return, persistence after reload, latency rows and post-trade
-  production-bridge presence still need evidence. Only disposable ROM/save copies
-  are used.
+- **Two-instance trade and reload recorded:** see the observations below. The
+  initial input regression was corrected and retested. Functional field return
+  and persistence passed on the corrected build; latency rows remain pending.
+  Production-bridge presence and the non-evolving/cancel paths have not been
+  exercised in the supplied recordings. Only disposable ROM/save copies are used.
+
+### Corrected-build retest: 2026-10-29
+
+`leomayca` supplied two private recordings (2m01.42s and 28.88s), using two
+independent mGBA 0.10.5 instances. Prepared parent revision: `e8f6e5a`; ROM fork,
+SHA1 and CRC32 are the corrected build listed above. Both copied ROM hashes were
+checked locally, and the isolated wrappers used fixture opt-in with 0 ms added
+one-way delay. ROM verification/startup logs are not visible in these recordings.
+The raw desktop videos and extracted frames are kept local, not published.
+
+| Recording / approximate offset | Observation |
+| --- | --- |
+| Trade, 0:00–0:20 | Reciprocal Kadabra/Machoke fixture parties; B opens Summary and returns; both reach the vanilla confirmation and standby screens. |
+| Trade, 0:22–0:51 | Both run the vanilla trade animation and show the received Pokemon. |
+| Trade, 0:53–1:20 | A's Machoke evolves into Machamp; B's Kadabra evolves into Alakazam. Both completion messages appear. |
+| Trade, 1:22–1:31 | Both show the vanilla saving message. |
+| Trade, about 1:32–1:40 | Both return to the field; A opens Start and its party, showing Machamp + Zigzagoon. |
+| Trade, about 1:46–2:01 | B opens its party, showing Alakazam + Zigzagoon; A opens Machamp's Summary. |
+| Restart, about 0:05–0:22 | Both games go through boot/title and Continue, then return to the saved map. This is a game restart, not a demonstrated closure/relaunch of the emulator processes. |
+| Restart, about 0:24–0:26 | Both party menus are visible again: Machamp + Zigzagoon on A, Alakazam + Zigzagoon on B. |
+
+The menus demonstrate responsive field input. Walking is not clearly shown in
+the recordings; the tester separately confirmed walking in **both** instances
+after the trade. This completes the functional field-return regression retest.
+
+A separate read-only inspection of the two updated disposable save files found
+both flash save slots valid, `FLAG_SYS_POKEMON_GET` set, and two party members in
+each latest save: Machamp level 25 + Zigzagoon level 10 on A, Alakazam level 25 +
+Zigzagoon level 10 on B. All four Pokemon checksums were valid. The inspection
+used the pinned `save.h`, `global.h`, `pokemon.h` and `pokemon.c` layouts,
+checksum, decryption and substructure-order rules; it did not modify any save.
+This supplements the restart video with evidence that the received parties and
+menu flag reached the disk saves, rather than only the current RAM party.
+
+No injected-delay acceptance, normal bridge presence, crash recovery or atomic
+distributed-save guarantee is inferred from this successful baseline.
 
 ### Initial two-instance flow: user-supplied video
 
@@ -315,10 +354,10 @@ A regression against the real adapter fails on the old code and passes after
 the fix for both the animation's null callback and cancel's link callback.
 The complete host suite passes with ASan/UBSan using `CC="cc -no-pie"`.
 
-The corrected ROM still needs a two-instance manual retest: finish the trade,
-walk and use the Start menu in both games, then reload the disposable saves
-without the spike scripts to check received Pokemon and normal movement.
-Do not count the original video or host regression as that acceptance result.
+The 2026-10-29 corrected-build retest above confirms the party menus, both saved
+received parties after restarting, and walking in both instances (tester
+confirmation). Count that retest as the correction's manual result, rather
+than the original video or host regression alone. Cancel remains unexercised.
 
 ### Missing Pokemon menu on early-game fixture saves
 
@@ -332,9 +371,9 @@ Explicit fixture opt-in now also sets `FLAG_SYS_POKEMON_GET` through vanilla
 `FlagSet`. The full trade save includes that flag along with the received party.
 Normal START leaves flags unchanged. The host regression fails before this fix
 and passes afterward, including the guard against flag changes without opt-in.
-After another full trade on the corrected build, close and reopen both copied
-ROMs without loading the spike scripts. Open Start > Pokemon and inspect the
-received species on both sides. This manual persistence check remains pending.
+The corrected-build restart video shows Start > Pokemon retaining the received
+species on both sides; read-only disk-save inspection also finds the menu flag
+set and the expected parties. The fixture-menu and persistence retest passed.
 
 ### First manual attempt: wire rejection corrected
 
