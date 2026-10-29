@@ -1,8 +1,9 @@
 # Virtual-link spike (#80)
 
-**Status: prototype, emulator acceptance pending.** This is an opt-in experiment,
+**Decision: GO for #81. Status: spike findings and emulator investigation complete;
+PR checks, human review and merge still apply.** This is an opt-in experiment,
 not the production backend from #81 or the trade-session controller from #83.
-Do not mark #80 complete or unblock those issues from a successful build alone.
+Close #80 through its approved PR before unblocking dependent implementation.
 The initial time box is three working days, as suggested in the ticket.
 
 ## Question and decision gate
@@ -15,12 +16,27 @@ virtual link: the original screens exchanged parties, animated the trade,
 evolved both received Pokemon and saved them. The initial build redrew the map
 without restoring player input; the corrected build's 2026-10-29 retest confirms
 movement, working menus and the received parties after restarting both games.
-The nominal 50 ms added-RTT run also completed trade, evolution, field return and
-reload on both sides. **The final go/no-go decision is pending the 100 and
-200 ms latency results below.**
-Host doubles cannot establish those results.
-If the experiment fails, record the failing screen and reason before deciding
-whether to change the adapter or re-plan #81/#83 around a separate trade flow.
+The nominal 50, 100 and 200 ms added-RTT runs also completed trade, evolution,
+saving, field return and game restart with the received parties on both sides.
+The recorded startup logs establish both peers' configured one-way delays;
+these are artificial link-data delays with frame scheduling, not independently
+measured internet RTTs.
+
+**Recommendation: GO. Implement the production virtual-link backend in #81
+and keep the vanilla trade flow for #83.** The party buffers, confirmation,
+animation, both evolution scenes and lockstep save can run over the existing
+mailbox/protocol transport without serial-interrupt emulation or a Cable Club
+room. The native UI completed the exercised path at all three delay settings,
+and game restarts plus disk-save inspection establish received-party persistence.
+There is no evidence here requiring a separate fork of the trade UI.
+
+This recommendation approves the approach, not this throwaway adapter for release.
+#81 must add bounded production session state, a 10-second peer-data timeout,
+clean cancellation before save, and working presence during/after the session.
+#83 owns full consent/session integration, received-Pokemon validation, audit
+confirmation and the Pokemon Center return point. Disconnect/save recovery,
+eggs, non-evolving trades, cancellation and broad compatibility testing remain
+production work; the spike does not establish atomic distributed saving.
 
 ## Prototype boundaries
 
@@ -205,24 +221,26 @@ the wrong transport.
    menu. Record the last `[link-spike] frame ... stage ... state ...` lines and
    the actual screen on **both** instances. Confirm all party icons/names match
    the other party, then open and leave Summary and reach confirmation.
-6. First cancel on both sides and verify return to the original field: walk in
-   each game, then open and close the Start menu. Restart both instances/scripts
-   between runs. Then use only disposable copies for
-   the full animation/evolution/save path. Reload both copied ROMs afterward
+6. Use only disposable copies for the full animation/evolution/save path. Walk
+   and open and close the Start menu after returning in both games. Restart
+   both instances/scripts between runs. Reload both copied ROMs afterward
    and verify the received Pokemon and position persisted. Check walking and
    the Start menu on both sides after the full trade as well.
 7. Repeat with the wrapper delays above. Note hangs or native link errors,
    rather than interpreting a lack of an error as successful transfer.
-8. After returning, reset Scripting and load `bridge.lua`; verify local and
-   remote presence again. Keep a sanitized result per row below.
+8. Supplemental production regression probes: cancel from the menu on both
+   sides, exercise a non-evolving trade, and switch back to `bridge.lua` after
+   returning to check local/remote presence. These have not been exercised in
+   the supplied recordings and are not claimed as passed; #81/#83 own their
+   production acceptance. Keep a sanitized result per row below.
 
 | Run | Screens reached A/B | Party bytes / summary / confirm | Evolution / save / reload | Return / presence | Error and elapsed time |
 | --- | --- | --- | --- | --- | --- |
 | No injected latency, initial build (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field drawn | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload was not recorded in this run | **Failed on initial build:** tester reported blocked movement after trade. Superseded by corrected-build retest below | No native link-error screen in the 2m11s video and traces; post-trade input regression reported afterward. Recording includes user input time |
 | No injected latency, corrected build (2026-10-29; both local wrappers set to 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties, B Summary, both confirmations; post-trade party menus work | A receives Machamp, B receives Alakazam; both retain them after boot/title and Continue. Disk save inspection agrees | Menus respond on both sides; tester confirms walking in both games after trade. Production bridge presence not exercised | No native link-error screen in the supplied 2m01s trade video or 29s restart video; durations include user input time |
 | 50 ms nominal added RTT (both recorded logs: 25 ms one way) | Both original menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties and both confirmation screens; Summary not repeated in this run | A receives Machamp, B receives Alakazam; both parties retained after game restart and Continue | Walking is visible on both sides; both party menus respond. Production bridge presence not exercised | No native link-error screen or unresolved stall in the 2m55.17s recording; includes startup and user input time |
-| 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
-| 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
+| 100 ms nominal added RTT (both recorded logs: 50 ms one way) | Both original menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties and both confirmation screens | Machamp on A, Alakazam on B; both retained after game restart and Continue | Both return to the field and open party menus. Production bridge presence not exercised | No native link-error screen or unresolved stall in the 2m37.45s recording; includes startup and user input time |
+| 200 ms nominal added RTT (both recorded logs: 100 ms one way) | Both original menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties and both confirmation screens | Machamp on A, Alakazam on B; both retained after game restart and Continue | Both return to the field and open party menus. Production bridge presence not exercised | No native link-error screen or unresolved stall in the 2m24.73s recording; includes startup and user input time |
 
 ## Verification so far
 
@@ -233,11 +251,15 @@ the wrong transport.
   It restores input after trade/cancel and enables the saved Pokemon menu only
   for explicit fixtures. ARM build, regenerated addresses and host checks pass;
   the corrected build's manual trade, evolution, field-input and reload checks
-  passed on 2026-10-29 at baseline and nominal 50 ms added RTT. The 100 and
-  200 ms latency rows remain pending.
-- `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
-  packages on the parent base. Lua: 246 tests pass; luacheck: no warnings/errors
-  in 37 tracked files. No production Go code changed.
+  passed on 2026-10-29 at baseline and nominal 50, 100 and 200 ms added RTT.
+- After rebasing onto parent `master` `b10b888` (the #79 trade-log merge),
+  `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all seven
+  packages. Lua: 246 tests pass; luacheck: no warnings/errors in 37 tracked
+  files. No production Go code changed in this spike.
+- Manual recordings used the existing protocol-v2 server built from `a6ef128`,
+  before that independent audit merge. This harness does not emit trade audit
+  confirmations. The rebased server is covered by the final automated checks;
+  the ROM revision and generated build identity are unchanged by the rebase.
 - The instrumented ARM build succeeds; `client/addresses.lua` is regenerated
   from that exact ELF/ROM. Build identity will be recorded with emulator results.
 - Lua harness tests cover guarded startup, waiting for a ready partner, filtering
@@ -254,10 +276,36 @@ the wrong transport.
   remains to be checked separately.
 - **Two-instance trade and reload recorded:** see the observations below. The
   initial input regression was corrected and retested. Functional field return
-  and persistence passed on the corrected build at baseline and nominal 50 ms
-  added RTT; the 100 and 200 ms latency rows remain pending.
+  and persistence passed on the corrected build at baseline and nominal 50,
+  100 and 200 ms added RTT.
   Production-bridge presence and the non-evolving/cancel paths have not been
   exercised in the supplied recordings. Only disposable ROM/save copies are used.
+
+### Nominal 100 and 200 ms added RTT: 2026-10-29
+
+`leomayca` supplied a 2m37.45s recording for 100 ms and a 2m24.73s recording for
+200 ms, using the corrected ROM and two independent mGBA 0.10.5 instances. Around
+0:42 in the first video, both consoles verify CRC32 `fac06040` and show roles
+0/1 with `injected one-way delay 50 ms`. Around 0:38 in the second, both consoles
+show the same ROM and `injected one-way delay 100 ms`. The prepared local
+wrappers match those settings. These are nominal added round trips, subject to
+frame scheduling and base latency; ping RTT is not a measurement of this delay.
+
+| Milestone | Nominal 100 ms video | Nominal 200 ms video |
+| --- | --- | --- |
+| Reciprocal party menus and confirmation | About 0:49–0:57 | About 0:43–0:51 |
+| Original trade animation and received Pokemon | About 0:58–1:29 | About 0:52–1:22 |
+| Machoke to Machamp on A, Kadabra to Alakazam on B | About 1:30–1:56 | About 1:23–1:48 |
+| Vanilla saving and return to the field | About 1:57–2:10 | About 1:49–2:02 |
+| Both party menus show the received evolved Pokemon | About 2:14–2:16 | About 2:04–2:06 |
+| Boot/title, Continue, and both received parties visible again | About 2:18–2:37; both parties at 2:36 | About 2:08–2:24; both parties at 2:24 |
+
+Both runs finish the full exercised path without a visible native link-error
+screen or unresolved stall. Their durations include loading, menus and restart
+input, so they are not transfer-time benchmarks. Some background desktop content
+obscures part of the first recording briefly; the startup logs and both final
+party results are visible. Raw recordings and extracted frames stay local.
+Together with the baseline and 50 ms runs, this supports the GO recommendation.
 
 ### Nominal 50 ms added RTT: 2026-10-29
 
@@ -284,8 +332,8 @@ are not delayed by these profiles.
 
 No native link-error screen or unresolved stall is visible. The full recording
 includes emulator startup, script loading, menu input and the final restarts;
-its duration is not a measured trade-transfer time. The remaining latency
-investigation is the nominal 100 and 200 ms profiles. Raw video and extracted
+its duration is not a measured trade-transfer time. The nominal 100 and 200 ms
+profiles were subsequently recorded above. Raw video and extracted
 desktop frames remain local; this document records the sanitized observations.
 
 ### Corrected-build retest: 2026-10-29
@@ -439,9 +487,9 @@ failed before the correction and passes afterward. Restart both copied ROMs
 and reload the scripts after updating an attempted session: this throwaway
 adapter does not reset/reconnect an already active virtual link in place.
 
-Before recommending go, fill in the emulator matrix and record the tested
-parent/fork revisions and sanitized logs. Production #81 still needs bounded
-session state, trustworthy role assignment, robust request sequencing, a
+The emulator matrix and corrected ROM identity support the GO recommendation
+above. Production #81 still needs bounded session state, trustworthy role
+assignment, robust request sequencing, a
 10-second peer timeout, clean cancellation before save, and coordinated
 handling of disconnects at save barriers. #83 owns the full consent/session
 flow and `trade_confirm` audit emission.
