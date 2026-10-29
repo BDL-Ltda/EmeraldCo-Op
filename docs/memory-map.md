@@ -357,6 +357,8 @@ client mirrors these values; never renumber one.
 | `2` | `COOP_MSG_LEAVE` | inbound | 1 byte: the remote slot (`0`–`3`) to free. See [Remote slots](#remote-slots). |
 | `3` | `COOP_MSG_FRAGMENT` | both | One slot of a multi-slot message (layout v2). See [Multi-slot messages](#multi-slot-messages). |
 | `4` | `COOP_MSG_DEBUG_ECHO` | both | Debug, sent as a multi-slot message: the ROM sends a received one back unchanged. Used by `client/debug/echo.lua`. |
+| `5` | `COOP_MSG_LINK_SPIKE` | both | Temporary opt-in #80 virtual-link experiment; see [contract and limits](virtual-link-spike.md#temporary-mailbox-contract). The normal bridge ignores it. |
+| `6` | `COOP_MSG_SPIKE_TRACE` | outbound | Temporary #80 local trace: stage `u8`, value little-endian `u16`. Never forwarded to the server. |
 
 ### Presence payload
 
