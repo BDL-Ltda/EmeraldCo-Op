@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>PR #92 — Co-op trade attendant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the {{...}} placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+.meta span{overflow-wrap:anywhere;min-width:0}pre{max-width:100%;overflow:auto;margin:10px 0 20px;font:inherit;white-space:pre}.seg{overflow-wrap:anywhere}.term{min-width:0}</style>
+</head>
+<body>
+<main>
+<header class="top"><span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#92</span>
+<h1>Invite a co-op trade partner at the Cable Club</h1>
+<p class="lede">A native peer list and a client-owned invitation flow bring two players to Ready. The actual Pokémon trade session remains #83.</p>
+<div class="meta"><span>references <b>#82 · draft</b></span><span>branch <b>feat/82-coop-trade-attendant</b></span><span>parent files <b>16</b></span><span>parent lines <b>+830 / −11</b></span><span>milestone <b>v1.5 Trading</b></span></div>
+<p class="small">ROM commit c53982f8d adds 18 changed files (+519 / −2) inside the submodule; the parent diff counts its pin as one file. Human multiplayer and emulator UI validation remain pending.</p>
+<ul class="toc"><li><a href="#big-picture">Big picture</a></li><li><a href="#how">How it works</a></li><li><a href="#detail">States</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#tested">Testing</a></li><li><a href="#next">Next</a></li><li><a href="#review">Review</a></li></ul></header>
+<section id="big-picture"><div class="prose"><span class="eyebrow">Big picture</span><h2>The attendant owns the place; Lua owns the invitation</h2><p>Issue #82 chooses the Pokémon Center 2F counter as the entry point. All towns share the Direct Corner script. The new Co-op trade option keeps the original Link services path and vanilla eligibility checks.</p></div><figure class="plate" data-anim style="margin:0"><div class="plate-head"><span class="cap">The existing transport carries a new invitation UI</span><button class="replay" type="button">Replay</button></div><div class="scroll"><svg viewBox="0 0 1000 310" role="img" aria-label="The ROM and Lua invitation state machine communicate through the existing mailbox and relay; Ready is the boundary for issue 83."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs><g class="step" style="--i:0"><rect class="box pub" x="20" y="70" width="205" height="64" rx="6"/><text x="34" y="95">Cable Club task</text><text class="t-sub" x="34" y="117">ROM: menu + peer list</text></g><g class="step" style="--i:1"><path class="edge em flow" d="M225 102H267" marker-end="url(#arrow)"/></g><g class="step" style="--i:1"><rect class="box pub" x="270" y="70" width="205" height="64" rx="6"/><text x="284" y="95">Mailbox v2</text><text class="t-sub" x="284" y="117">5: command / 6: state</text></g><g class="step" style="--i:2"><path class="edge em flow" d="M475 102H517" marker-end="url(#arrow)"/></g><g class="step" style="--i:2"><rect class="box pub" x="520" y="70" width="205" height="64" rx="6"/><text x="534" y="95">trade.lua</text><text class="t-sub" x="534" y="117">Target, deadline, lifecycle</text></g><g class="step" style="--i:3"><path class="edge em flow" d="M725 102H767" marker-end="url(#arrow)"/></g><g class="step" style="--i:3"><rect class="box " x="770" y="70" width="205" height="64" rx="6"/><text x="784" y="95">Go relay</text><text class="t-sub" x="784" y="117">Broadcast; no availability DB</text></g><g class="step" style="--i:4"><rect class="box pub" x="520" y="210" width="205" height="64" rx="6"/><text x="534" y="235">Ready handoff</text><text class="t-sub" x="534" y="257">partnerId + initiator</text></g><g class="step" style="--i:4"><path class="edge em flow" d="M622 134V207" marker-end="url(#arrow)"/></g><g class="step" style="--i:5"><rect class="box dim" x="770" y="210" width="205" height="64" rx="6"/><text x="784" y="235">#83 session</text><text class="t-sub" x="784" y="257">Party/link/save flow later</text></g><g class="step" style="--i:5"><path class="edge em flow" d="M725 242H767" marker-end="url(#arrow)"/></g></svg></div></figure></section>
+<section id="how"><div class="prose"><span class="eyebrow">How it works</span><h2>Availability is separate from overworld presence</h2><p>Waiting players appear even in different towns. Entering an invitation marks both peers unavailable. A third player receives the relay broadcast but cannot act on a message addressed to someone else.</p></div><figure class="plate" data-anim style="margin:0"><div class="plate-head"><span class="cap">One chosen partner; every receiver filters the broadcast</span><button class="replay" type="button">Replay</button></div><div class="scroll"><svg viewBox="0 0 1000 430" role="img" aria-label="Alice opens the attendant, invites Bob through the relay, and Bob accepts. Both enter Ready. Other peers ignore the invitation target."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs><g class="step" style="--i:0"><rect class="box pub" x="20" y="15" width="190" height="64" rx="6"/><text x="34" y="40">Alice ROM</text><text class="t-sub" x="34" y="62">Native attendant window</text></g><g class="step" style="--i:0"><rect class="box pub" x="265" y="15" width="190" height="64" rx="6"/><text x="279" y="40">Alice Lua</text><text class="t-sub" x="279" y="62">Invitation state</text></g><g class="step" style="--i:0"><rect class="box " x="510" y="15" width="190" height="64" rx="6"/><text x="524" y="40">Relay</text><text class="t-sub" x="524" y="62">Broadcast to every peer</text></g><g class="step" style="--i:0"><rect class="box pub" x="755" y="15" width="220" height="64" rx="6"/><text x="769" y="40">Bob Lua + ROM</text><text class="t-sub" x="769" y="62">Target checks + prompt</text></g><path class="life" d="M115 79V398"/><path class="life" d="M360 79V398"/><path class="life" d="M605 79V398"/><path class="life" d="M865 79V398"/><g class="step" style="--i:1"><text class="t-sub" x="124" y="111">OPEN → waiting</text><path class="edge em flow" d="M115 120H360" marker-end="url(#arrow)"/></g><g class="step" style="--i:2"><text class="t-sub" x="369" y="166">trade_invite (Bob)</text><path class="edge em flow" d="M360 175H605" marker-end="url(#arrow)"/></g><g class="step" style="--i:3"><text class="t-sub" x="614" y="221">Bob gets accept prompt</text><path class="edge em flow" d="M605 230H865" marker-end="url(#arrow)"/></g><g class="step" style="--i:4"><text class="t-sub" x="614" y="276">trade_accept (Alice)</text><path class="edge em ret" d="M865 285H605" marker-end="url(#arrow)"/></g><g class="step" style="--i:5"><text class="t-sub" x="369" y="331">Accept selected partner</text><path class="edge em ret" d="M605 340H360" marker-end="url(#arrow)"/></g><text class="t-mono t-em" x="290" y="413">READY</text><text class="t-mono t-em" x="820" y="413">READY</text></svg></div></figure><p class="small">The picture omits the availability messages around each transition. Decline, timeout and partner cancellation return to waiting; B on the waiting list closes the native task. Socket loss releases its script.</p></section>
+<section id="detail"><div class="prose"><span class="eyebrow">Under the hood</span><h2>Explore the states and the retry barrier</h2><p>Values come from <code>client/lib/trade.lua</code>. The native snapshot echoes a 16-bit visit token, state, notice, partner ID and at most four selectable IDs.</p></div><div class="plate" style="display:grid;gap:14px"><div class="bytes"><button class="seg " type="button"  data-title="Closed" data-value="0 · available=false" data-text="B at the waiting list or a disconnect leaves the attendant. A fresh visit token is needed after reconnect."><small>Closed</small>0</button><button class="seg " type="button"  data-title="Waiting" data-value="1 · available=true" data-text="Only connected, available peers appear. Town, map group and avatar visibility do not restrict this list."><small>Waiting</small>1</button><button class="seg " type="button"  data-title="Inviting" data-value="2 · available=false" data-text="Only the selected peer can accept or decline. The inviter may cancel with B. A 30-second deadline runs."><small>Inviting</small>2</button><button class="seg " type="button"  data-title="Invited" data-value="3 · available=false" data-text="A accepts; B declines back to waiting. No answer within 30 seconds declines automatically."><small>Invited</small>3</button><button class="seg crc" type="button" data-selected data-title="Ready" data-value="4 · available=false" data-text="Both clients expose the accepted partner and initiator role. Trading is not available yet; issue 83 consumes this handoff."><small>Ready</small>4</button><button class="seg " type="button"  data-title="Retry barrier" data-value="retiring[playerId]" data-text="A terminal reply drains the previous conversation before a retry. Old accepts are canceled; unmatched cancel acknowledgments do not loop."><small>Retry barrier</small>drain</button></div><div class="detail" aria-live="polite"></div></div></section>
+<section id="decisions"><div class="prose"><span class="eyebrow">Decisions</span><h2>Keep the invitation bounded and recoverable</h2></div><div class="decisions">
+<div class="decision"><h3>Reuse vanilla eligibility</h3><code>call CableClub_EventScript_CheckPartyTradeRequirements</code><div class="why"><b>Why</b><p>The issue requires vanilla rules. The shared script retains Pokédex and Bad Egg gates and checks two Pokémon and Enigma Berry restrictions before entering the new UI.</p></div></div>
+<div class="decision"><h3>Drain old replies before retrying</h3><code>retiring[partner] = true</code><div class="why"><b>Why</b><p>Protocol v2 has no invitation nonce. A terminal reply forms a FIFO barrier so an old accept cannot accept a new invitation. An active partner acknowledges once; unmatched cancels are ignored. Crossing invites keep the smaller ID as inviter.</p></div></div>
+<div class="decision"><h3>Share the existing transport budget</h3><code>client:sendTrade(message)</code><div class="why"><b>Why</b><p>Controls share the 20-message budget with ping and presence. Sixteen unsent controls are the bound; overflow closes the socket so leave removes stale availability. Native cancellation retries a full ring. No new socket, address or dependency is needed.</p></div></div>
+</div></section>
+<section id="tested"><div class="prose"><span class="eyebrow">How it was tested</span><h2>Captured local checks</h2><p>Go ran in the pinned Go 1.27.2 image. Lua used a source-only snapshot with no private config and no network. Native task tests ran with ASan/UBSan and engine doubles; the ARM build checked the production headers/scripts.</p></div>
+<div class="term"><div>$ go vet ./... &amp;&amp; go test -race ./...; then cmd/symgen</div><pre>ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/echoserver	1.040s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	6.236s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	2.044s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	1.058s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	1.093s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	4.272s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog	1.093s
+symgen: wrote client/addresses.lua</pre><div>$ lua5.4 client/tests/run.lua &amp;&amp; luacheck client/</div><pre>256 passed, 0 failed (16 suites)
+Total: 0 warnings / 0 errors in 35 files</pre><div>$ sh rom/tests/coop/run.sh</div><pre>PASS coop presence: 7 test groups (ASan/UBSan)
+PASS coop mailbox: 6 test groups (ASan/UBSan)
+4 trade task/decoder test groups passed</pre><div>$ Docker ARM build</div><pre>Building pokeemerald with arm-none-eabi-gcc (devkitARM) 16.1.0, jobs=8...
+ca292cad6d08f5b434ec26d59f24c1fe20a7c693  pokeemerald_modern.gba</pre></div>
+<p><strong>Not yet tested by humans:</strong> two/three mGBA instances in different towns, native layout and every acceptance path. Davi requested the PR stay in draft for that later test. Automated checks do not substitute for the required two-developer result.</p></section>
+<section id="next"><div class="prose"><span class="eyebrow">What comes next</span><h2>Ready is a handoff, not a saved trade</h2><p>The current screen explicitly says “Trading is not available yet.” #83 must consume <code>getSession()</code>, start the session at both clients and own party/link/save behavior. The complete issue acceptance remains open.</p></div><figure class="plate" data-anim style="margin:0"><div class="plate-head"><span class="cap">The invitation UI prepares the session dependency</span><button class="replay" type="button">Replay</button></div><div class="scroll"><svg viewBox="0 0 1000 200" role="img" aria-label="The attendant and virtual link are separate dependencies of the trade session."><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs><g class="step" style="--i:0"><rect class="box pub" x="30" y="30" width="260" height="64" rx="6"/><text x="44" y="55">#82 attendant</text><text class="t-sub" x="44" y="77">This draft: invitations + Ready</text></g><g class="step" style="--i:0"><rect class="box dim" x="30" y="115" width="260" height="64" rx="6"/><text x="44" y="140">#81 virtual link</text><text class="t-sub" x="44" y="162">Separate implementation</text></g><g class="step" style="--i:1"><path class="edge em flow" d="M290 62H490V100H650" marker-end="url(#arrow)"/></g><g class="step" style="--i:1"><path class="edge em flow" d="M290 147H490V100" marker-end="url(#arrow)"/></g><g class="step" style="--i:2"><rect class="box dim" x="655" y="68" width="295" height="64" rx="6"/><text x="669" y="93">#83 trade session</text><text class="t-sub" x="669" y="115">Actual trade screen + party/save</text></g></svg></div></figure></section>
+<section id="review"><div class="prose"><span class="eyebrow">For the reviewer</span><h2>Check cleanup before the session integration</h2><p>Start with <code>docs/trade-attendant.md</code>, <code>client/lib/trade.lua</code> and the linked ROM commit. Ticks below are local to your browser.</p></div>
+<div class="checks"><label class="check"><input type="checkbox" id="review-0"><span>Does every reply require both the selected partner and our target ID?</span></label><label class="check"><input type="checkbox" id="review-1"><span>Do delayed accepts, crossing invites and terminal acknowledgments settle without a loop?</span></label><label class="check"><input type="checkbox" id="review-2"><span>Does B retry a full outbound ring and does disconnect release the native script?</span></label><label class="check"><input type="checkbox" id="review-3"><span>Have two named developers recorded the different-town, third-player and timeout tests?</span></label></div>
+<div class="limits"><div class="limit"><b>#82 remains open</b><span>Draft, multiplayer/UI validation pending. No closing issue references were present in the verified GitHub query.</span></div><div class="limit"><b>#83 session</b><span>Acceptance currently stops at Ready; party data and saves remain unchanged.</span></div></div></section>
+<footer>Built with the project pr-walkthrough template. Sources: parent b09921d, ROM c53982f8d, issue #82 and captured test output. <a href="https://github.com/BDL-Ltda/EmeraldCo-Op/pull/92">Open draft PR #92</a>.</footer>
+</main>
+
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
