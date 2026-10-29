@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>PR 94 — Vanilla trades over the virtual link</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* pr-walkthrough template. Keep the tokens and classes; replace the page content placeholders.
+   Layout: one reading column (~62ch) with full-width diagram plates; each section = one idea; SVG diagrams animate in order when scrolled to and can be replayed. */
+:root {
+  --paper: #f2f5f3;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #cfd9d3;
+  --panel: #e5ece8;
+  --plate: #fbfcfb;
+  --emerald: #0d7a52;
+  --amber: #a5650f;
+  --danger: #b3261e;
+  --code-bg: #14201b;
+  --code-fg: #d6e6dd;
+  --code-dim: #7f978b;
+  --code-ok: #6fd6a6;
+  --code-bad: #ff9a92;
+  --font-display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+    --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+    --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f1714; --ink: #e2ebe6; --muted: #98aaa1; --rule: #2a3a33; --panel: #17241f; --plate: #121c18;
+  --emerald: #43c995; --amber: #e0a24a; --danger: #f2827a;
+  --code-bg: #0a110e; --code-fg: #cfe3d8; --code-dim: #6f877b; --code-ok: #6fd6a6; --code-bad: #ff9a92;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 1040px; margin: 0 auto; padding-block: 56px 96px; display: grid; gap: 72px; }
+section { display: grid; gap: 18px; min-width: 0; }
+.prose { max-width: 62ch; display: grid; gap: 12px; }
+.prose > * { margin: 0; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.05rem; font-family: var(--font-body); font-weight: 600; }
+p { margin: 0; }
+ul, ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+a { color: var(--emerald); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--panel); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--emerald); }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 58ch; }
+.small { font-size: 0.88rem; color: var(--muted); }
+
+/* header */
+header.top { display: grid; gap: 18px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 500; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding: 0; list-style: none; }
+.toc a { display: inline-block; font-size: 0.85rem; text-decoration: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; }
+.toc a:hover { border-color: var(--emerald); color: var(--emerald); }
+
+/* diagram plates */
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px; min-width: 0; }
+.plate-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plate-head .cap { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.replay { font: 500 0.78rem var(--font-mono); color: var(--emerald); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.replay:hover { border-color: var(--emerald); }
+.scroll { overflow-x: auto; }
+.scroll svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 22px; height: 12px; border: 2px solid var(--emerald); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.d { border-style: dashed; border-color: var(--amber); }
+.legend i.m { border-color: var(--rule); }
+.legend i.flow { border: 0; border-top: 2px dashed var(--emerald); height: 0; vertical-align: 3px; }
+
+/* svg vocabulary */
+svg text { fill: var(--ink); font-family: var(--font-body); font-size: 15px; }
+svg .t-mono { font-family: var(--font-mono); font-size: 14px; }
+svg .t-sub { fill: var(--muted); font-size: 12.5px; }
+svg .t-zone { fill: var(--muted); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; }
+svg .t-em { fill: var(--emerald); }
+svg .t-bad { fill: var(--danger); }
+svg .zone { fill: none; stroke: var(--rule); stroke-width: 1.5; }
+svg .box { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .box.pub { stroke: var(--emerald); stroke-width: 2; }
+svg .box.priv { stroke: var(--amber); stroke-width: 2; stroke-dasharray: 6 4; }
+svg .box.bad { fill: none; stroke: var(--danger); stroke-width: 1.5; }
+svg .box.dim { opacity: 0.6; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg .edge.em { stroke: var(--emerald); stroke-width: 2.2; }
+svg .edge.bad { stroke: var(--danger); stroke-width: 1.4; stroke-dasharray: 4 4; }
+svg .edge.ret { stroke-dasharray: 5 5; }
+svg .life { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 6; }
+svg .ah { fill: var(--muted); }
+svg .ah.em { fill: var(--emerald); }
+svg .ah.bad { fill: var(--danger); }
+svg .gate { fill: var(--plate); stroke: var(--emerald); stroke-width: 2; }
+svg .badge { fill: var(--emerald); }
+svg .badge-t { fill: var(--plate); font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
+svg .pulse { fill: var(--emerald); }
+
+/* animation: visible at rest; .play staggers groups in */
+.flow { stroke-dasharray: 8 8; animation: dashflow 1.1s linear infinite; }
+@keyframes dashflow { to { stroke-dashoffset: -16; } }
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.play .step { animation: appear 0.55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 0.5s); transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .flow { animation: none; }
+  .play .step { animation: none; }
+  svg .pulse { display: none; }
+}
+
+/* terminal */
+.term { background: var(--code-bg); color: var(--code-fg); font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.65; padding: 16px 18px; border-radius: 8px; overflow-x: auto; }
+.term div { white-space: pre; }
+.term .p { color: var(--code-ok); }
+.term .c { color: var(--code-dim); }
+.term .ok { color: var(--code-ok); }
+.term .bad { color: var(--code-bad); }
+.play.term div { animation: appear 0.4s ease both; animation-delay: calc(var(--i, 0) * 0.35s); }
+@media (prefers-reduced-motion: reduce) { .play.term div { animation: none; } }
+
+/* bps explorer */
+.bytes { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg { font: 500 0.88rem var(--font-mono); color: var(--ink); background: var(--panel); border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; cursor: pointer; display: grid; gap: 2px; text-align: left; min-width: 0; }
+.seg small { font: 400 0.7rem var(--font-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.seg.wide { flex: 1 1 200px; }
+.seg.crc { border-color: var(--emerald); }
+.seg[aria-pressed="true"] { background: var(--emerald); border-color: var(--emerald); color: var(--plate); }
+.seg[aria-pressed="true"] small { color: var(--plate); }
+.seg:focus-visible, .replay:focus-visible, .toc a:focus-visible, .check input:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+.segline { display: flex; justify-content: space-between; gap: 8px; font: 0.72rem var(--font-mono); color: var(--muted); }
+.detail { border-left: 3px solid var(--emerald); padding: 4px 0 4px 14px; min-height: 5.5em; max-width: 64ch; display: grid; gap: 4px; }
+.detail .v { font-family: var(--font-mono); color: var(--emerald); font-weight: 500; }
+
+/* decisions */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.decision { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.decision .why { border-left: 3px solid var(--amber); padding-left: 14px; display: grid; gap: 6px; }
+.decision .why b { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber); font-weight: 500; }
+
+/* tree */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 3px; overflow-x: auto; }
+.tree div { white-space: pre; }
+.tree .in { color: var(--emerald); }
+.tree .out { color: var(--danger); text-decoration: line-through; }
+.tree .note { color: var(--muted); font-family: var(--font-body); font-size: 0.8rem; }
+
+/* checklist */
+.checks { display: grid; gap: 8px; }
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; max-width: 70ch; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--emerald); }
+.limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.limit { border-top: 3px solid var(--amber); background: var(--panel); border-radius: 0 0 6px 6px; padding: 12px 14px; display: grid; gap: 4px; font-size: 0.92rem; min-width: 0; }
+.limit b { font-family: var(--font-mono); font-weight: 500; color: var(--amber); font-size: 0.8rem; }
+
+footer { font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 18px; }
+</style>
+</head>
+<body><main>
+<header class="top">
+  <span class="eyebrow">Knowledge transfer · BDL-Ltda/EmeraldCo-Op#94</span>
+  <h1>Vanilla trades can cross the virtual link</h1>
+  <p class="lede">The spike proves the full trade path between two mGBA instances. Keep the original screens and build the production transport in #81.</p>
+  <div class="meta"><span>closes <b>#80</b></span><span>branch <b>feat/80-virtual-link-spike</b></span><span>files <b>9</b></span><span>lines <b>+850 / −4</b></span><span>milestone <b>v1.5 Trading</b></span></div>
+  <ul class="toc"><li><a href="#big-picture">System</a></li><li><a href="#how">Flow</a></li><li><a href="#detail">Wait conditions</a></li><li><a href="#decisions">Decisions</a></li><li><a href="#tested">Evidence</a></li><li><a href="#review">Review</a></li></ul>
+</header>
+
+<section id="big-picture">
+  <div class="prose"><span class="eyebrow">Big picture</span><h2>Replace cable operations, keep trade.c</h2><p>Issue #80 asks whether the mailbox and server can carry the block-level operations used by the original game. This is a feasibility experiment. The ordinary bridge never sends the START command.</p></div>
+  <figure class="plate" data-anim style="margin:0">
+    <div class="plate-head"><span class="cap">The experiment's transport path</span><button class="replay" type="button">Replay</button></div>
+    <div class="scroll"><svg viewBox="0 0 1000 300" role="img" aria-label="Vanilla trade calls use the adapter, mailbox and Lua harness to reach the existing server and the other game.">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs>
+      <text class="t-zone" x="30" y="28">LOCAL GAME AND CLIENT</text>
+      <g class="step" style="--i:0"><rect class="box" x="30" y="65" width="180" height="65" rx="6"/><text x="45" y="91">Vanilla trade.c</text><text class="t-sub" x="45" y="113">Menus → evolution → save</text></g>
+      <g class="step" style="--i:1"><path class="edge em flow" d="M210 97H248" marker-end="url(#arrow)"/><rect class="box pub" x="250" y="65" width="210" height="65" rx="6"/><text x="265" y="91">Opt-in ROM adapter</text><text class="t-sub" x="265" y="113">Blocks, echo, barriers</text></g>
+      <g class="step" style="--i:2"><path class="edge em flow" d="M460 97H498" marker-end="url(#arrow)"/><rect class="box" x="500" y="65" width="170" height="65" rx="6"/><text x="515" y="91">Mailbox v2</text><text class="t-sub" x="515" y="113">Fragmented messages</text></g>
+      <g class="step" style="--i:3"><path class="edge em flow" d="M670 97H708" marker-end="url(#arrow)"/><rect class="box pub" x="710" y="65" width="260" height="65" rx="6"/><text x="725" y="91">Lua spike harness</text><text class="t-sub" x="725" y="113">Partner + sequence checks</text></g>
+      <g class="step" style="--i:4"><path class="edge em flow" d="M840 130V208" marker-end="url(#arrow)"/><rect class="box" x="710" y="210" width="260" height="65" rx="6"/><text x="725" y="236">Existing protocol-v2 server</text><text class="t-sub" x="725" y="258">trade_available / trade_link</text></g>
+      <g class="step" style="--i:5"><path class="edge em flow" d="M710 242H632" marker-end="url(#arrow)"/><rect class="box priv" x="30" y="210" width="600" height="65" rx="6"/><text x="45" y="236">Other mGBA instance: reverse path to its vanilla trade screens</text><text class="t-sub" x="45" y="258">Disposable ROM/save copies; no serial-interrupt emulation</text></g>
+    </svg></div>
+    <div class="legend"><span><i></i>Added experiment</span><span><i class="d"></i>Local game/save</span><span><i class="m"></i>Existing component</span></div>
+  </figure>
+</section>
+
+<section id="how">
+  <div class="prose"><span class="eyebrow">How it works</span><h2>The original state machines keep running</h2><p>The adapter exchanges real LinkPlayer identity and the original block buffers. It pumps from the main loop, so Summary, animation, evolution and saving can own the screen without stopping transport.</p></div>
+  <figure class="plate" data-anim style="margin:0"><div class="plate-head"><span class="cap">Logical stages, not a latency trace</span><button class="replay" type="button">Replay</button></div><div class="scroll">
+    <svg viewBox="0 0 1000 365" role="img" aria-label="Exchange identity and party blocks, run vanilla confirmation and evolution, synchronize save, then restore local field input.">
+      <defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah em" d="M0 0L10 5L0 10z"/></marker></defs>
+      <text class="t-mono" x="70" y="28">Role 0</text><text class="t-mono" x="820" y="28">Role 1</text><path class="life" d="M100 45V340M850 45V340"/>
+      <g class="step" style="--i:0"><path class="edge em flow" d="M100 72H850" marker-start="url(#flow-arrow)" marker-end="url(#flow-arrow)"/><text x="260" y="60">HELLO: native identity, version and progress</text></g>
+      <g class="step" style="--i:1"><path class="edge em flow" d="M100 125H850" marker-start="url(#flow-arrow)" marker-end="url(#flow-arrow)"/><text x="245" y="113">Party / mail / ribbons: local echo + peer blocks</text></g>
+      <g class="step" style="--i:2"><rect class="box" x="180" y="150" width="590" height="45" rx="6"/><text x="200" y="178">Vanilla menus → confirmation → animation → trade evolution</text></g>
+      <g class="step" style="--i:3"><path class="edge em flow" d="M100 235H850" marker-start="url(#flow-arrow)" marker-end="url(#flow-arrow)"/><text x="240" y="223">Standby generations synchronize the vanilla save stages</text></g>
+      <g class="step" style="--i:4"><rect class="box pub" x="180" y="263" width="590" height="55" rx="6"/><text x="200" y="286">Close virtual session; restore CB1_Overworld</text><text class="t-sub" x="200" y="306">Completion trace waits for both field callbacks and unlocked controls</text></g>
+      <text class="t-sub" x="210" y="348">Standby synchronization does not make two independent flash saves atomic.</text>
+    </svg></div></figure>
+</section>
+
+<section id="detail"><div class="prose"><span class="eyebrow">Under the hood</span><h2>“Finished” has to mean something real</h2><p>Select a condition to inspect why a screen can safely progress. These are the prototype's conditions, not production recovery guarantees.</p></div>
+  <div class="plate"><div class="bytes">
+    <button class="seg" type="button" data-selected data-title="Both sender bits" data-value="received mask = 3" data-text="The cable echoes the local block. The adapter must preserve that echo and the peer bit; a remote-only implementation leaves party exchange waiting forever."><small>Party exchange</small>Self + peer</button>
+    <button class="seg wide" type="button" data-title="Standby generation matches" data-value="local barrier = remote barrier" data-text="IsLinkTaskFinished waits for matching generations, an empty adapter queue and no active mailbox stream. Unconditional success would remove the save's intended synchronization."><small>Link task</small>Queue + stream + barrier</button>
+    <button class="seg crc" type="button" data-title="Input restored, not only graphics" data-value="CB1_Overworld + CB2_Overworld + unlocked" data-text="The first build redrew the map with callback1 still null. The corrected return callback reinstalls field input; both games' menus and walking were retested."><small>Return to field</small>Controls ready</button>
+  </div><div class="detail" aria-live="polite"></div></div>
+</section>
+
+<section id="decisions"><div class="prose"><span class="eyebrow">Decisions</span><h2>Three boundaries matter</h2></div>
+  <div class="decisions">
+    <div class="decision"><h3>Reuse the native screens</h3><code>SendBlock → mailbox → trade_link</code><div class="why"><b>Why</b><p>The issue already chooses vanilla trade.c. The spike confirms its buffers and wait conditions can cross this transport without rebuilding the user interface.</p></div></div>
+    <div class="decision"><h3>Pump outside the overworld</h3><code>CoopLinkSpike_Update()</code><div class="why"><b>Why</b><p>Menus and evolution replace the main callbacks. Transport tied only to the overworld would stop as soon as the trade begins.</p></div></div>
+    <div class="decision"><h3>Keep the experiment opt-in</h3><code>START: role + fixture flag</code><div class="why"><b>Why</b><p>Normal play leaves the adapter inactive. Only explicit disposable-save fixtures replace the party and enable its menu; valuable saves must not use them.</p></div></div>
+  </div>
+</section>
+
+<section id="tested"><div class="prose"><span class="eyebrow">How it was tested</span><h2>Four paired emulator runs, then reload</h2><p>leomayca used two independent mGBA 0.10.5 instances and a local server. Baseline and nominal 50, 100 and 200 ms added-RTT profiles completed the original trade, both evolutions, saving and field return. Restarting both games retained Machamp on A and Alakazam on B.</p><p>Both peers' recorded one-way settings were 25, 50 and 100 ms for the delayed profiles. This is artificial link-data delay plus scheduling, not a measured internet RTT. Raw desktop videos and saves remain private; the findings contain sanitized timelines.</p></div>
+  <div class="plate"><p><strong>Tested ROM</strong> · CRC32 <code>fac06040</code></p><p class="small">SHA1 <code>10235a0df17fd71bb987ac58882a612194a14b78</code></p><p class="small">The final rebuild reproduces this same hash, and symgen leaves addresses.lua unchanged.</p></div>
+  <h3>Actual command output</h3>
+  <p class="small">Go vet / race detector, Lua, lint, ROM host checks, and ARM build. The local C suite uses CC="cc -no-pie" with ASan/UBSan; the unchanged default runner also passed Linux CI.</p>
+  <pre class="term">ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/echoserver	1.025s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/fakeclient	6.229s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/server	2.040s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/cmd/symgen	1.039s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/protocol	1.060s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/room	4.228s
+ok  	github.com/DaviAlencastro/EmeraldCo-Op/internal/tradelog	1.072s</pre><pre class="term">246 passed, 0 failed (16 suites)</pre><pre class="term">Total: 0 warnings / 0 errors in 37 files</pre><pre class="term">PASS coop presence: 7 test groups (ASan/UBSan)
+PASS coop mailbox: 6 test groups (ASan/UBSan)
+PASS coop link spike: guarded entry, identity, backpressure, self echo, requests, barriers, close/reopen, return and bounds</pre><pre class="term">cd build/modern &amp;&amp; arm-none-eabi-ld -Map ../../pokeemerald_modern.map -T ../../ld_script_modern.ld --print-memory-usage -o ../../pokeemerald_modern.elf &lt;objs&gt; &lt;libs&gt;
+Build complete. Outputs are in rom/. Compare this ROM SHA1 with another developer:
+10235a0df17fd71bb987ac58882a612194a14b78  pokeemerald_modern.gba</pre>
+  <p class="small"><a href="https://github.com/BDL-Ltda/EmeraldCo-Op/pull/94/checks">Current CI checks</a> · <a href="https://github.com/BDL-Ltda/EmeraldCo-Op/blob/feat/80-virtual-link-spike/docs/virtual-link-spike.md">Full findings, native timeout points and evidence matrix</a></p>
+</section>
+
+<section id="review"><div class="prose"><span class="eyebrow">For the reviewer</span><h2>GO for the approach; production work stays separate</h2><p>Start with the findings and the pinned ROM adapter. These ticks are stored only in this browser.</p></div>
+  <div class="checks">
+    <label class="check"><input type="checkbox" id="inactive"><span>Does ordinary play keep the prototype inactive, and is fixture party replacement explicitly opt-in?</span></label>
+    <label class="check"><input type="checkbox" id="waits"><span>Do self echo, received bits and standby generations preserve the waits used by vanilla trade and save?</span></label>
+    <label class="check"><input type="checkbox" id="evidence"><span>Does the evidence support feasibility without claiming measured WAN latency or atomic distributed saving?</span></label>
+    <label class="check"><input type="checkbox" id="closing"><span>The PR closes #80 only. Human approval and merge are still required.</span></label>
+  </div>
+  <div class="limits"><div class="limit"><b>#81 · Production transport</b><span>Bounded sessions, 10-second peer timeout, clean pre-save cancellation and presence during/after trade.</span></div><div class="limit"><b>#82 · Entry</b><span>Attendant and invite integration instead of a debug START.</span></div><div class="limit"><b>#83 · Full session</b><span>Pokémon validation and rules, audit confirmation, save/session handling and the Pokémon Center return point.</span></div></div>
+</section>
+<footer>Generated for BDL-Ltda/EmeraldCo-Op#94 by Codex with the pr-walkthrough skill. Based on the PR diff, issue #80 and the commands run for it. One developer ran two local emulator instances; this is not claimed as a two-developer test.</footer>
+</main>
+<script>
+(function () {
+  // Diagrams: content is visible by default; .play restarts the staggered entrance.
+  function play(el) { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); }
+  var anims = document.querySelectorAll("[data-anim]");
+  anims.forEach(function (fig) {
+    var btn = fig.querySelector(".replay");
+    if (btn) btn.addEventListener("click", function () { play(fig); });
+  });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { play(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.35 });
+    anims.forEach(function (fig) { io.observe(fig); });
+  }
+
+  // Explorers: each .bytes group drives the .detail that follows it.
+  document.querySelectorAll(".bytes").forEach(function (group) {
+    var detail = group.parentElement.querySelector(".detail");
+    var segs = group.querySelectorAll(".seg");
+    function select(btn) {
+      segs.forEach(function (b) { b.setAttribute("aria-pressed", b === btn ? "true" : "false"); });
+      detail.innerHTML = "";
+      var h = document.createElement("h3"); h.textContent = btn.dataset.title || "";
+      var v = document.createElement("span"); v.className = "v"; v.textContent = btn.dataset.value || "";
+      var p = document.createElement("p"); p.textContent = btn.dataset.text || "";
+      detail.append(h, v, p);
+    }
+    segs.forEach(function (b) { b.addEventListener("click", function () { select(b); }); });
+    if (segs.length) select(group.querySelector(".seg[data-selected]") || segs[0]);
+  });
+
+  // Reviewer checklist, remembered per browser and per page.
+  var KEY = "walkthrough-checks:" + location.pathname;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+  document.querySelectorAll(".checks input").forEach(function (cb) {
+    cb.checked = !!saved[cb.id];
+    cb.addEventListener("change", function () {
+      saved[cb.id] = cb.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>
