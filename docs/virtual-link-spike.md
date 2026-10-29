@@ -15,7 +15,9 @@ virtual link: the original screens exchanged parties, animated the trade,
 evolved both received Pokemon and saved them. The initial build redrew the map
 without restoring player input; the corrected build's 2026-10-29 retest confirms
 movement, working menus and the received parties after restarting both games.
-**The final go/no-go decision is pending the 50–200 ms latency results below.**
+The nominal 50 ms added-RTT run also completed trade, evolution, field return and
+reload on both sides. **The final go/no-go decision is pending the 100 and
+200 ms latency results below.**
 Host doubles cannot establish those results.
 If the experiment fails, record the failing screen and reason before deciding
 whether to change the adapter or re-plan #81/#83 around a separate trade flow.
@@ -218,7 +220,7 @@ the wrong transport.
 | --- | --- | --- | --- | --- | --- |
 | No injected latency, initial build (both logs: 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving, field drawn | Parties displayed reciprocally; both logs confirm Summary and return; both confirm screens | Both evolved; save path passed the signature barrier; reload was not recorded in this run | **Failed on initial build:** tester reported blocked movement after trade. Superseded by corrected-build retest below | No native link-error screen in the 2m11s video and traces; post-trade input regression reported afterward. Recording includes user input time |
 | No injected latency, corrected build (2026-10-29; both local wrappers set to 0 ms one way) | Both original trade menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties, B Summary, both confirmations; post-trade party menus work | A receives Machamp, B receives Alakazam; both retain them after boot/title and Continue. Disk save inspection agrees | Menus respond on both sides; tester confirms walking in both games after trade. Production bridge presence not exercised | No native link-error screen in the supplied 2m01s trade video or 29s restart video; durations include user input time |
-| 50 ms added RTT | Pending | Pending | Pending | Pending | Pending |
+| 50 ms nominal added RTT (both recorded logs: 25 ms one way) | Both original menus, confirmation, animation, evolution, saving and field | Reciprocal fixture parties and both confirmation screens; Summary not repeated in this run | A receives Machamp, B receives Alakazam; both parties retained after game restart and Continue | Walking is visible on both sides; both party menus respond. Production bridge presence not exercised | No native link-error screen or unresolved stall in the 2m55.17s recording; includes startup and user input time |
 | 100 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 | 200 ms added RTT | Pending | Pending | Pending | Pending | Pending |
 
@@ -231,7 +233,8 @@ the wrong transport.
   It restores input after trade/cancel and enables the saved Pokemon menu only
   for explicit fixtures. ARM build, regenerated addresses and host checks pass;
   the corrected build's manual trade, evolution, field-input and reload checks
-  passed on 2026-10-29. The latency rows remain pending.
+  passed on 2026-10-29 at baseline and nominal 50 ms added RTT. The 100 and
+  200 ms latency rows remain pending.
 - `go vet ./...` and uncached `go test -race -count=1 ./...` pass in all six
   packages on the parent base. Lua: 246 tests pass; luacheck: no warnings/errors
   in 37 tracked files. No production Go code changed.
@@ -251,9 +254,39 @@ the wrong transport.
   remains to be checked separately.
 - **Two-instance trade and reload recorded:** see the observations below. The
   initial input regression was corrected and retested. Functional field return
-  and persistence passed on the corrected build; latency rows remain pending.
+  and persistence passed on the corrected build at baseline and nominal 50 ms
+  added RTT; the 100 and 200 ms latency rows remain pending.
   Production-bridge presence and the non-evolving/cancel paths have not been
   exercised in the supplied recordings. Only disposable ROM/save copies are used.
+
+### Nominal 50 ms added RTT: 2026-10-29
+
+`leomayca` supplied a private 2m55.17s recording of the prepared 50 ms profiles,
+using the same corrected ROM and two independent mGBA 0.10.5 instances. Around
+0:48, **both** scripting consoles show ROM verification CRC32 `fac06040` and
+their respective roles with `injected one-way delay 25 ms`. The local wrapper
+settings match those recorded logs. This establishes the configured nominal
+50 ms added-RTT condition; it is not an independent measurement of exact wall
+clock packet latency. Frame scheduling and base latency also apply, and pings
+are not delayed by these profiles.
+
+| Approximate video offset | Observation |
+| --- | --- |
+| 0:38–0:48 | Both scripts verify the corrected ROM, join as `spike_a` / `spike_b`, and start roles 0 / 1 with 25 ms added one-way delay. |
+| 0:49–0:56 | Party exchange completes and both original menus display the reciprocal Kadabra/Machoke fixture parties. |
+| 0:57–1:03 | Both reach the vanilla confirmation and communication-standby screens. |
+| 1:04–1:36 | Both run the original animation and show the received Pokemon. |
+| 1:37–2:02 | Machoke evolves into Machamp on A; Kadabra evolves into Alakazam on B. |
+| 2:03–2:12 | Both display saving and finish the field transition. |
+| 2:13–2:26 | Both are back on the map; changes in position relative to map landmarks show walking in both games. |
+| 2:29–2:35 | Both party menus show the evolved received Pokemon and the remaining Zigzagoon. |
+| 2:36–2:55 | Both restart through boot/title and Continue. At about 2:54 both party menus again show Machamp + Zigzagoon on A and Alakazam + Zigzagoon on B. |
+
+No native link-error screen or unresolved stall is visible. The full recording
+includes emulator startup, script loading, menu input and the final restarts;
+its duration is not a measured trade-transfer time. The remaining latency
+investigation is the nominal 100 and 200 ms profiles. Raw video and extracted
+desktop frames remain local; this document records the sanitized observations.
 
 ### Corrected-build retest: 2026-10-29
 
