@@ -203,6 +203,28 @@ Added in v2 for v1.5 trading ([#29](https://github.com/BDL-Ltda/EmeraldCo-Op/iss
 {"v":2,"type":"trade_confirm","playerId":"leo","targetId":"davi","pokemon":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
 ```
 
+### Attendant client contract
+
+The [attendant implementation](trade-attendant.md) advertises `false` as soon
+as either side enters an invitation or Ready handoff, and `true` again on
+returning to waiting. It checks the 30-second deadline before accepting a
+reply. Only the selected known peer can complete/cancel an invitation;
+non-targets ignore addressed messages. Crossing invites keep the smaller
+`playerId` as inviter and show the other player the accept prompt.
+
+Because v2 has no invitation nonce, a local decline/cancel/timeout keeps that
+peer unselectable until a matching terminal reply drains the old conversation.
+An active partner acknowledges a terminal decline/cancel with one
+`trade_cancel` (`canceled`) before re-advertising. The original sender consumes
+that acknowledgment without replying; unmatched cancels are ignored. This
+prevents delayed accepts from applying to a later retry on the same socket.
+Replaced/disconnected peers and new connections discard the old state.
+
+Acceptance currently produces a Ready handoff (`partnerId`, initiator role)
+for #83. Until that issue implements the session, no `trade_link` or
+`trade_confirm` is sent by the attendant. Message shapes and server routing
+are unchanged.
+
 ### Trade flow
 
 ```mermaid

@@ -74,6 +74,14 @@ bytes for manual diagnosis. The file is not escrow or proof of saved trades.
 
 For the MVP, **leomayca hosts the server with port forwarding**. Access uses a **shared join key** and **basic limits**. The details of hosting, local configuration and limits belong to [#18](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/18) and [playing-online.md](playing-online.md). Never commit or publish the join key, public IPs or other secrets. `client/config.lua` is local-only; [client/config.example.lua](../client/config.example.lua) provides placeholder settings until the configuration loader is implemented.
 
+## Trade attendant (v1.5)
+
+The v1.5 [trade attendant](trade-attendant.md) adds client-owned waiting and
+invitation states at the shared Cable Club counter. The ROM owns its field UI;
+Lua owns availability, target filtering, timeouts and the accepted partner
+handoff. The relay remains stateless for availability. The actual trade session
+and party/save changes belong to #83; acceptance currently stops at Ready.
+
 ## v1 synchronization boundary
 
 **Presence is the only synchronized state in v1.** Players see each other in the overworld; saves, battles and items stay local. Trading, PvP battles and other shared gameplay belong to later versions and must be re-planned before implementation. See [ROADMAP.md](ROADMAP.md).

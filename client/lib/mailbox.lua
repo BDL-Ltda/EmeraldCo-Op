@@ -36,7 +36,9 @@ M.FLAG_LUA_CONNECTED = 0x01
 M.FLAG_ROM_READY = 0x02
 
 -- Message types, mirroring include/constants/coop.h (docs/memory-map.md#message-types).
-M.MSG = { NONE = 0, PRESENCE = 1, LEAVE = 2, FRAGMENT = 3, DEBUG_ECHO = 4 }
+M.MSG = { NONE = 0, PRESENCE = 1, LEAVE = 2, FRAGMENT = 3, DEBUG_ECHO = 4,
+	-- 5/6 belong to the parallel virtual-link spike (PR #94).
+	TRADE_COMMAND = 7, TRADE_STATE = 8 }
 
 local Mailbox = {}
 Mailbox.__index = Mailbox
