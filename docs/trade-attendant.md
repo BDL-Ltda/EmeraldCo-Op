@@ -35,7 +35,8 @@ reads game structs through hard-coded addresses. See the
 
 Both invitation states have a **30-second** deadline, checked before inputs
 and network replies as well as each update. The bridge uses the existing
-wall-clock-bounded, monotonic `netclock` so fast-forward cannot accelerate it.
+wall-clock-bounded, monotonic `netclock`, ticked once per frame; mailbox commands
+and network events reuse that timestamp instead of advancing it with traffic.
 Timeout/decline returns to waiting with a notice. B at the waiting list closes
 the window and releases the script. A socket drop clears the mailbox connected
 flag; the native task releases the script and shows the unavailable-connection
@@ -62,6 +63,10 @@ most 16 unsent controls and retries under the existing socket budget (20
 messages per clock second, shared with ping/presence). Queue overflow closes
 the connection so the server's leave removes stale availability. UI snapshots
 coalesce while the mailbox is full; native cancel retries a full outbound ring.
+Attendant message types are 7/8, leaving 5/6 to the parallel #80 spike.
+The spike and attendant ROM branches still need a source merge and a fresh
+build/address generation when the second parent PR integrates; their separate
+ROM builds must not be mixed.
 
 ## Session boundary
 
@@ -114,3 +119,40 @@ screenshots/logs and results in the PR. At least two developers must test.
 
 Human multiplayer and emulator UI results must be recorded separately from
 automated tests; passing the latter does not complete this checklist.
+
+### Agent-operated local mGBA run (2026-11-02)
+
+Two independent mGBA 0.10.5 processes connected to a local protocol v2 server.
+Each used a separate copy of an in-game save, with the Pokédex and two Pokémon,
+at the Oldale Town 2F right-hand attendant. The agent pressed ordinary GBA
+buttons through mGBA's scripting input API; it did not write RAM, inject trade
+messages or use a save state. Each window was inspected in the foreground;
+evidence images were captured by `emu:screenshot` from each game separately.
+
+ROM source: `0a6d73511900567d1f5cbf406d345bf57329035e`; ROM SHA1:
+`5effc694a514624d9c746f5810ff0f96692dfc9b`; CRC32: `d2fdae80`.
+The corresponding ELF generated `client/addresses.lua`.
+
+Observed results:
+
+- A connected peer outside the attendant did not appear. Entering the second
+  attendant populated both lists with the correct IDs and underscores.
+- A invited B: A waited for a reply and B showed A's named accept prompt.
+  B declined; both returned to waiting and A displayed the decline notice.
+- A invited again, then canceled with B. A's window closed, B returned to
+  waiting with a cancellation notice and A disappeared from B's list.
+- An unanswered invitation was still pending at 27 real seconds and both
+  windows showed the timeout notice at 33 seconds. Reinviting worked afterward.
+- Accepting put both clients at Ready. B canceled that handoff; A returned to
+  waiting with a cancellation notice and B left the list.
+- Link services opened the original Cable Club menu (Trade Center, Colosseum,
+  Exit). Canceling its save prompt returned to the field.
+- Stopping the isolated server during an invitation closed both trade windows
+  and displayed the unavailable-connection message. After server restart and
+  re-entry, both lists repopulated without an old invitation.
+- Closing B while waiting removed B from A's list.
+
+Game-only evidence is included in the [PR #92 walkthrough](https://raw.githack.com/BDL-Ltda/EmeraldCo-Op/walkthroughs/pr-92.html#tested).
+This run does not claim the separate requirement for two named human developers.
+Different towns, a third emulator, one-Pokémon rejection, Bad Egg/Enigma Berry
+fixtures and the actual #83 session remain pending emulator acceptance tests.

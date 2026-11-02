@@ -87,7 +87,7 @@ local function drawPanel(text)
 end
 
 local pipe, attendant
-local tradeClock = netclock.new()
+local networkNow = 0
 -- The network client, or nil when config.lua's network settings are invalid.
 local client, nerr = net.new(config, {
 	-- mGBA's connect blocks the emulator until it succeeds or fails.
@@ -106,7 +106,7 @@ local client, nerr = net.new(config, {
 	onEvent = function(kind, data, now)
 		view:onEvent(kind, data, now)
 		if pipe then pipe:onEvent(kind, data) end
-		if attendant then attendant.onEvent(kind, data, tradeClock:tick(os.time())) end
+		if attendant then attendant.onEvent(kind, data, now) end
 	end,
 })
 if not client then
@@ -173,7 +173,7 @@ local function verifyRom()
 		function(line) console:error(line) end,
 		function(msgType, data)
 			if attendant and msgType == mailbox.MSG.TRADE_COMMAND then
-				attendant.command(data, tradeClock:tick(os.time()))
+				attendant.command(data, networkNow)
 			end
 		end)
 end
@@ -183,7 +183,6 @@ end
 -- per-second limit (lib/netclock.lua). Socket events are only polled once per
 -- frame, so a finer clock would not measure latency any better.
 local clock = netclock.new()
-local networkNow = 0
 local function updateNet()
 	local now = clock:tick(os.time())
 	networkNow = now
@@ -217,7 +216,7 @@ local function updateNet()
 	if pipe and ready then
 		pipe.drainOutbound()
 		if client then client:update(now) end
-		if attendant then attendant.update(tradeClock:tick(os.time())) end
+		if attendant then attendant.update(now) end
 		pipe.flushInbound()
 	end
 	local text = view:update(now)

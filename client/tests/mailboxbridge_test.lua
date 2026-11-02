@@ -51,6 +51,21 @@ tests["single-slot attendant controls reach the dispatcher unchanged"] = functio
 	h.same(f.messages, { { type = mailbox.MSG.TRADE_COMMAND, data = bytes } })
 end
 
+tests["virtual-link spike types cannot be dispatched as attendant commands"] = function()
+	local f = fixture()
+	local fragments = require("fragments")
+	for _, kind in ipairs({ 5, 6 }) do
+		f.outbound[#f.outbound + 1] = { type = kind, payload = "spike" }
+		for _, payload in ipairs(assert(fragments.split(kind, "spike"))) do
+			f.outbound[#f.outbound + 1] = { type = mailbox.MSG.FRAGMENT, payload = payload }
+		end
+	end
+	f.pipe.drainOutbound()
+	for _, message in ipairs(f.messages) do assert(message.type ~= mailbox.MSG.TRADE_COMMAND) end
+	h.eq(mailbox.MSG.TRADE_COMMAND, 7)
+	h.eq(mailbox.MSG.TRADE_STATE, 8)
+end
+
 tests["outbound mailbox presence reaches network and panel without struct reads"] = function()
 	local f = fixture()
 	f.outbound[1] = { type = mailbox.MSG.PRESENCE, payload = assert(mailbox.encodePresence(presence())) }

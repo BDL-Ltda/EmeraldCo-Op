@@ -6,6 +6,7 @@ local tests = {}
 local function bridge(validRom)
 	local handlers, lines, logs, outbound, states, inbound, wire = {}, {}, {}, {}, {}, {}, {}
 	local buffer = {}
+	local clocks = {}
 	function buffer.clear() lines[#lines + 1] = "" end
 	function buffer.setSize(_, cols, rows) assert(cols >= 80 and rows >= 4) end
 	function buffer.moveCursor(_, x, y) h.eq(x, 0); buffer.row = y end
@@ -62,6 +63,17 @@ local function bridge(validRom)
 			error("unexpected file")
 		end,
 		require = function(name)
+			if name == "netclock" then
+				return { new = function()
+					local real = require("netclock").new()
+					local record = { ticks = 0 }
+					clocks[#clocks + 1] = record
+					return { tick = function(_, seconds)
+						record.ticks = record.ticks + 1
+						return real:tick(seconds)
+					end }
+				end }
+			end
 			if name == "romcheck" then
 				return { verify = function() return box.romValid ~= false and validRom, "ROM fixture" end }
 			end
@@ -74,7 +86,7 @@ local function bridge(validRom)
 	}, { __index = _G })
 	assert(loadfile("client/bridge.lua", "t", env))()
 	return { handlers = handlers, lines = lines, logs = logs, box = box,
-		outbound = outbound, client = client, states = states, inbound = inbound, wire = wire }
+		outbound = outbound, client = client, states = states, inbound = inbound, wire = wire, clocks = clocks }
 end
 
 tests["the bridge reads the mailbox every frame and updates its panel"] = function()
@@ -192,6 +204,22 @@ tests["attendant commands and targeted replies cross the real bridge, including 
 	welcome()
 	command(trade.COMMAND.OPEN, 1) -- ROM token restarts at one after soft reset.
 	h.eq(b.wire[#b.wire].available, true)
+end
+
+tests["trade traffic and mailbox commands reuse one clock tick per frame"] = function()
+	local b = bridge(true)
+	h.eq(#b.clocks, 1)
+	b.handlers.frame()
+	h.eq(b.clocks[1].ticks, 1)
+	b.client.adapter.onEvent("message", { type = "welcome", players = {} }, 0)
+	for _ = 1, 40 do b.client.adapter.onEvent("message", { type = "pong", t = 0 }, 0) end
+	h.eq(b.clocks[1].ticks, 1)
+	b.outbound[1] = { type = mailbox.MSG.TRADE_COMMAND, payload = string.pack("<BI2", 1, 1) }
+	for i = 2, 15 do
+		b.outbound[i] = { type = mailbox.MSG.TRADE_COMMAND, payload = string.pack("<BI2", 0, 1) }
+	end
+	b.handlers.frame()
+	h.eq(b.clocks[1].ticks, 2)
 end
 
 return tests

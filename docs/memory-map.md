@@ -357,8 +357,9 @@ client mirrors these values; never renumber one.
 | `2` | `COOP_MSG_LEAVE` | inbound | 1 byte: the remote slot (`0`–`3`) to free. See [Remote slots](#remote-slots). |
 | `3` | `COOP_MSG_FRAGMENT` | both | One slot of a multi-slot message (layout v2). See [Multi-slot messages](#multi-slot-messages). |
 | `4` | `COOP_MSG_DEBUG_ECHO` | both | Debug, sent as a multi-slot message: the ROM sends a received one back unchanged. Used by `client/debug/echo.lua`. |
-| `5` | `COOP_MSG_TRADE_COMMAND` | outbound | Single-slot attendant command, 3–19 bytes. See below. |
-| `6` | `COOP_MSG_TRADE_STATE` | inbound | Complete attendant snapshot, 21–85 bytes, sent through fragments. See below. |
+| `5`–`6` | reserved | spike | Allocated by the parallel virtual-link spike (PR #94); not attendant controls. |
+| `7` | `COOP_MSG_TRADE_COMMAND` | outbound | Single-slot attendant command, 3–19 bytes. See below. |
+| `8` | `COOP_MSG_TRADE_STATE` | inbound | Complete attendant snapshot, 21–85 bytes, sent through fragments. See below. |
 
 ### Trade attendant payloads
 
