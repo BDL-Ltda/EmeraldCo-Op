@@ -99,6 +99,19 @@ local function joined(config)
 	return w
 end
 
+tests["virtual-link data is sent only while joined, as our own valid trade_link"] = function()
+	local w = setup()
+	local message = { v = 2, type = "trade_link", playerId = "bernardo", targetId = "leo", seq = 0, data = "0901" }
+	h.eq(w.client:sendTradeLink(message), false)
+	w = joined()
+	h.eq(w.client:sendTradeLink({ v = 2, type = "trade_link", playerId = "leo", targetId = "bernardo",
+		seq = 0, data = "09" }), false)
+	h.eq(w.client:sendTradeLink({ v = 2, type = "trade_cancel", playerId = "bernardo", targetId = "leo",
+		reason = "canceled" }), false)
+	h.eq(w.client:sendTradeLink(message), true)
+	h.same(w.sock().take(), { message })
+end
+
 tests["invalid network settings disable networking with a clear error"] = function()
 	local env = { connect = function() error("must not connect") end, again = AGAIN, log = print, logError = print }
 	local cases = {

@@ -346,6 +346,19 @@ function M.new(config, env)
 		flush()
 	end
 
+	-- Virtual-link data for the trade partner (lib/virtuallink.lua). It shares
+	-- the ping/presence budget. Returns true once the message is queued, or
+	-- false while not joined or throttled: the caller keeps it for next frame.
+	function client.sendTradeLink(_, message)
+		if message.type ~= "trade_link" or message.playerId ~= config.PLAYER_ID or protocol.check(message) then
+			logError("[net] not sending an invalid trade_link")
+			return false
+		end
+		if not joined or not readyToSend() then return false end
+		send(message)
+		return sock ~= nil
+	end
+
 	-- Closes the connection, e.g. when the ROM changes or emulation stops.
 	-- The next update() reconnects once a verified game is running again.
 	function client.close(_, why)

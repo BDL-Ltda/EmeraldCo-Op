@@ -35,6 +35,8 @@ local mailboxbridge = require("mailboxbridge")
 local net = require("net")
 local netclock = require("netclock")
 local debugview = require("debugview")
+local virtuallink = require("virtuallink")
+local protocol = require("protocol")
 
 -- loadfile instead of require: a missing file must be a friendly error, and a
 -- reloaded script must read the current file, not a cached module.
@@ -85,7 +87,7 @@ local function drawPanel(text)
 	end
 end
 
-local pipe
+local pipe, link, linkTrigger
 -- The network client, or nil when config.lua's network settings are invalid.
 local client, nerr = net.new(config, {
 	-- mGBA's connect blocks the emulator until it succeeds or fails.
@@ -104,11 +106,31 @@ local client, nerr = net.new(config, {
 	onEvent = function(kind, data, now)
 		view:onEvent(kind, data, now)
 		if pipe then pipe:onEvent(kind, data) end
+		if link then link.onEvent(kind, data) end
+		if linkTrigger then linkTrigger.onEvent(kind, data) end
 	end,
 })
 if not client then
 	fail(nerr)
 	view:onEvent("status", "Network disabled", 0)
+else
+	-- The virtual link of a trade session (lib/virtuallink.lua, docs/virtual-link.md).
+	link = virtuallink.new(config.PLAYER_ID, {
+		sendLink = function(message) return client:sendTradeLink(message) end,
+		toRom = function(bytes) return pipe ~= nil and pipe.sendMessage(virtuallink.MSG_TYPE, bytes) end,
+		log = function(line) console:log(line) end,
+	})
+	-- Debug trigger until the Cable Club attendant starts trade sessions (#82/#83).
+	if config.TRADE_LINK_PARTNER ~= nil then
+		local partnerError = protocol.checkPlayerId(config.TRADE_LINK_PARTNER)
+		if partnerError then
+			fail("TRADE_LINK_PARTNER " .. partnerError .. "; the debug trade trigger is off")
+		else
+			linkTrigger = virtuallink.newDebugTrigger(link, config.TRADE_LINK_PARTNER)
+			console:log("[bridge] debug: a trade session with " .. config.TRADE_LINK_PARTNER
+				.. " starts once both players are online")
+		end
+	end
 end
 
 local box, ready = nil, false
@@ -129,6 +151,7 @@ end
 local function verifyRom()
 	-- A different ROM may already occupy RAM here; never write the old address.
 	if pipe then pipe.reset() end
+	if link then link.reset() end
 	pipe, box, ready, lastMailboxError = nil, nil, false, nil
 	view:setPlayerState(nil)
 	if client then
@@ -158,11 +181,16 @@ local function verifyRom()
 		lastMailboxError = reason
 		console:log("[bridge] waiting for mailbox: " .. reason)
 	end
-	-- Multi-slot messages (mailbox layout v2) are reassembled by the pipe. No
-	-- ROM message type is forwarded to the network yet (trading, #78/#81).
+	-- Multi-slot messages (mailbox layout v2) are reassembled by the pipe.
+	-- Virtual-link packets go to the trade partner; other types are ignored.
 	pipe = mailboxbridge.new(box, client or { setPlayerState = function() end }, view,
 		function(line) console:error(line) end,
 		function(msgType, data)
+			if link and msgType == virtuallink.MSG_TYPE then
+				local outcome = link.onRomMessage(data)
+				if outcome and linkTrigger then linkTrigger.onEnd(outcome) end
+				return
+			end
 			console:log(string.format("[bridge] ignoring mailbox message type %d (%d bytes)", msgType, #data))
 		end)
 end
@@ -206,6 +234,8 @@ local function updateNet()
 	if pipe and ready then
 		pipe.drainOutbound()
 		if client then client:update(now) end
+		if linkTrigger then linkTrigger.update(now) end
+		if link then link.update() end
 		pipe.flushInbound()
 	end
 	local text = view:update(now)
