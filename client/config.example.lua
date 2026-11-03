@@ -6,4 +6,7 @@ return {
 	PLAYER_ID = "your-player-id", -- unique per player: 1-16 of a-z, A-Z, 0-9, _ and -
 	JOIN_KEY = "", -- shared join key from the server host
 	DEBUG = false, -- true logs state/presence detail; the debug panel stays visible either way
+	-- Debug (#81): trade over the virtual link with this player once both are
+	-- online and in the overworld. Use disposable saves. See docs/virtual-link.md.
+	-- TRADE_LINK_PARTNER = "partner-id",
 }
