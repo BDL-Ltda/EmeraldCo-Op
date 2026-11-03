@@ -84,3 +84,12 @@ and client and play over the internet for at least 20 minutes. Earlier tests
 of development builds do not establish acceptance of the released artifacts.
 
 Never commit ROMs, saves, savestates, BIOS files, ELF/map build outputs or BPS patches. Build outputs remain local; `client/addresses.lua` is tracked generated data.
+
+## Virtual-link experiment (#80)
+
+The opt-in [virtual-link spike](virtual-link-spike.md) investigates reusing the
+vanilla trade screens over mailbox v2 and `trade_link`. It is not the production
+trade backend. The normal bridge never starts it; the dedicated spike harness
+uses disposable saves and requires two-instance emulator evidence before a
+go/no-go recommendation. Production timeout/cancel and session behavior remain
+in #81 and #83.
