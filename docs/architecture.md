@@ -85,11 +85,14 @@ of development builds do not establish acceptance of the released artifacts.
 
 Never commit ROMs, saves, savestates, BIOS files, ELF/map build outputs or BPS patches. Build outputs remain local; `client/addresses.lua` is tracked generated data.
 
-## Virtual-link experiment (#80)
+## Virtual link (v1.5)
 
-The opt-in [virtual-link spike](virtual-link-spike.md) investigates reusing the
-vanilla trade screens over mailbox v2 and `trade_link`. It is not the production
-trade backend. The normal bridge never starts it; the dedicated spike harness
-uses disposable saves and requires two-instance emulator evidence before a
-go/no-go recommendation. Production timeout/cancel and session behavior remain
-in #81 and #83.
+Trading reuses the vanilla trade screens. The [virtual link](virtual-link.md)
+([#81](https://github.com/BDL-Ltda/EmeraldCo-Op/issues/81), proven by the
+[#80 spike](virtual-link-spike.md)) carries their link-cable calls ROM to ROM
+as `COOP_MSG_LINK` mailbox messages and protocol `trade_link` messages, with Lua
+relaying them only to and from the trade partner. It is active only during a
+trade session. The ROM owns the 10-second partner timeout and the clean cancel
+before the save, which restores the party and never shows the vanilla link
+error screen. Starting sessions from the attendant and the full session belong
+to #82 and #83; until then a debug trigger in `client/config.lua` starts one.

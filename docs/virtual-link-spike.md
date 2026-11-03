@@ -1,5 +1,10 @@
 # Virtual-link spike (#80)
 
+> **Superseded by the production [virtual link](virtual-link.md) (#81).** The
+> spike's adapter (`link_spike.c`), its `client/spike/link*.lua` harness and the
+> temporary message types below were replaced. This page records the findings;
+> the harness can still be read at parent commit `09af287`.
+
 **Decision: GO for #81. Status: spike findings and emulator investigation complete;
 PR checks, human review and merge still apply.** This is an opt-in experiment,
 not the production backend from #81 or the trade-session controller from #83.
