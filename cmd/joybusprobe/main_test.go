@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -64,11 +65,7 @@ func TestProbeAgainstModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dataLn.Close()
-	clockLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clockLn.Close()
+	clockLn := listenClock(t)
 
 	g := &fakeGBA{joystat: 0x08, trans: 0x12345678}
 	done := make(chan struct{})
@@ -124,11 +121,7 @@ func TestAcceptNeedsClockSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dataLn.Close()
-	clockLn, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clockLn.Close()
+	clockLn := listenClock(t)
 	c, err := net.Dial("tcp", dataLn.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -136,5 +129,85 @@ func TestAcceptNeedsClockSocket(t *testing.T) {
 	defer c.Close()
 	if _, err := accept(dataLn, clockLn, 100*time.Millisecond); err == nil {
 		t.Fatal("accept succeeded without a clock connection")
+	}
+}
+
+func listenClock(t *testing.T) *net.TCPListener {
+	t.Helper()
+	ln, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	return ln
+}
+
+// A timed-out attempt must not leave a clock Accept behind to steal the next
+// attempt's clock socket: the next valid pair connects with its own sockets,
+// and the abandoned data socket is closed.
+func TestAcceptRecoversAfterClockTimeout(t *testing.T) {
+	dataLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dataLn.Close()
+	clockLn := listenClock(t)
+
+	lone, err := net.Dial("tcp", dataLn.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lone.Close()
+	if _, err := accept(dataLn, clockLn, 100*time.Millisecond); err == nil {
+		t.Fatal("accept succeeded without a clock connection")
+	}
+
+	type pair struct{ data, clock net.Conn }
+	dialed := make(chan pair, 1)
+	go func() {
+		d, err := net.Dial("tcp", dataLn.Addr().String())
+		if err != nil {
+			t.Error(err)
+			close(dialed)
+			return
+		}
+		time.Sleep(20 * time.Millisecond) // mGBA connects data, then clock
+		c, err := net.Dial("tcp", clockLn.Addr().String())
+		if err != nil {
+			t.Error(err)
+			d.Close()
+			close(dialed)
+			return
+		}
+		dialed <- pair{d, c}
+	}()
+	l, err := accept(dataLn, clockLn, 2*time.Second)
+	if err != nil {
+		t.Fatalf("accept after a timeout: %v", err)
+	}
+	defer l.close()
+	p, ok := <-dialed
+	if !ok {
+		t.FailNow()
+	}
+	defer p.data.Close()
+	defer p.clock.Close()
+
+	// The accepted clock socket is the new one.
+	if _, err := p.clock.Write([]byte{0x5A}); err != nil {
+		t.Fatal(err)
+	}
+	l.clock.SetReadDeadline(time.Now().Add(time.Second))
+	var b [1]byte
+	if _, err := io.ReadFull(l.clock, b[:]); err != nil || b[0] != 0x5A {
+		t.Fatalf("clock socket read = %#x, %v; want the new pair's byte 0x5a", b[0], err)
+	}
+	// The timed-out attempt's data socket was closed, not left with no owner.
+	lone.SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := lone.Read(b[:]); err != io.EOF {
+		var ne net.Error
+		if errors.As(err, &ne) && ne.Timeout() {
+			t.Fatal("abandoned data socket is still open")
+		}
 	}
 }

@@ -184,32 +184,32 @@ func runSession(l *link, opts options, logf func(string, ...any)) (result, error
 }
 
 // accept waits for mGBA's two connections. mGBA connects the data socket
-// first, then the clock socket.
-func accept(data, clock net.Listener, clockWait time.Duration) (*link, error) {
+// first, then the clock socket. The clock accept is bounded by a listener
+// deadline rather than a goroutine, so a timed-out attempt leaves no pending
+// Accept behind to steal the clock socket of the next attempt.
+func accept(data net.Listener, clock *net.TCPListener, clockWait time.Duration) (*link, error) {
 	d, err := data.Accept()
 	if err != nil {
 		return nil, err
 	}
-	type accepted struct {
-		c   net.Conn
-		err error
-	}
-	ch := make(chan accepted, 1)
-	go func() {
-		c, err := clock.Accept()
-		ch <- accepted{c, err}
-	}()
-	select {
-	case a := <-ch:
-		if a.err != nil {
-			d.Close()
-			return nil, a.err
-		}
-		return &link{data: d, clock: a.c}, nil
-	case <-time.After(clockWait):
+	if err := clock.SetDeadline(time.Now().Add(clockWait)); err != nil {
 		d.Close()
-		return nil, errors.New("data socket connected but the clock socket did not")
+		return nil, err
 	}
+	c, err := clock.Accept()
+	if clearErr := clock.SetDeadline(time.Time{}); err == nil && clearErr != nil {
+		c.Close()
+		err = clearErr
+	}
+	if err != nil {
+		d.Close()
+		var ne net.Error
+		if errors.As(err, &ne) && ne.Timeout() {
+			return nil, errors.New("data socket connected but the clock socket did not")
+		}
+		return nil, err
+	}
+	return &link{data: d, clock: c}, nil
 }
 
 func main() {
@@ -223,7 +223,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	clock, err := net.Listen("tcp", net.JoinHostPort(*host, fmt.Sprint(*clockPort)))
+	clockAddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(*host, fmt.Sprint(*clockPort)))
+	if err != nil {
+		log.Fatal(err)
+	}
+	clock, err := net.ListenTCP("tcp", clockAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
