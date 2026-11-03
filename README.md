@@ -27,6 +27,7 @@ EmeraldCo-Op/
 │   ├── server/               # authenticated single-room presence relay
 │   ├── fakeclient/           # simulated walking player for server tests
 │   ├── echoserver/           # line echo server for client socket tests
+│   ├── joybusprobe/          # disposable spike probe for mGBA's Dolphin link (#70)
 │   └── symgen/               # ELF symbol generator and symbol allowlist
 ├── internal/                 # shared Go packages
 ├── client/                   # mGBA Lua client and example configuration
